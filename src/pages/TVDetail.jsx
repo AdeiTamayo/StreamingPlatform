@@ -7,6 +7,8 @@ import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
 
+const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
+
 export default function TVDetail() {
   const { id } = useParams();
   const [show, setShow] = useState(null);
@@ -21,6 +23,7 @@ export default function TVDetail() {
   const [watchedCount, setWatchedCount] = useState(0);
   const [episodes, setEpisodes] = useState([]);
   const progressTimer = useRef(null);
+  const watchedRef = useRef(false);
 
   const seasons = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
   const currentSeason = useMemo(() => seasons.find((s) => s.season_number === season), [seasons, season]);
@@ -59,6 +62,10 @@ export default function TVDetail() {
   }, [id, season, episode]);
 
   useEffect(() => {
+    watchedRef.current = watched;
+  }, [watched]);
+
+  useEffect(() => {
     setWatchedCount(getWatchedCount(id, season, episodeCount));
   }, [id, season, episodeCount, watched]);
 
@@ -76,6 +83,22 @@ export default function TVDetail() {
 
   function handleProgress(currentTime) {
     saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
+
+    if (watchedRef.current || !show) return;
+
+    const currentEpisode = episodes.find((item) => item.episode_number === episode);
+    const runtimeMinutes = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
+    if (!runtimeMinutes) return;
+
+    const runtimeSeconds = runtimeMinutes * 60;
+    const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
+
+    if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
+      markWatched('tv', id, `${show.name} S${season}E${episode}`, season, episode);
+      clearProgress('tv', id, season, episode);
+      watchedRef.current = true;
+      setWatched(true);
+    }
   }
 
   function toggleWatched() {
