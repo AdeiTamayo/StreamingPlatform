@@ -44,7 +44,7 @@ export default function MovieDetail() {
       clearProgress('movie', id);
       setWatched(false);
     } else {
-      markWatched('movie', id, movie.title, null, null);
+      markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
       clearProgress('movie', id);
       setWatched(true);
     }
@@ -109,10 +109,10 @@ export default function MovieDetail() {
             else { addWatchLater('movie', id, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
           }}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
           {startAt && (
-          <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', id); }}>
-            Restart from beginning
-          </button>
-        )}
+            <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', id); }}>
+              Restart from beginning
+            </button>
+          )}
         </div>
         <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} />
       </section>

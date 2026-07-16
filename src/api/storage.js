@@ -11,14 +11,18 @@ function progressKey(type, id, season, episode) {
 }
 
 function parseWatchedKey(k) {
-  const m = k.match(/^watched:tv-(\d+)-S(\d+)E(\d+)$/);
-  if (m) return { showId: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  let m = k.match(/^watched:tv-(\d+)-S(\d+)E(\d+)$/);
+  if (m) return { type: 'tv', showId: m[1], id: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  m = k.match(/^watched:movie-(.+)$/);
+  if (m) return { type: 'movie', id: m[1], season: null, episode: null };
   return null;
 }
 
 function parseProgressKey(k) {
-  const m = k.match(/^progress:tv-(\d+)-S(\d+)E(\d+)$/);
-  if (m) return { showId: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  let m = k.match(/^progress:tv-(\d+)-S(\d+)E(\d+)$/);
+  if (m) return { type: 'tv', showId: m[1], id: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  m = k.match(/^progress:movie-(.+)$/);
+  if (m) return { type: 'movie', id: m[1], season: null, episode: null };
   return null;
 }
 
@@ -26,10 +30,12 @@ export function isWatched(type, id, season, episode) {
   return localStorage.getItem(watchedKey(type, id, season, episode)) !== null;
 }
 
-export function markWatched(type, id, title, season, episode) {
+export function markWatched(type, id, title, season, episode, meta) {
+  const data = { type, id, title, season, episode, watchedAt: Date.now() };
+  if (meta) data.meta = meta;
   localStorage.setItem(
     watchedKey(type, id, season, episode),
-    JSON.stringify({ type, id, title, watchedAt: Date.now() })
+    JSON.stringify(data)
   );
 }
 
@@ -46,9 +52,9 @@ export function getLastWatchedEpisode(showId) {
       try {
         const data = JSON.parse(localStorage.getItem(k));
         if (!last || data.watchedAt > last.watchedAt) {
-          last = { ...p, watchedAt: data.watchedAt };
+          last = { ...p, season: data.season ?? p.season, episode: data.episode ?? p.episode, watchedAt: data.watchedAt };
         }
-      } catch {}
+      } catch { }
     }
   }
   return last;
@@ -98,27 +104,54 @@ export function isInWatchLater(type, id) {
 
 // Last Seen
 export function getLastSeen() {
-  const map = {};
+  const items = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     if (k.startsWith('watched:')) {
       try {
         const data = JSON.parse(localStorage.getItem(k));
-        map[k] = { ...data, ts: data.watchedAt };
-      } catch {}
+        const parsed = parseWatchedKey(k);
+        if (parsed) {
+          items.push({
+            storageKey: k,
+            type: parsed.type,
+            id: data.id ?? parsed.id ?? parsed.showId,
+            title: data.title || data.meta?.title || null,
+            season: data.season ?? parsed.season ?? null,
+            episode: data.episode ?? parsed.episode ?? null,
+            ts: data.watchedAt || 0,
+            source: 'watched',
+            meta: data.meta || null,
+          });
+        }
+      } catch { }
     } else if (k.startsWith('progress:')) {
       try {
         const data = JSON.parse(localStorage.getItem(k));
         if (data.currentTime > 30) {
           const wKey = k.replace('progress:', 'watched:');
-          if (!map[wKey]) {
-            map[k] = { ...data, ts: data.savedAt, type: k.includes('movie') ? 'movie' : 'tv' };
+          if (!localStorage.getItem(wKey)) {
+            const parsed = parseProgressKey(k);
+            if (parsed) {
+              items.push({
+                storageKey: k,
+                type: parsed.type,
+                id: data.id ?? parsed.id ?? parsed.showId,
+                title: data.meta?.title || null,
+                season: data.season ?? parsed.season ?? null,
+                episode: data.episode ?? parsed.episode ?? null,
+                ts: data.savedAt || 0,
+                source: 'progress',
+                currentTime: data.currentTime,
+                meta: data.meta || null,
+              });
+            }
           }
         }
-      } catch {}
+      } catch { }
     }
   }
-  return Object.values(map).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  return items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 }
 
 // Continue Watching (has progress > 30s but NOT marked watched)
@@ -143,7 +176,7 @@ export function getContinueWatching() {
         savedAt: data.savedAt,
         meta: data.meta || null,
       });
-    } catch {}
+    } catch { }
   }
   return progressItems.sort((a, b) => b.savedAt - a.savedAt);
 }
@@ -158,7 +191,7 @@ export function getEpisodeWatchLater() {
     if (!k.startsWith(EP_WL_PREFIX)) continue;
     try {
       items.push(JSON.parse(localStorage.getItem(k)));
-    } catch {}
+    } catch { }
   }
   return items.sort((a, b) => b.addedAt - a.addedAt);
 }

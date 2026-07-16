@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl } from '../api/vidsrc';
 import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater } from '../api/storage';
@@ -11,6 +11,7 @@ const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
 export default function TVDetail() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const [show, setShow] = useState(null);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
@@ -24,6 +25,7 @@ export default function TVDetail() {
   const [episodes, setEpisodes] = useState([]);
   const progressTimer = useRef(null);
   const watchedRef = useRef(false);
+  const autoWatchedRef = useRef(null);
 
   const seasons = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
   const currentSeason = useMemo(() => seasons.find((s) => s.season_number === season), [seasons, season]);
@@ -42,8 +44,14 @@ export default function TVDetail() {
         const s = data.seasons?.filter((s) => s.season_number > 0) || [];
         if (s.length === 0) return;
         const firstSeason = s[0].season_number;
+        const requestedSeason = Number(searchParams.get('season'));
+        const requestedEpisode = Number(searchParams.get('episode'));
+        const requestedSeasonExists = requestedSeason > 0 && s.some((seasonItem) => seasonItem.season_number === requestedSeason);
         const last = getLastWatchedEpisode(id);
-        if (last && s.find((s) => s.season_number === last.season)) {
+        if (requestedSeasonExists && requestedEpisode > 0) {
+          setSeason(requestedSeason);
+          setEpisode(requestedEpisode);
+        } else if (last && s.find((seasonItem) => seasonItem.season_number === last.season)) {
           setSeason(last.season);
           setEpisode(last.episode);
         } else {
@@ -52,7 +60,7 @@ export default function TVDetail() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, searchParams]);
 
   useEffect(() => {
     setWatched(isWatched('tv', id, season, episode));
@@ -64,6 +72,10 @@ export default function TVDetail() {
   useEffect(() => {
     watchedRef.current = watched;
   }, [watched]);
+
+  useEffect(() => {
+    autoWatchedRef.current = null;
+  }, [season, episode]);
 
   useEffect(() => {
     setWatchedCount(getWatchedCount(id, season, episodeCount));
@@ -81,6 +93,17 @@ export default function TVDetail() {
     };
   }, []);
 
+  function autoMarkWatched() {
+    const episodeKey = `${season}-${episode}`;
+    if (!show || watchedRef.current || autoWatchedRef.current === episodeKey) return;
+    autoWatchedRef.current = episodeKey;
+    markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
+    clearProgress('tv', id, season, episode);
+    watchedRef.current = true;
+    setWatched(true);
+    setStartAt(null);
+  }
+
   function handleProgress(currentTime) {
     saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
 
@@ -94,11 +117,12 @@ export default function TVDetail() {
     const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
 
     if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
-      markWatched('tv', id, `${show.name} S${season}E${episode}`, season, episode);
-      clearProgress('tv', id, season, episode);
-      watchedRef.current = true;
-      setWatched(true);
+      autoMarkWatched();
     }
+  }
+
+  function handleEnded() {
+    autoMarkWatched();
   }
 
   function toggleWatched() {
@@ -107,7 +131,7 @@ export default function TVDetail() {
       clearProgress('tv', id, season, episode);
       setWatched(false);
     } else {
-      markWatched('tv', id, `${show.name} S${season}E${episode}`, season, episode);
+      markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
       clearProgress('tv', id, season, episode);
       setWatched(true);
     }
@@ -230,7 +254,13 @@ export default function TVDetail() {
             ))}
           </div>
         </div>
-        <Player key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`} src={embedUrl} title={`${show.name} S${season}E${episode}`} onProgress={handleProgress} />
+        <Player
+          key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
+          src={embedUrl}
+          title={`${show.name} S${season}E${episode}`}
+          onProgress={handleProgress}
+          onEnded={handleEnded}
+        />
         <div className="ep-nav">
           <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
           <span className="ep-nav-label">S{season} E{episode}</span>
