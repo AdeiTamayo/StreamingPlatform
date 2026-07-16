@@ -1,26 +1,36 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getPopularTV } from '../api/tmdb';
+import { getPopularTV, getTVGenres, discoverByGenre } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 
 export default function TVShows() {
   const [shows, setShows] = useState([]);
+  const [genres, setGenres] = useState([]);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [genre, setGenre] = useState('');
+
+  useEffect(() => {
+    getTVGenres().then((data) => setGenres(data.genres || [])).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    getPopularTV(page)
-      .then((data) => setShows(data.results || []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [page]);
+    const fetcher = genre ? discoverByGenre('tv', genre, page) : getPopularTV(page);
+    fetcher.then((data) => setShows(data.results || [])).catch(console.error).finally(() => setLoading(false));
+  }, [page, genre]);
 
   return (
     <div className="page">
       <Link to="/" className="home-link">Home</Link>
       <section className="section">
-        <h2 className="section-title">Popular TV Shows</h2>
+        <div className="section-header">
+          <h2 className="section-title">TV Shows</h2>
+          <select className="genre-select" value={genre} onChange={(e) => { setGenre(e.target.value); setPage(1); }}>
+            <option value="">All</option>
+            {genres.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
         {loading ? (
           <div className="loading">Loading...</div>
         ) : (

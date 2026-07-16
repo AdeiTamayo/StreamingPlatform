@@ -2,25 +2,29 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 import Player from '../components/Player';
 
 export default function MovieDetail() {
   const { id } = useParams();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
   const [startAt, setStartAt] = useState(null);
+  const [inWL, setInWL] = useState(false);
   const progressTimer = useRef(null);
 
   useEffect(() => {
     setLoading(true);
+    setError(false);
     setWatched(isWatched('movie', id));
+    setInWL(isInWatchLater('movie', id));
     const prog = getProgress('movie', id);
     setStartAt(prog?.currentTime || null);
     getMovieDetail(id)
       .then(setMovie)
-      .catch(console.error)
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -31,7 +35,7 @@ export default function MovieDetail() {
   }, []);
 
   function handleProgress(currentTime) {
-    saveProgress('movie', id, currentTime);
+    saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
   }
 
   function toggleWatched() {
@@ -47,6 +51,19 @@ export default function MovieDetail() {
   }
 
   if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
+  function retry() {
+    setLoading(true);
+    setError(false);
+    getMovieDetail(id).then(setMovie).catch(() => setError(true)).finally(() => setLoading(false));
+  }
+
+  if (error) return (
+    <div className="page">
+      <Link to="/" className="home-link">Home</Link>
+      <div className="loading">Failed to load. Check your connection.</div>
+      <div className="retry-bar"><button className="watch-toggle" onClick={retry}>Retry</button></div>
+    </div>
+  );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
   const embedUrl = getMovieEmbedUrl(id, startAt);
@@ -83,14 +100,20 @@ export default function MovieDetail() {
 
       <section className="section">
         <h2 className="section-title">Watch Now</h2>
-        <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
-          {watched ? 'Watched' : 'Mark as watched'}
-        </button>
-        {startAt && (
+        <div className="detail-actions">
+          <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
+            {watched ? 'Watched' : 'Mark as watched'}
+          </button>
+          <button className={`watch-toggle ${inWL ? 'in-wl' : ''}`} onClick={() => {
+            if (inWL) { removeWatchLater('movie', id); setInWL(false); }
+            else { addWatchLater('movie', id, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
+          }}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
+          {startAt && (
           <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', id); }}>
             Restart from beginning
           </button>
         )}
+        </div>
         <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} />
       </section>
     </div>

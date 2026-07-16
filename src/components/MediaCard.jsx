@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched } from '../api/storage';
 
 export default function MediaCard({ item, mediaType }) {
+  const [loaded, setLoaded] = useState(false);
   const type = mediaType || item.media_type || 'movie';
   const id = item.id;
   const title = item.title || item.name;
@@ -14,13 +16,29 @@ export default function MediaCard({ item, mediaType }) {
   return (
     <Link to={`/${type === 'tv' ? 'tv' : 'movie'}/${id}`} className="media-card">
       <div className="media-card-poster">
-        <img src={poster} alt={title} loading="lazy" />
-        <span className="media-card-rating">{rating}</span>
-        {watched && <span className="media-card-watched">Watched</span>}
+        {!loaded && <div className="media-card-skeleton" />}
+        <img
+          src={poster}
+          alt={title}
+          loading="lazy"
+          onLoad={() => setLoaded(true)}
+          style={{ opacity: loaded ? 1 : 0 }}
+        />
+        {loaded && <span className="media-card-rating">{rating}</span>}
+        {loaded && watched && <span className="media-card-watched">Watched</span>}
       </div>
       <div className="media-card-info">
-        <h3>{title}</h3>
-        {year && <span className="media-card-year">{year}</span>}
+        {!loaded ? (
+          <>
+            <div className="skeleton-text skeleton-title" />
+            <div className="skeleton-text skeleton-year" />
+          </>
+        ) : (
+          <>
+            <h3>{title}</h3>
+            {year && <span className="media-card-year">{year}</span>}
+          </>
+        )}
       </div>
     </Link>
   );

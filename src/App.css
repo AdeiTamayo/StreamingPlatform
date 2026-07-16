@@ -77,6 +77,34 @@
   margin-bottom: 1.25rem;
 }
 
+.sub-section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.75rem;
+  color: var(--text-muted);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.genre-select {
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.8rem;
+  outline: none;
+}
+
 /* Media Grid */
 .media-grid {
   display: grid;
@@ -136,6 +164,37 @@
 
 .media-card-info {
   padding: 0.6rem;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.media-card-skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-text {
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #111 25%, #222 50%, #111 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 80%;
+  margin-bottom: 6px;
+}
+
+.skeleton-year {
+  width: 40%;
 }
 
 .media-card-info h3 {
@@ -269,6 +328,28 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.badge-btn {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.badge-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text);
+}
+
+.badge-btn.in-wl {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
 .badge.rating {
   background: #f5c518;
   color: #000;
@@ -391,6 +472,19 @@
   background: #666;
 }
 
+.cs-item-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cs-item-num {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
 .custom-select-item {
   display: flex;
   align-items: center;
@@ -450,6 +544,86 @@
   opacity: 0.8;
 }
 
+.watch-toggle.in-wl {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+/* Watch Later page */
+.ep-wl-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100px;
+}
+
+.ep-wl-card a {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.ep-wl-card .media-card-info {
+  padding: 1rem;
+}
+
+.wl-remove {
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  border: none;
+  border-top: 1px solid var(--border);
+  transition: background 0.2s;
+}
+
+.wl-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Last Seen page */
+.last-seen-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.last-seen-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  transition: background 0.2s;
+}
+
+.last-seen-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ls-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.ls-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* Episode nav */
 .ep-nav {
   display: flex;
@@ -483,6 +657,139 @@
   font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+/* Retry bar */
+.retry-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 1.5rem;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  margin-top: 3rem;
+}
+
+.footer a {
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
+/* Settings */
+.settings-section {
+  margin-top: 1rem;
+}
+
+.settings-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.confirm-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.confirm-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.watch-toggle.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Continue Watching */
+.cw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.cw-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  transition: background 0.2s;
+}
+
+.cw-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cw-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.cw-progress {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Season Progress Bar */
+.season-progress {
+  margin-bottom: 0.75rem;
+}
+
+.sp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.sp-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.sp-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.sp-bar {
+  display: flex;
+  gap: 3px;
+}
+
+.sp-dot {
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  padding: 0;
+  min-width: 0;
+}
+
+.sp-dot:hover {
+  transform: scaleY(1.4);
+}
+
+.sp-dot.done {
+  background: #4ade80;
+}
+
+.sp-dot.current {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 /* Responsive */

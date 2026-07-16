@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { isWatched } from '../api/storage';
 
-export default function EpisodeDropdown({ showId, season, episode, episodeCount, onSelect }) {
+export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -13,25 +13,26 @@ export default function EpisodeDropdown({ showId, season, episode, episodeCount,
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const episodes = Array.from({ length: episodeCount }, (_, i) => i + 1);
-
   return (
     <div className="custom-select" ref={ref}>
       <button className="custom-select-trigger" onClick={() => setOpen(!open)}>
-        Episode {episode}
+        {episodes.find((e) => e.episode_number === episode)?.name || `Episode ${episode}`}
         <span className={`cs-arrow ${open ? 'open' : ''}`}>&#9662;</span>
       </button>
       {open && (
         <div className="custom-select-menu">
           {episodes.map((ep) => {
-            const watched = isWatched('tv', showId, season, ep);
+            const watched = isWatched('tv', showId, season, ep.episode_number);
             return (
               <button
-                key={ep}
-                className={`custom-select-item ${ep === episode ? 'active' : ''} ${watched ? 'watched' : ''}`}
-                onClick={() => { onSelect(ep); setOpen(false); }}
+                key={ep.episode_number}
+                className={`custom-select-item ${ep.episode_number === episode ? 'active' : ''} ${watched ? 'watched' : ''}`}
+                onClick={() => { onSelect(ep.episode_number); setOpen(false); }}
               >
-                <span>Episode {ep}</span>
+                <span className="cs-item-label">
+                  <span className="cs-item-num">{ep.episode_number}.</span>
+                  {ep.name}
+                </span>
                 {watched && <span className="cs-check">&#10003;</span>}
               </button>
             );

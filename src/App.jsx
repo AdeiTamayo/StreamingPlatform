@@ -5,6 +5,9 @@ import TVShows from './pages/TVShows';
 import MovieDetail from './pages/MovieDetail';
 import TVDetail from './pages/TVDetail';
 import Search from './pages/Search';
+import WatchLater from './pages/WatchLater';
+import LastSeen from './pages/LastSeen';
+import Settings from './pages/Settings';
 import './App.css';
 
 export default function App() {
@@ -17,7 +20,13 @@ export default function App() {
         <Route path="/movie/:id" element={<MovieDetail />} />
         <Route path="/tv/:id" element={<TVDetail />} />
         <Route path="/search" element={<Search />} />
+        <Route path="/watch-later" element={<WatchLater />} />
+        <Route path="/last-seen" element={<LastSeen />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
+      <footer className="footer">
+        <span>Powered by <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a></span>
+      </footer>
     </main>
   );
 }
