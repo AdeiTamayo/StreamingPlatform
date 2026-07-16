@@ -12,7 +12,7 @@ import './App.css';
 
 export default function App() {
   return (
-    <main>
+    <main className="app-shell">
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/movies" element={<Movies />} />
@@ -24,9 +24,6 @@ export default function App() {
         <Route path="/last-seen" element={<LastSeen />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
-      <footer className="footer">
-        <span>Powered by <a href="https://www.themoviedb.org/" target="_blank" rel="noopener noreferrer">TMDB</a></span>
-      </footer>
     </main>
   );
 }

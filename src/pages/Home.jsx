@@ -33,17 +33,17 @@ export default function Home() {
         <form className="hero-search" onSubmit={handleSearch}>
           <input
             type="text"
-            placeholder="Search movies & shows..."
+            placeholder="Search movies, shows, or actors..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          <button type="submit">Search</button>
         </form>
-        <div className="nav-links">
-          <Link to="/movies">Movies</Link>
-          <Link to="/tv">TV Shows</Link>
+        <div className="hero-actions">
           <Link to="/watch-later">Watch Later</Link>
           <Link to="/last-seen">Last Seen</Link>
-          <Link to="/settings">Settings</Link>
+          <Link to="/movies">Movies</Link>
+          <Link to="/tv">TV Shows</Link>
         </div>
       </section>
 

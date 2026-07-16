@@ -15,10 +15,18 @@ export default function Navbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/" className="logo">StreamFlow</Link>
-      <div className="nav-links">
+      <Link to="/" className="logo">
+        <span className="logo-mark">SF</span>
+        <span className="logo-text">
+          <strong>StreamFlow</strong>
+          <small>Browse. Watch. Save.</small>
+        </span>
+      </Link>
+      <div className="nav-links nav-links-primary">
         <Link to="/movies">Movies</Link>
         <Link to="/tv">TV Shows</Link>
+        <Link to="/watch-later">Watch Later</Link>
+        <Link to="/last-seen">Last Seen</Link>
       </div>
       <form className="search-form" onSubmit={handleSubmit}>
         <input
@@ -27,6 +35,7 @@ export default function Navbar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
+        <button type="submit">Search</button>
       </form>
     </nav>
   );
