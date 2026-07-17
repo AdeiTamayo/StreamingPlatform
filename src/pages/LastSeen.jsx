@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getLastSeen } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
+import CollectionSkeleton from '../components/CollectionSkeleton';
 
 const EPISODES_PER_PAGE = 6;
 
@@ -18,9 +19,12 @@ function formatEpisodeLabel(item) {
 export default function LastSeen() {
   const [items, setItems] = useState([]);
   const [pages, setPages] = useState({});
+  const [hideWatched, setHideWatched] = useState({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setItems(getLastSeen());
+    setLoading(false);
   }, []);
 
   const { series, movies } = useMemo(() => {
@@ -68,17 +72,27 @@ export default function LastSeen() {
       <Link to="/" className="home-link">Home</Link>
       <section className="section">
         <h2 className="section-title">Last Seen</h2>
-        {items.length === 0 ? (
-          <div className="loading">No activity yet</div>
+        {loading ? (
+          <>
+            <CollectionSkeleton variant="history" count={3} />
+          </>
+        ) : items.length === 0 ? (
+          <div className="empty-state">
+            <h3>No history yet</h3>
+            <p>Your watched episodes and resume points will appear here as you start playing something.</p>
+            <Link to="/tv" className="empty-state-action">Browse TV shows</Link>
+          </div>
         ) : (
           <>
             {series.length > 0 && (
               <div className="last-seen-groups">
-                {series.map((show) => {
+                  {series.map((show) => {
+                  const hidden = hideWatched[show.id] || false;
+                  const filtered = hidden ? show.episodes.filter((ep) => ep.source === 'progress') : show.episodes;
                   const currentPage = pages[show.id] || 0;
-                  const pageCount = Math.max(1, Math.ceil(show.episodes.length / EPISODES_PER_PAGE));
+                  const pageCount = Math.max(1, Math.ceil(filtered.length / EPISODES_PER_PAGE));
                   const safePage = Math.min(currentPage, pageCount - 1);
-                  const visibleEpisodes = show.episodes.slice(safePage * EPISODES_PER_PAGE, (safePage + 1) * EPISODES_PER_PAGE);
+                  const visibleEpisodes = filtered.slice(safePage * EPISODES_PER_PAGE, (safePage + 1) * EPISODES_PER_PAGE);
 
                   return (
                     <article key={show.id} className="last-seen-series">
@@ -90,7 +104,12 @@ export default function LastSeen() {
                             <p className="last-seen-series-subtitle">{show.episodes.length} saved episode{show.episodes.length === 1 ? '' : 's'}</p>
                           </div>
                         </div>
-                        <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
+                        <div className="last-seen-series-actions">
+                          <button className={`watch-toggle ${hidden ? 'in-wl' : ''}`} onClick={() => setHideWatched((prev) => ({ ...prev, [show.id]: !hidden }))}>
+                            {hidden ? 'Show all' : 'Hide watched'}
+                          </button>
+                          <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
+                        </div>
                       </div>
 
                       <div className="last-seen-episode-list">

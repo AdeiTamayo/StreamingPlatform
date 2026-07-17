@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getWatchLater, removeWatchLater, getEpisodeWatchLater, removeEpisodeWatchLater } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
+import CollectionSkeleton from '../components/CollectionSkeleton';
 
 export default function WatchLater() {
   const [items, setItems] = useState([]);
   const [epItems, setEpItems] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setItems(getWatchLater());
     setEpItems(getEpisodeWatchLater());
+    setLoading(false);
   }, []);
 
   function handleRemove(type, id) {
@@ -27,8 +30,14 @@ export default function WatchLater() {
       <Link to="/" className="home-link">Home</Link>
       <section className="section">
         <h2 className="section-title">Watch Later</h2>
-        {items.length === 0 && epItems.length === 0 ? (
-          <div className="loading">Nothing saved yet</div>
+        {loading ? (
+          <CollectionSkeleton variant="grid" count={6} />
+        ) : items.length === 0 && epItems.length === 0 ? (
+          <div className="empty-state">
+            <h3>Nothing saved yet</h3>
+            <p>Add movies, shows, or individual episodes to watch later and they’ll show up here.</p>
+            <Link to="/movies" className="empty-state-action">Start browsing</Link>
+          </div>
         ) : (
           <>
             {items.length > 0 && (

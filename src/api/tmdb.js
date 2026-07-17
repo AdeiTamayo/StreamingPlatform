@@ -72,6 +72,14 @@ export async function searchMulti(query, page = 1) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/multi?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
 }
 
+export async function searchMovies(query, page = 1) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/movie?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
+}
+
+export async function searchTV(query, page = 1) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/tv?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
+}
+
 export async function getMovieDetail(id) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits`);
 }
@@ -97,8 +105,20 @@ export async function getTVGenres() {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/tv/list?api_key=${CONFIG.TMDB_API_KEY}`);
 }
 
-export async function discoverByGenre(type, genreId, page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/discover/${type}?api_key=${CONFIG.TMDB_API_KEY}&with_genres=${genreId}&page=${page}`);
+export async function getCountries() {
+  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/countries?api_key=${CONFIG.TMDB_API_KEY}`);
+  return data.sort((a, b) => a.english_name.localeCompare(b.english_name));
+}
+
+export async function discover(type, filters, page = 1) {
+  let url = `${CONFIG.TMDB_BASE_URL}/discover/${type}?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`;
+  if (filters?.genreId) url += `&with_genres=${filters.genreId}`;
+  if (filters?.country) url += `&with_origin_country=${filters.country}`;
+  if (filters?.year) url += type === 'tv' ? `&first_air_date_year=${filters.year}` : `&primary_release_year=${filters.year}`;
+  if (filters?.sortBy) url += `&sort_by=${filters.sortBy}`;
+  if (filters?.releaseDateGte) url += type === 'tv' ? `&first_air_date.gte=${filters.releaseDateGte}` : `&primary_release_date.gte=${filters.releaseDateGte}`;
+  if (filters?.releaseDateLte) url += type === 'tv' ? `&first_air_date.lte=${filters.releaseDateLte}` : `&primary_release_date.lte=${filters.releaseDateLte}`;
+  return fetchWithFallback(url);
 }
 
 export function imageUrl(path, size = 'w500') {
