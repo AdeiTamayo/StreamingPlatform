@@ -37,8 +37,8 @@ export default function TVShows() {
   const sortOptionList = [{ value: '', label: 'Sort by' }, ...sortOptions];
 
   useEffect(() => {
-    getTVGenres().then((data) => setGenres(data.genres || [])).catch(() => {});
-    getCountries().then(setCountries).catch(() => {});
+    getTVGenres().then((data) => setGenres(data.genres || [])).catch(() => { });
+    getCountries().then(setCountries).catch(() => { });
   }, []);
 
   useEffect(() => {

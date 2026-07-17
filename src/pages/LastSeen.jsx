@@ -86,7 +86,7 @@ export default function LastSeen() {
           <>
             {series.length > 0 && (
               <div className="last-seen-groups">
-                  {series.map((show) => {
+                {series.map((show) => {
                   const hidden = hideWatched[show.id] || false;
                   const filtered = hidden ? show.episodes.filter((ep) => ep.source === 'progress') : show.episodes;
                   const currentPage = pages[show.id] || 0;

@@ -37,8 +37,8 @@ export default function Movies() {
   const sortOptionList = [{ value: '', label: 'Sort by' }, ...sortOptions];
 
   useEffect(() => {
-    getMovieGenres().then((data) => setGenres(data.genres || [])).catch(() => {});
-    getCountries().then(setCountries).catch(() => {});
+    getMovieGenres().then((data) => setGenres(data.genres || [])).catch(() => { });
+    getCountries().then(setCountries).catch(() => { });
   }, []);
 
   useEffect(() => {
