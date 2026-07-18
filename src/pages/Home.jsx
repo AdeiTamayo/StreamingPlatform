@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { getTrending } from '../api/tmdb';
+import { Link } from 'react-router-dom';
+import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
-import { getContinueWatching } from '../api/storage';
+import { getContinueWatching, getProgress } from '../api/storage';
 
 export default function Home() {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [continueWatching, setContinueWatching] = useState([]);
-  const [query, setQuery] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
+    document.title = 'StreamFlow';
     setContinueWatching(getContinueWatching());
     getTrending('all')
       .then((data) => setTrending(data.results || []))
@@ -19,50 +18,40 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []);
 
-  function handleSearch(e) {
-    e.preventDefault();
-    if (query.trim()) {
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-      setQuery('');
-    }
-  }
-
   return (
     <div className="page">
-      <section className="hero">
-        <form className="hero-search" onSubmit={handleSearch}>
-          <input
-            type="text"
-            placeholder="Search movies, shows, or actors..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button type="submit">Search</button>
-        </form>
-        <div className="hero-actions">
-          <Link to="/watch-later">Watch Later</Link>
-          <Link to="/last-seen">Last Seen</Link>
-          <Link to="/movies">Movies</Link>
-          <Link to="/tv">TV Shows</Link>
-        </div>
-      </section>
-
       {continueWatching.length > 0 && (
         <section className="section">
           <h2 className="section-title">Continue Watching</h2>
-          <div className="cw-list">
+          <div className="cw-grid">
             {continueWatching.map((item, i) => {
-              const mins = Math.floor(item.currentTime / 60);
-              const secs = Math.floor(item.currentTime % 60);
               const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
+              const poster = item.meta?.poster;
+              const prog = getProgress(item.type, item.id, item.season, item.episode);
+              const runtime = item.type === 'movie' ? null : null;
+              const pct = prog?.currentTime && prog?.runtime ? Math.min(100, Math.round((prog.currentTime / prog.runtime) * 100)) : null;
               return (
                 <Link
                   key={`${item.type}-${item.id}-${item.episode || ''}-${i}`}
-                  to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}`}
-                  className="cw-item"
+                  to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
+                  className="cw-card"
                 >
-                  <span className="cw-label">{label}{item.episode ? ` S${item.season}E${item.episode}` : ''}</span>
-                  <span className="cw-progress">{mins}:{String(secs).padStart(2, '0')}</span>
+                  <div className="cw-card-poster">
+                    {poster ? (
+                      <img src={imageUrl(poster)} alt={label} loading="lazy" />
+                    ) : (
+                      <div className="cw-card-placeholder" />
+                    )}
+                    {pct !== null && (
+                      <div className="cw-card-bar">
+                        <div className="cw-card-bar-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="cw-card-info">
+                    <span className="cw-card-label">{label}</span>
+                    {item.season && <span className="cw-card-meta">S{item.season}E{item.episode}</span>}
+                  </div>
                 </Link>
               );
             })}

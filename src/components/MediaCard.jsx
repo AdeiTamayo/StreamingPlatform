@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
-import { isWatched } from '../api/storage';
+import { isWatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 
 export default function MediaCard({ item, mediaType }) {
   const [loaded, setLoaded] = useState(false);
+  const [inWL, setInWL] = useState(() => isInWatchLater(mediaType || item.media_type || 'movie', item.id));
   const type = mediaType || item.media_type || 'movie';
   const id = item.id;
   const title = item.title || item.name;
@@ -12,6 +13,18 @@ export default function MediaCard({ item, mediaType }) {
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '?';
   const poster = imageUrl(item.poster_path);
   const watched = type === 'movie' && isWatched('movie', id);
+
+  function toggleWL(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inWL) {
+      removeWatchLater(type, id);
+      setInWL(false);
+    } else {
+      addWatchLater(type, id, title, year, poster);
+      setInWL(true);
+    }
+  }
 
   return (
     <Link to={`/${type === 'tv' ? 'tv' : 'movie'}/${id}`} className="media-card">
@@ -26,6 +39,11 @@ export default function MediaCard({ item, mediaType }) {
         />
         {loaded && <span className="media-card-rating">{rating}</span>}
         {loaded && watched && <span className="media-card-watched">Watched</span>}
+        {loaded && (
+          <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>
+            {inWL ? '\u2605' : '\u2606'}
+          </button>
+        )}
       </div>
       <div className="media-card-info">
         {!loaded ? (

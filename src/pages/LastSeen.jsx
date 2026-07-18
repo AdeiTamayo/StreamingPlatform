@@ -23,6 +23,7 @@ export default function LastSeen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.title = 'Last Seen - StreamFlow';
     setItems(getLastSeen());
     setLoading(false);
   }, []);
@@ -80,7 +81,6 @@ export default function LastSeen() {
 
   return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <section className="section">
         <h2 className="section-title">Last Seen</h2>
         {loading ? (

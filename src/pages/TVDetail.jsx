@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl } from '../api/vidsrc';
 import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
+import MediaCard from '../components/MediaCard';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
@@ -23,7 +24,8 @@ export default function TVDetail() {
   const [inEpWL, setInEpWL] = useState(false);
   const [watchedCount, setWatchedCount] = useState(0);
   const [episodes, setEpisodes] = useState([]);
-  const progressTimer = useRef(null);
+  const [trailerKey, setTrailerKey] = useState(null);
+  const [showTrailer, setShowTrailer] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(null);
 
@@ -39,10 +41,16 @@ export default function TVDetail() {
     setError(false);
     watchedRef.current = false;
     autoWatchedRef.current = null;
+    setTrailerKey(null);
+    setShowTrailer(false);
     getTVDetail(id)
       .then((data) => {
         setShow(data);
+        document.title = `${data.name} - StreamFlow`;
         setInWL(isInWatchLater('tv', id));
+        const vids = data.videos?.results || [];
+        const yt = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+        if (yt) setTrailerKey(yt.key);
         const s = data.seasons?.filter((s) => s.season_number > 0) || [];
         if (s.length === 0) return;
         const firstSeason = s[0].season_number;
@@ -90,12 +98,6 @@ export default function TVDetail() {
       setEpisodes(data.episodes || []);
     }).catch(() => { });
   }, [id, season]);
-
-  useEffect(() => {
-    return () => {
-      if (progressTimer.current) clearInterval(progressTimer.current);
-    };
-  }, []);
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
@@ -169,7 +171,6 @@ export default function TVDetail() {
 
   if (error) return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <div className="loading">Failed to load. Check your connection.</div>
       <div className="retry-bar"><button className="watch-toggle" onClick={retry}>Retry</button></div>
     </div>
@@ -181,10 +182,10 @@ export default function TVDetail() {
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
   const genres = show.genres?.map((g) => g.name).join(', ') || '';
+  const recommendations = show.recommendations?.results?.slice(0, 10) || [];
 
   return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <div className="detail-header" style={{ backgroundImage: `url(${backdrop})` }}>
         <div className="detail-header-overlay">
           <div className="detail-poster">
@@ -236,6 +237,11 @@ export default function TVDetail() {
             if (inEpWL) { removeEpisodeWatchLater(id, season, episode); setInEpWL(false); }
             else { addEpisodeWatchLater(id, season, episode, show.name); setInEpWL(true); }
           }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
+          {trailerKey && (
+            <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
+              {showTrailer ? 'Hide Trailer' : 'Trailer'}
+            </button>
+          )}
           {startAt && (
             <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', id, season, episode); }}>
               Restart
@@ -258,14 +264,26 @@ export default function TVDetail() {
             ))}
           </div>
         </div>
-        <Player
-          key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
-          src={embedUrl}
-          title={`${show.name} S${season}E${episode}`}
-          onProgress={handleProgress}
-          onEnded={handleEnded}
-          runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
-        />
+        {showTrailer && trailerKey ? (
+          <div className="trailer-wrapper">
+            <iframe
+              src={`https://www.youtube.com/embed/${trailerKey}`}
+              title="Trailer"
+              allow="autoplay; fullscreen; encrypted-media"
+              allowFullScreen
+              className="player-iframe"
+            />
+          </div>
+        ) : (
+          <Player
+            key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
+            src={embedUrl}
+            title={`${show.name} S${season}E${episode}`}
+            onProgress={handleProgress}
+            onEnded={handleEnded}
+            runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
+          />
+        )}
         <div className="ep-nav">
           <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
           <span className="ep-nav-label">S{season} E{episode}</span>
@@ -273,6 +291,17 @@ export default function TVDetail() {
           <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
         </div>
       </section>
+
+      {recommendations.length > 0 && (
+        <section className="section">
+          <h2 className="section-title">You might also like</h2>
+          <div className="media-grid">
+            {recommendations.map((item) => (
+              <MediaCard key={item.id} item={item} mediaType="tv" />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

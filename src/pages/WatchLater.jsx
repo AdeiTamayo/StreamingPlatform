@@ -10,6 +10,7 @@ export default function WatchLater() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    document.title = 'Watch Later - StreamFlow';
     setItems(getWatchLater());
     setEpItems(getEpisodeWatchLater());
     setLoading(false);
@@ -27,7 +28,6 @@ export default function WatchLater() {
 
   return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <section className="section">
         <h2 className="section-title">Watch Later</h2>
         {loading ? (

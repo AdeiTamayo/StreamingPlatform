@@ -15,14 +15,8 @@ export default function Navbar() {
 
   return (
     <nav className="navbar">
-      <Link to="/" className="logo">
-        <span className="logo-mark">SF</span>
-        <span className="logo-text">
-          <strong>StreamFlow</strong>
-          <small>Browse. Watch. Save.</small>
-        </span>
-      </Link>
       <div className="nav-links nav-links-primary">
+        <Link to="/">Home</Link>
         <Link to="/movies">Movies</Link>
         <Link to="/tv">TV Shows</Link>
         <Link to="/watch-later">Watch Later</Link>

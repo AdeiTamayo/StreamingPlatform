@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl } from '../api/vidsrc';
 import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 import Player from '../components/Player';
+import MediaCard from '../components/MediaCard';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
@@ -15,7 +16,8 @@ export default function MovieDetail() {
   const [watched, setWatched] = useState(false);
   const [startAt, setStartAt] = useState(null);
   const [inWL, setInWL] = useState(false);
-  const progressTimer = useRef(null);
+  const [trailerKey, setTrailerKey] = useState(null);
+  const [showTrailer, setShowTrailer] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
 
@@ -28,17 +30,19 @@ export default function MovieDetail() {
     setStartAt(prog?.currentTime || null);
     watchedRef.current = isWatched('movie', id);
     autoWatchedRef.current = false;
+    setTrailerKey(null);
+    setShowTrailer(false);
     getMovieDetail(id)
-      .then(setMovie)
+      .then((data) => {
+        setMovie(data);
+        document.title = `${data.title} - StreamFlow`;
+        const vids = data.videos?.results || [];
+        const yt = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+        if (yt) setTrailerKey(yt.key);
+      })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [id]);
-
-  useEffect(() => {
-    return () => {
-      if (progressTimer.current) clearInterval(progressTimer.current);
-    };
-  }, []);
 
   function autoMarkWatched() {
     if (!movie || watchedRef.current || autoWatchedRef.current) return;
@@ -87,7 +91,6 @@ export default function MovieDetail() {
 
   if (error) return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <div className="loading">Failed to load. Check your connection.</div>
       <div className="retry-bar"><button className="watch-toggle" onClick={retry}>Retry</button></div>
     </div>
@@ -99,10 +102,10 @@ export default function MovieDetail() {
   const year = (movie.release_date || '').slice(0, 4);
   const cast = movie.credits?.cast?.slice(0, 8) || [];
   const genres = movie.genres?.map((g) => g.name).join(', ') || '';
+  const recommendations = movie.recommendations?.results?.slice(0, 10) || [];
 
   return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <div className="detail-header" style={{ backgroundImage: `url(${backdrop})` }}>
         <div className="detail-header-overlay">
           <div className="detail-poster">
@@ -136,14 +139,43 @@ export default function MovieDetail() {
             if (inWL) { removeWatchLater('movie', id); setInWL(false); }
             else { addWatchLater('movie', id, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
           }}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
+          {trailerKey && (
+            <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
+              {showTrailer ? 'Hide Trailer' : 'Trailer'}
+            </button>
+          )}
           {startAt && (
             <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', id); }}>
               Restart from beginning
             </button>
           )}
         </div>
-        <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
+        {showTrailer && trailerKey && (
+          <div className="trailer-wrapper">
+            <iframe
+              src={`https://www.youtube.com/embed/${trailerKey}`}
+              title="Trailer"
+              allow="autoplay; fullscreen; encrypted-media"
+              allowFullScreen
+              className="player-iframe"
+            />
+          </div>
+        )}
+        {!showTrailer && (
+          <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
+        )}
       </section>
+
+      {recommendations.length > 0 && (
+        <section className="section">
+          <h2 className="section-title">You might also like</h2>
+          <div className="media-grid">
+            {recommendations.map((item) => (
+              <MediaCard key={item.id} item={item} mediaType="movie" />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

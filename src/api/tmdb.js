@@ -29,7 +29,24 @@ function getCached(url) {
 function setCache(url, data) {
   try {
     localStorage.setItem(cacheKey(url), JSON.stringify({ data, ts: Date.now() }));
+    pruneCache();
   } catch {}
+}
+
+function pruneCache() {
+  const entries = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith('tmdb:')) continue;
+    try {
+      const { ts } = JSON.parse(localStorage.getItem(k));
+      entries.push({ k, ts });
+    } catch {}
+  }
+  if (entries.length <= 120) return;
+  entries.sort((a, b) => a.ts - b.ts);
+  const toRemove = entries.slice(0, entries.length - 100);
+  toRemove.forEach((e) => localStorage.removeItem(e.k));
 }
 
 async function fetchJson(url, retries = 2) {
@@ -81,11 +98,21 @@ export async function searchTV(query, page = 1) {
 }
 
 export async function getMovieDetail(id) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits`);
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`);
 }
 
 export async function getTVDetail(id) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits`);
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`);
+}
+
+export async function getMovieRecommendations(id) {
+  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}/recommendations?api_key=${CONFIG.TMDB_API_KEY}`);
+  return data.results || [];
+}
+
+export async function getTVRecommendations(id) {
+  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/recommendations?api_key=${CONFIG.TMDB_API_KEY}`);
+  return data.results || [];
 }
 
 export async function getTVSeasons(id) {

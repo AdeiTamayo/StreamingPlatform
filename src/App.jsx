@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Movies from './pages/Movies';
 import TVShows from './pages/TVShows';
@@ -8,11 +9,13 @@ import Search from './pages/Search';
 import WatchLater from './pages/WatchLater';
 import LastSeen from './pages/LastSeen';
 import Settings from './pages/Settings';
+import NotFound from './pages/NotFound';
 import './App.css';
 
 export default function App() {
   return (
     <main className="app-shell">
+      <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/movies" element={<Movies />} />
@@ -23,6 +26,7 @@ export default function App() {
         <Route path="/watch-later" element={<WatchLater />} />
         <Route path="/last-seen" element={<LastSeen />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </main>
   );

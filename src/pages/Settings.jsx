@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Settings() {
   const [confirm, setConfirm] = useState(false);
   const navigate = useNavigate();
+  useEffect(() => { document.title = 'Settings - StreamFlow'; }, []);
 
   function clearAll() {
     const keys = [];
@@ -20,7 +21,6 @@ export default function Settings() {
 
   return (
     <div className="page">
-      <Link to="/" className="home-link">Home</Link>
       <section className="section">
         <h2 className="section-title">Settings</h2>
         <div className="settings-section">
