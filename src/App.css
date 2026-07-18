@@ -1042,6 +1042,13 @@
   background: #666;
 }
 
+.custom-select-empty {
+  padding: 0.5rem 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .cs-item-label {
   display: flex;
   align-items: center;
@@ -1076,6 +1083,10 @@
 
 .custom-select-item.active {
   background: rgba(125, 211, 252, 0.16);
+}
+
+.custom-select-item.highlighted {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .custom-select-item.watched {
@@ -1248,6 +1259,18 @@
   gap: 0.4rem;
 }
 
+.last-seen-episode-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.last-seen-episode-row .last-seen-episode,
+.last-seen-episode-row .last-seen-item {
+  flex: 1;
+  min-width: 0;
+}
+
 .last-seen-episode,
 .last-seen-item {
   display: flex;
@@ -1258,6 +1281,29 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   transition: background 0.2s, border-color 0.2s;
+}
+
+.ls-remove {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.ls-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 .last-seen-episode:hover,
@@ -1313,6 +1359,32 @@
   font-size: 0.8rem;
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.ep-nav-watch {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  padding: 0;
+}
+
+.ep-nav-watch:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ep-nav-watch.watched {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
 }
 
 /* Retry bar */

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { getPopularMovies, getMovieGenres, getCountries, discover, searchMovies } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import FilterBar from '../components/FilterBar';
+import FilterDropdown from '../components/FilterDropdown';
+import DatePickerField from '../components/DatePickerField';
 
 const years = Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i);
 
@@ -15,6 +17,7 @@ const sortOptions = [
 ];
 
 const yearOptions = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
+const sortOptionList = [{ value: '', label: 'Sort by' }, ...sortOptions];
 
 export default function Movies() {
   const [movies, setMovies] = useState([]);
@@ -34,7 +37,6 @@ export default function Movies() {
 
   const countryOptions = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
   const genreOptions = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
-  const sortOptionList = [{ value: '', label: 'Sort by' }, ...sortOptions];
 
   useEffect(() => {
     getMovieGenres().then((data) => setGenres(data.genres || [])).catch(() => { });
@@ -68,24 +70,22 @@ export default function Movies() {
           <FilterBar
             countryValue={country}
             genreValue={genre}
-            yearValue={year}
-            sortValue={sortBy}
-            releaseDateFrom={releaseDateFrom}
-            releaseDateUntil={releaseDateUntil}
             showMore={showMore}
             onToggleShowMore={() => setShowMore((s) => !s)}
             onCountryChange={(value) => { setCountry(value); setPage(1); }}
             onGenreChange={(value) => { setGenre(value); setPage(1); }}
-            onYearChange={(value) => { setYear(value); setPage(1); }}
-            onSortChange={(value) => { setSortBy(value); setPage(1); }}
-            onReleaseDateFromChange={(value) => { setReleaseDateFrom(value); setPage(1); }}
-            onReleaseDateUntilChange={(value) => { setReleaseDateUntil(value); setPage(1); }}
             countryOptions={countryOptions}
             genreOptions={genreOptions}
-            yearOptions={yearOptions}
-            sortOptions={sortOptionList}
           />
         </div>
+        {showMore && (
+          <div className="more-filters-panel">
+            <DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
+            <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
+            <FilterDropdown value={year} options={yearOptions} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} />
+            <FilterDropdown value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} />
+          </div>
+        )}
         <div className="search-bar">
           <input
             className="search-input"

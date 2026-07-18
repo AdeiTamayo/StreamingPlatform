@@ -61,7 +61,7 @@ export function getLastWatchedEpisode(showId) {
 }
 
 export function saveProgress(type, id, currentTime, season, episode, meta) {
-  const data = { currentTime, savedAt: Date.now() };
+  const data = { type, id, currentTime, savedAt: Date.now(), season, episode };
   if (meta) data.meta = meta;
   localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getLastSeen } from '../api/storage';
+import { getLastSeen, markUnwatched, clearProgress } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 
@@ -63,6 +63,17 @@ export default function LastSeen() {
     return { series: groupedSeries, movies: sortedMovies };
   }, [items]);
 
+  function handleRemove(item) {
+    if (item.type === 'movie') {
+      markUnwatched('movie', item.id);
+      clearProgress('movie', item.id);
+    } else if (item.season && item.episode) {
+      markUnwatched('tv', item.id, item.season, item.episode);
+      clearProgress('tv', item.id, item.season, item.episode);
+    }
+    setItems(getLastSeen());
+  }
+
   function setPage(showId, nextPage) {
     setPages((current) => ({ ...current, [showId]: nextPage }));
   }
@@ -114,14 +125,16 @@ export default function LastSeen() {
 
                       <div className="last-seen-episode-list">
                         {visibleEpisodes.map((item) => (
-                          <Link
-                            key={item.storageKey}
-                            to={`/tv/${show.id}?season=${item.season}&episode=${item.episode}`}
-                            className="last-seen-episode"
-                          >
-                            <span className="ls-label">{formatEpisodeLabel(item)}</span>
-                            <span className="ls-meta">{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
-                          </Link>
+                          <div key={item.storageKey} className="last-seen-episode-row">
+                            <Link
+                              to={`/tv/${show.id}?season=${item.season}&episode=${item.episode}`}
+                              className="last-seen-episode"
+                            >
+                              <span className="ls-label">{formatEpisodeLabel(item)}</span>
+                              <span className="ls-meta">{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
+                            </Link>
+                            <button className="ls-remove" onClick={() => handleRemove(item)} title="Remove">&times;</button>
+                          </div>
                         ))}
                       </div>
 
@@ -141,12 +154,19 @@ export default function LastSeen() {
             {movies.length > 0 && (
               <section className="section last-seen-movies">
                 <h3 className="sub-section-title">Movies</h3>
-                <div className="last-seen-list">
+                <div className="media-grid">
                   {movies.map((item) => (
-                    <Link key={item.storageKey} to={`/movie/${item.id}`} className="last-seen-item">
-                      <span className="ls-label">{item.title || `Movie ${item.id}`}</span>
-                      <span className="ls-meta">Movie</span>
-                    </Link>
+                    <div key={item.storageKey} className="media-card">
+                      <Link to={`/movie/${item.id}`}>
+                        <div className="media-card-poster">
+                          <img src={imageUrl(item.meta?.poster)} alt={item.title} loading="lazy" />
+                        </div>
+                        <div className="media-card-info">
+                          <h3>{item.title || `Movie ${item.id}`}</h3>
+                        </div>
+                      </Link>
+                      <button className="wl-remove" onClick={() => handleRemove(item)}>Remove</button>
+                    </div>
                   ))}
                 </div>
               </section>

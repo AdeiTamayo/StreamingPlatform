@@ -5,6 +5,8 @@ import { getMovieEmbedUrl } from '../api/vidsrc';
 import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 import Player from '../components/Player';
 
+const AUTO_WATCH_REMAINING_SECONDS = 120;
+
 export default function MovieDetail() {
   const { id } = useParams();
   const [movie, setMovie] = useState(null);
@@ -14,6 +16,8 @@ export default function MovieDetail() {
   const [startAt, setStartAt] = useState(null);
   const [inWL, setInWL] = useState(false);
   const progressTimer = useRef(null);
+  const watchedRef = useRef(false);
+  const autoWatchedRef = useRef(false);
 
   useEffect(() => {
     setLoading(true);
@@ -22,6 +26,8 @@ export default function MovieDetail() {
     setInWL(isInWatchLater('movie', id));
     const prog = getProgress('movie', id);
     setStartAt(prog?.currentTime || null);
+    watchedRef.current = isWatched('movie', id);
+    autoWatchedRef.current = false;
     getMovieDetail(id)
       .then(setMovie)
       .catch(() => setError(true))
@@ -34,8 +40,30 @@ export default function MovieDetail() {
     };
   }, []);
 
+  function autoMarkWatched() {
+    if (!movie || watchedRef.current || autoWatchedRef.current) return;
+    autoWatchedRef.current = true;
+    markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
+    clearProgress('movie', id);
+    watchedRef.current = true;
+    setWatched(true);
+    setStartAt(null);
+  }
+
   function handleProgress(currentTime) {
     saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
+    if (watchedRef.current || !movie) return;
+    const runtimeMinutes = movie.runtime;
+    if (!runtimeMinutes) return;
+    const runtimeSeconds = runtimeMinutes * 60;
+    const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
+    if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
+      autoMarkWatched();
+    }
+  }
+
+  function handleEnded() {
+    autoMarkWatched();
   }
 
   function toggleWatched() {
@@ -114,7 +142,7 @@ export default function MovieDetail() {
             </button>
           )}
         </div>
-        <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} />
+        <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
       </section>
     </div>
   );

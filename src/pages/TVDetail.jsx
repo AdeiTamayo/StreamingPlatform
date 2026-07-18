@@ -37,6 +37,8 @@ export default function TVDetail() {
   useEffect(() => {
     setLoading(true);
     setError(false);
+    watchedRef.current = false;
+    autoWatchedRef.current = null;
     getTVDetail(id)
       .then((data) => {
         setShow(data);
@@ -67,6 +69,8 @@ export default function TVDetail() {
     setInEpWL(isInEpisodeWatchLater(id, season, episode));
     const prog = getProgress('tv', id, season, episode);
     setStartAt(prog?.currentTime || null);
+    watchedRef.current = isWatched('tv', id, season, episode);
+    autoWatchedRef.current = null;
   }, [id, season, episode]);
 
   useEffect(() => {
@@ -260,11 +264,13 @@ export default function TVDetail() {
           title={`${show.name} S${season}E${episode}`}
           onProgress={handleProgress}
           onEnded={handleEnded}
+          runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
         />
         <div className="ep-nav">
           <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
           <span className="ep-nav-label">S{season} E{episode}</span>
           <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
+          <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
         </div>
       </section>
     </div>
