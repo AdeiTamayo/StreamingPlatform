@@ -54,12 +54,20 @@ export default function MovieDetail() {
     setStartAt(null);
   }
 
-  function handleProgress(currentTime) {
+  function handleProgress(currentTime, duration) {
     if (watchedRef.current || !movie) return;
     saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
-    const runtimeMinutes = movie.runtime;
-    if (!runtimeMinutes) return;
-    const runtimeSeconds = runtimeMinutes * 60;
+    const tmdbRuntime = movie.runtime || null;
+    const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
+
+    try {
+      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
+      prev.push({ ts: Date.now(), msg: `autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds}` });
+      if (prev.length > 50) prev.splice(0, prev.length - 50);
+      localStorage.setItem('player_debug', JSON.stringify(prev));
+    } catch { }
+
+    if (!runtimeSeconds) return;
     const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
     if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
       autoMarkWatched();

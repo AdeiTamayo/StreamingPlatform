@@ -119,15 +119,23 @@ export default function TVDetail() {
     setStartAt(null);
   }
 
-  function handleProgress(currentTime) {
+  function handleProgress(currentTime, duration) {
     if (watchedRef.current || !show) return;
     saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
 
     const currentEpisode = episodes.find((item) => item.episode_number === episode);
-    const runtimeMinutes = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
-    if (!runtimeMinutes) return;
+    const tmdbRuntime = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
+    const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
-    const runtimeSeconds = runtimeMinutes * 60;
+    try {
+      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
+      prev.push({ ts: Date.now(), msg: `autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}` });
+      if (prev.length > 50) prev.splice(0, prev.length - 50);
+      localStorage.setItem('player_debug', JSON.stringify(prev));
+    } catch { }
+
+    if (!runtimeSeconds) return;
+
     const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
 
     if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
@@ -161,7 +169,16 @@ export default function TVDetail() {
     }
   }
 
+  function markCurrentWatched() {
+    if (watchedRef.current || !show) return;
+    markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
+    clearProgress('tv', id, season, episode);
+    watchedRef.current = true;
+    setWatched(true);
+  }
+
   function goNext() {
+    markCurrentWatched();
     if (episode < episodeCount) {
       setEpisode(episode + 1);
     } else if (seasonIdx < seasons.length - 1) {
@@ -227,7 +244,7 @@ export default function TVDetail() {
             <SeasonDropdown
               seasons={seasons}
               value={season}
-              onSelect={(s) => { setSeason(s); setEpisode(1); }}
+              onSelect={(s) => { markCurrentWatched(); setSeason(s); setEpisode(1); }}
             />
           </label>
           <label>
@@ -236,7 +253,7 @@ export default function TVDetail() {
               season={season}
               episode={episode}
               episodes={episodes}
-              onSelect={setEpisode}
+              onSelect={(ep) => { markCurrentWatched(); setEpisode(ep); }}
             />
           </label>
           <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>

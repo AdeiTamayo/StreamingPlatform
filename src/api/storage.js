@@ -63,7 +63,22 @@ export function getLastWatchedEpisode(showId) {
 export function saveProgress(type, id, currentTime, season, episode, meta) {
   const data = { type, id, currentTime, savedAt: Date.now(), season, episode };
   if (meta) data.meta = meta;
-  localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
+  try {
+    localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
+    try {
+      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
+      prev.push({ ts: Date.now(), msg: `saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}` });
+      if (prev.length > 50) prev.splice(0, prev.length - 50);
+      localStorage.setItem('player_debug', JSON.stringify(prev));
+    } catch { /* debug log failure is fine */ }
+  } catch (err) {
+    try {
+      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
+      prev.push({ ts: Date.now(), msg: `saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${err.message}` });
+      if (prev.length > 50) prev.splice(0, prev.length - 50);
+      localStorage.setItem('player_debug', JSON.stringify(prev));
+    } catch { /* nothing we can do */ }
+  }
 }
 
 export function getProgress(type, id, season, episode) {
