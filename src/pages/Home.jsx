@@ -28,8 +28,7 @@ export default function Home() {
               const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
               const poster = item.meta?.poster;
               const prog = getProgress(item.type, item.id, item.season, item.episode);
-              const runtime = item.type === 'movie' ? null : null;
-              const pct = prog?.currentTime && prog?.runtime ? Math.min(100, Math.round((prog.currentTime / prog.runtime) * 100)) : null;
+              const pct = prog?.currentTime ? Math.min(99, Math.round((prog.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
               return (
                 <Link
                   key={`${item.type}-${item.id}-${item.episode || ''}-${i}`}

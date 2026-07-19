@@ -55,8 +55,8 @@ export default function MovieDetail() {
   }
 
   function handleProgress(currentTime) {
-    saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
     if (watchedRef.current || !movie) return;
+    saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
     const runtimeMinutes = movie.runtime;
     if (!runtimeMinutes) return;
     const runtimeSeconds = runtimeMinutes * 60;
@@ -82,12 +82,13 @@ export default function MovieDetail() {
     }
   }
 
-  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
   function retry() {
     setLoading(true);
     setError(false);
     getMovieDetail(id).then(setMovie).catch(() => setError(true)).finally(() => setLoading(false));
   }
+
+  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
 
   if (error) return (
     <div className="page">

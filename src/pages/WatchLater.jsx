@@ -64,7 +64,7 @@ export default function WatchLater() {
                 <div className="media-grid">
                   {epItems.map((item) => (
                     <div key={`${item.showId}-S${item.season}E${item.episode}`} className="media-card ep-wl-card">
-                      <Link to={`/tv/${item.showId}`}>
+                      <Link to={`/tv/${item.showId}?season=${item.season}&episode=${item.episode}`}>
                         <div className="media-card-info">
                           <h3>{item.showTitle}</h3>
                           <span className="media-card-year">S{item.season} E{item.episode}</span>

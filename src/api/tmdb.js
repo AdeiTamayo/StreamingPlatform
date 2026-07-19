@@ -105,21 +105,6 @@ export async function getTVDetail(id) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`);
 }
 
-export async function getMovieRecommendations(id) {
-  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}/recommendations?api_key=${CONFIG.TMDB_API_KEY}`);
-  return data.results || [];
-}
-
-export async function getTVRecommendations(id) {
-  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/recommendations?api_key=${CONFIG.TMDB_API_KEY}`);
-  return data.results || [];
-}
-
-export async function getTVSeasons(id) {
-  const detail = await getTVDetail(id);
-  return detail.seasons || [];
-}
-
 export async function getSeasonDetails(id, seasonNumber) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}?api_key=${CONFIG.TMDB_API_KEY}`);
 }

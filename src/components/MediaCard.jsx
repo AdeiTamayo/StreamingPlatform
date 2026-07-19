@@ -1,18 +1,18 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
-import { isWatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 
-export default function MediaCard({ item, mediaType }) {
+const MediaCard = memo(function MediaCard({ item, mediaType }) {
   const [loaded, setLoaded] = useState(false);
   const [inWL, setInWL] = useState(() => isInWatchLater(mediaType || item.media_type || 'movie', item.id));
+  const [isWatchedState, setIsWatchedState] = useState(() => isWatched(mediaType || item.media_type || 'movie', item.id));
   const type = mediaType || item.media_type || 'movie';
   const id = item.id;
   const title = item.title || item.name;
   const year = (item.release_date || item.first_air_date || '').slice(0, 4);
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '?';
   const poster = imageUrl(item.poster_path);
-  const watched = type === 'movie' && isWatched('movie', id);
 
   function toggleWL(e) {
     e.preventDefault();
@@ -23,6 +23,18 @@ export default function MediaCard({ item, mediaType }) {
     } else {
       addWatchLater(type, id, title, year, poster);
       setInWL(true);
+    }
+  }
+
+  function toggleWatched(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isWatchedState) {
+      markUnwatched(type, id);
+      setIsWatchedState(false);
+    } else {
+      markWatched(type, id, title, null, null, { title, poster: item.poster_path });
+      setIsWatchedState(true);
     }
   }
 
@@ -38,11 +50,15 @@ export default function MediaCard({ item, mediaType }) {
           style={{ opacity: loaded ? 1 : 0 }}
         />
         {loaded && <span className="media-card-rating">{rating}</span>}
-        {loaded && watched && <span className="media-card-watched">Watched</span>}
         {loaded && (
-          <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>
-            {inWL ? '\u2605' : '\u2606'}
-          </button>
+          <div className="media-card-actions">
+            <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>
+              {inWL ? '\u2605' : '\u2606'}
+            </button>
+            <button className={`media-card-watched-btn ${isWatchedState ? 'active' : ''}`} onClick={toggleWatched} title={isWatchedState ? 'Unmark watched' : 'Mark as watched'}>
+              {isWatchedState ? '\u2713' : '+'}
+            </button>
+          </div>
         )}
       </div>
       <div className="media-card-info">
@@ -60,4 +76,6 @@ export default function MediaCard({ item, mediaType }) {
       </div>
     </Link>
   );
-}
+});
+
+export default MediaCard;

@@ -152,7 +152,7 @@ export default function LastSeen() {
             )}
 
             {movies.length > 0 && (
-              <section className="section last-seen-movies">
+              <section className="section">
                 <h3 className="sub-section-title">Movies</h3>
                 <div className="media-grid">
                   {movies.map((item) => (

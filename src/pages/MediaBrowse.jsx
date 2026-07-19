@@ -62,7 +62,7 @@ export default function MediaBrowse({ type }) {
     return (isMovie ? getPopularMovies : getPopularTV)(page);
   }, [isMovie, type]);
 
-  const { results, page, setPage, loading } = useSearchFilter(fetchFn, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil });
+  const { results, page, setPage, totalPages, loading } = useSearchFilter(fetchFn, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil });
 
   return (
     <div className="page">
@@ -99,6 +99,8 @@ export default function MediaBrowse({ type }) {
         </div>
         {loading ? (
           <div className="loading">Loading...</div>
+        ) : results.length === 0 ? (
+          <div className="loading">No results found</div>
         ) : (
           <>
             <div className="media-grid">
@@ -106,11 +108,13 @@ export default function MediaBrowse({ type }) {
                 <MediaCard key={item.id} item={item} mediaType={type} />
               ))}
             </div>
-            <div className="pagination">
-              <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-              <span>Page {page}</span>
-              <button onClick={() => setPage((p) => p + 1)}>Next</button>
-            </div>
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+                <span>Page {page}</span>
+                <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
+              </div>
+            )}
           </>
         )}
       </section>

@@ -13,6 +13,8 @@ const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 export default function TVDetail() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const urlSeason = searchParams.get('season');
+  const urlEpisode = searchParams.get('episode');
   const [show, setShow] = useState(null);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
@@ -34,6 +36,13 @@ export default function TVDetail() {
   const episodeCount = currentSeason?.episode_count || 12;
   const seasonIdx = seasons.findIndex((s) => s.season_number === season);
   const hasPrev = episode > 1 || seasonIdx > 0;
+  const episodeNums = useMemo(() => Array.from({ length: episodeCount }, (_, i) => i + 1), [episodeCount]);
+  const watchedStates = useMemo(() => {
+    const map = {};
+    episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id, season, ep); });
+    return map;
+  }, [episodeNums, id, season, watchedCount]);
+
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
   useEffect(() => {
@@ -54,8 +63,8 @@ export default function TVDetail() {
         const s = data.seasons?.filter((s) => s.season_number > 0) || [];
         if (s.length === 0) return;
         const firstSeason = s[0].season_number;
-        const requestedSeason = Number(searchParams.get('season'));
-        const requestedEpisode = Number(searchParams.get('episode'));
+        const requestedSeason = Number(urlSeason);
+        const requestedEpisode = Number(urlEpisode);
         const requestedSeasonExists = requestedSeason > 0 && s.some((seasonItem) => seasonItem.season_number === requestedSeason);
         const last = getLastWatchedEpisode(id);
         if (requestedSeasonExists && requestedEpisode > 0) {
@@ -70,7 +79,7 @@ export default function TVDetail() {
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false));
-  }, [id, searchParams]);
+  }, [id, urlSeason, urlEpisode]);
 
   useEffect(() => {
     setWatched(isWatched('tv', id, season, episode));
@@ -111,9 +120,8 @@ export default function TVDetail() {
   }
 
   function handleProgress(currentTime) {
-    saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
-
     if (watchedRef.current || !show) return;
+    saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
 
     const currentEpisode = episodes.find((item) => item.episode_number === episode);
     const runtimeMinutes = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
@@ -162,12 +170,13 @@ export default function TVDetail() {
     }
   }
 
-  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
   function retry() {
     setLoading(true);
     setError(false);
     getTVDetail(id).then((data) => { setShow(data); }).catch(() => setError(true)).finally(() => setLoading(false));
   }
+
+  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
 
   if (error) return (
     <div className="page">
@@ -254,10 +263,10 @@ export default function TVDetail() {
             <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
           </div>
           <div className="sp-bar">
-            {Array.from({ length: episodeCount }, (_, i) => i + 1).map((ep) => (
+            {episodeNums.map((ep) => (
               <button
                 key={ep}
-                className={`sp-dot ${ep === episode ? 'current' : ''} ${isWatched('tv', id, season, ep) ? 'done' : ''}`}
+                className={`sp-dot ${ep === episode ? 'current' : ''} ${watchedStates[ep] ? 'done' : ''}`}
                 onClick={() => setEpisode(ep)}
                 title={`Episode ${ep}`}
               />

@@ -10,7 +10,7 @@ export default function Settings() {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('tmdb:')) {
+      if (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k.startsWith('tmdb:')) {
         keys.push(k);
       }
     }
