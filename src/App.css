@@ -333,6 +333,20 @@
   letter-spacing: -0.01em;
 }
 
+button.date-picker-month {
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--text);
+  padding: 0.3rem 0.6rem;
+  border-radius: 8px;
+  transition: background 0.18s ease;
+}
+
+button.date-picker-month:hover {
+  background: rgba(125, 211, 252, 0.12);
+}
+
 .date-picker-nav {
   width: 2rem;
   height: 2rem;
@@ -389,6 +403,19 @@
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #03111e;
   font-weight: 800;
+}
+
+.date-picker-grid.months,
+.date-picker-grid.years {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.date-picker-grid.months .date-picker-cell,
+.date-picker-grid.years .date-picker-cell {
+  height: 2.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 10px;
 }
 
 .date-picker-footer {
