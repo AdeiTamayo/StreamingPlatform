@@ -110,7 +110,7 @@ export default function MovieDetail() {
   );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
-  const embedUrl = getMovieEmbedUrl(id, startAt);
+  const embedUrl = getMovieEmbedUrl(id);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
   const cast = movie.credits?.cast?.slice(0, 8) || [];

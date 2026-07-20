@@ -208,7 +208,7 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(id, season, episode, startAt);
+  const embedUrl = getTVEmbedUrl(id, season, episode);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
