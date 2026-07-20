@@ -8,6 +8,8 @@ export default function Home() {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
   const [continueWatching, setContinueWatching] = useState([]);
+  const [heroIdx, setHeroIdx] = useState(0);
+  const [cwFilter, setCwFilter] = useState('all');
 
   useEffect(() => {
     document.title = 'StreamFlow';
@@ -18,13 +20,96 @@ export default function Home() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (trending.length < 2) return;
+    const timer = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % Math.min(trending.length, 8));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [trending.length]);
+
+  const heroItems = trending.slice(0, 8);
+  const hero = heroItems[heroIdx];
+
+  const filteredCW = continueWatching.filter((item) => {
+    if (cwFilter === 'all') return true;
+    return item.type === cwFilter;
+  });
+
+  const cwCounts = {
+    all: continueWatching.length,
+    movie: continueWatching.filter((i) => i.type === 'movie').length,
+    tv: continueWatching.filter((i) => i.type === 'tv').length,
+  };
+
+  const CW_TABS = [
+    { key: 'all', label: `All (${cwCounts.all})` },
+    { key: 'movie', label: `Movies (${cwCounts.movie})` },
+    { key: 'tv', label: `Series (${cwCounts.tv})` },
+  ];
+
   return (
     <div className="page">
+      {hero && (
+        <section className="hero">
+          <div className="hero-backdrop">
+            <img
+              src={imageUrl(hero.backdrop_path || hero.poster_path, 'original')}
+              alt=""
+              key={hero.id}
+            />
+            <div className="hero-gradient" />
+          </div>
+          <div className="hero-content">
+            <span className="hero-badge">{hero.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
+            <h1 className="hero-title">{hero.title || hero.name}</h1>
+            <div className="hero-meta">
+              {hero.vote_average > 0 && (
+                <span className="hero-rating">{hero.vote_average.toFixed(1)}</span>
+              )}
+              <span className="hero-year">{(hero.release_date || hero.first_air_date || '').slice(0, 4)}</span>
+            </div>
+            {hero.overview && <p className="hero-overview">{hero.overview}</p>}
+            <div className="hero-actions">
+              <Link
+                to={`/${hero.media_type === 'tv' ? 'tv' : 'movie'}/${hero.id}`}
+                className="hero-btn hero-btn-primary"
+              >
+                &#9654; Play
+              </Link>
+            </div>
+            <div className="hero-dots">
+              {heroItems.map((_, i) => (
+                <button
+                  key={i}
+                  className={`hero-dot ${i === heroIdx ? 'active' : ''}`}
+                  onClick={() => setHeroIdx(i)}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {continueWatching.length > 0 && (
         <section className="section">
-          <h2 className="section-title">Continue Watching</h2>
-          <div className="cw-grid">
-            {continueWatching.map((item, i) => {
+          <div className="section-header">
+            <h2 className="section-title">Continue Watching</h2>
+            <div className="cw-toggles">
+              {CW_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  className={`cw-toggle ${cwFilter === t.key ? 'active' : ''}`}
+                  onClick={() => setCwFilter(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {filteredCW.length > 0 ? (
+            <div className="cw-grid">
+              {filteredCW.map((item, i) => {
               const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
               const poster = item.meta?.poster;
               const prog = getProgress(item.type, item.id, item.season, item.episode);
@@ -54,7 +139,10 @@ export default function Home() {
                 </Link>
               );
             })}
-          </div>
+            </div>
+          ) : (
+            <div className="loading">Nothing in this category</div>
+          )}
         </section>
       )}
 

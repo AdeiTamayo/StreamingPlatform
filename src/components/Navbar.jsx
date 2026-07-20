@@ -51,33 +51,69 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
 
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-open', menuOpen);
+    return () => document.body.classList.remove('sidebar-open');
+  }, [menuOpen]);
+
   function isActive(path) {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   }
 
   return (
-    <nav className="navbar">
-      <button className="navbar-hamburger" onClick={() => setMenuOpen((s) => !s)} aria-label="Toggle menu">
+    <>
+      {/* Desktop top navbar */}
+      <nav className="navbar">
+        <div className="nav-links">
+          {NAV_ITEMS.map((item) => (
+            <Link key={item.to} to={item.to} className={isActive(item.to) ? 'active' : ''}>
+              {item.label}
+            </Link>
+          ))}
+        </div>
+        <form className="navbar-search" onSubmit={handleSubmit}>
+          <input
+            ref={searchRef}
+            type="text"
+            placeholder="Search... (/)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button type="submit">Search</button>
+        </form>
+      </nav>
+
+      {/* Mobile hamburger + sidebar drawer */}
+      <button className="sidebar-hamburger" onClick={() => setMenuOpen((s) => !s)} aria-label="Toggle menu">
         <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
         <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
         <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
       </button>
-      <div className={`nav-links ${menuOpen ? 'nav-links-open' : ''}`} ref={menuRef}>
-        {NAV_ITEMS.map((item) => (
-          <Link key={item.to} to={item.to} className={isActive(item.to) ? 'active' : ''}>{item.label}</Link>
-        ))}
-      </div>
-      <form className="search-form" onSubmit={handleSubmit}>
-        <input
-          ref={searchRef}
-          type="text"
-          placeholder="Search... (/)"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <button type="submit">Search</button>
-      </form>
-    </nav>
+      {menuOpen && <div className="sidebar-overlay" />}
+      <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} ref={menuRef}>
+        <div className="sidebar-brand">StreamFlow</div>
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={`sidebar-link ${isActive(item.to) ? 'active' : ''}`}
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+        <form className="sidebar-search" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button type="submit">Search</button>
+        </form>
+      </aside>
+    </>
   );
 }

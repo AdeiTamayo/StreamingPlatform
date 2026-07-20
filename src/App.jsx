@@ -26,23 +26,25 @@ export default function App() {
   return (
     <ToastProvider>
       <ErrorBoundary>
-        <main className="app-shell">
+        <div className="app-shell">
           <Navbar />
-          <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/movies" element={<Movies />} />
-              <Route path="/tv" element={<TVShows />} />
-              <Route path="/movie/:id" element={<MovieDetail />} />
-              <Route path="/tv/:id" element={<TVDetail />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/watch-later" element={<WatchLater />} />
-              <Route path="/last-seen" element={<LastSeen />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </main>
+          <div className="app-content">
+            <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/movies" element={<Movies />} />
+                <Route path="/tv" element={<TVShows />} />
+                <Route path="/movie/:id" element={<MovieDetail />} />
+                <Route path="/tv/:id" element={<TVDetail />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/watch-later" element={<WatchLater />} />
+                <Route path="/last-seen" element={<LastSeen />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
+          </div>
+        </div>
       </ErrorBoundary>
     </ToastProvider>
   );
