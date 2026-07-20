@@ -50,6 +50,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }) {
           style={{ opacity: loaded ? 1 : 0 }}
         />
         {loaded && <span className="media-card-rating">{rating}</span>}
+        {loaded && <span className={`media-card-type ${type}`}>{type === 'tv' ? 'TV' : 'Movie'}</span>}
         {loaded && (
           <div className="media-card-actions">
             <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>

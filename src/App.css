@@ -57,9 +57,63 @@
   transition: color 0.2s, background 0.2s;
 }
 
-.nav-links a:hover {
+.nav-links a:hover,
+.nav-links a.active {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
+}
+
+.nav-links a.active {
+  color: var(--accent);
+}
+
+.navbar-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 2rem;
+  height: 2rem;
+  padding: 0.35rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hamburger-line {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.hamburger-line.open:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.hamburger-line.open:nth-child(2) { opacity: 0; }
+.hamburger-line.open:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+@media (max-width: 768px) {
+  .navbar-hamburger { display: flex; }
+
+  .nav-links {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 80;
+    flex-direction: column;
+    background: rgba(11, 18, 30, 0.98);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem;
+    backdrop-filter: blur(12px);
+  }
+
+  .nav-links-open { display: flex; }
+
+  .nav-links a { padding: 0.6rem 1rem; border-radius: 10px; }
 }
 
 /* Page layout */
@@ -167,6 +221,24 @@
   gap: 0.5rem;
   flex-wrap: nowrap;
   align-items: center;
+}
+
+.filter-clear-btn {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.filter-clear-btn:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
 }
 
 .genre-select {
@@ -498,6 +570,28 @@ button.date-picker-month:hover {
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 999px;
+}
+
+.media-card-type {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.media-card-type.tv {
+  background: rgba(56, 189, 248, 0.85);
+  color: #03111e;
+}
+
+.media-card-type.movie {
+  background: rgba(168, 85, 247, 0.85);
+  color: #fff;
 }
 
 .media-card-watched {
@@ -1183,7 +1277,8 @@ button.date-picker-month:hover {
 }
 
 .last-seen-series {
-  padding: 1rem;
+  padding: 0.65rem;
+  margin-bottom: 0.4rem;
   border-radius: calc(var(--radius) + 2px);
   border: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(20, 31, 49, 0.92), rgba(12, 18, 30, 0.96));
@@ -1192,31 +1287,31 @@ button.date-picker-month:hover {
 .last-seen-series-head {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 0.9rem;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
 }
 
 .last-seen-series-title-wrap {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.5rem;
   min-width: 0;
 }
 
 .last-seen-series-poster {
-  width: 42px;
-  height: 63px;
-  border-radius: 10px;
+  width: 32px;
+  height: 48px;
+  border-radius: 6px;
   object-fit: cover;
   flex: 0 0 auto;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .last-seen-series-title {
-  font-size: 1rem;
+  font-size: 0.88rem;
   font-weight: 700;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .last-seen-series-subtitle {
@@ -1257,13 +1352,13 @@ button.date-picker-month:hover {
 .last-seen-episode-list {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 0.25rem;
 }
 
 .last-seen-episode-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .last-seen-episode-row .last-seen-episode,
@@ -1277,7 +1372,7 @@ button.date-picker-month:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.6rem 0.75rem;
+  padding: 0.35rem 0.6rem;
   border-radius: var(--radius-sm);
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -1742,4 +1837,339 @@ button.date-picker-month:hover {
     padding: 0.4rem 0.8rem;
     font-size: 0.78rem;
   }
+}
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  background: rgba(20, 31, 49, 0.95);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  animation: toast-in 0.25s ease;
+  white-space: nowrap;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Search tabs */
+.search-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.search-tab {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.search-tab:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+.search-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #03111e;
+  border-color: transparent;
+}
+
+/* Search history */
+.search-history {
+  margin-bottom: 1rem;
+}
+
+.search-history-title {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+.search-history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.search-history-item {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.search-history-item:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+/* Detail crew */
+.detail-crew {
+  margin-top: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.detail-crew strong {
+  color: var(--text);
+}
+
+/* Episode list on TV detail */
+.episode-list-toggle {
+  margin-top: 0.75rem;
+}
+
+.episode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.episode-card {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  align-items: flex-start;
+}
+
+.episode-card.current {
+  border-color: rgba(125, 211, 252, 0.3);
+  background: rgba(125, 211, 252, 0.04);
+}
+
+.episode-card-thumb {
+  width: 80px;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.episode-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.episode-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.episode-card-info h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+
+.episode-card-info .ep-meta {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.episode-card-info .ep-overview {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Watch later filter/sort */
+.wl-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.wl-controls .custom-select-trigger,
+.last-seen-controls .custom-select-trigger {
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 500;
+  min-height: 0;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.wl-controls .custom-select-trigger:hover,
+.last-seen-controls .custom-select-trigger:hover {
+  border-color: rgba(125, 211, 252, 0.22);
+  background: rgba(125, 211, 252, 0.08);
+}
+
+.wl-controls .custom-select-trigger:focus,
+.last-seen-controls .custom-select-trigger:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.wl-clear-btn,
+.last-seen-clear-btn {
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.wl-clear-btn:hover,
+.last-seen-clear-btn:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+/* Last Seen controls */
+.last-seen-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.last-seen-search {
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.8rem;
+  outline: none;
+  min-width: 0;
+  flex: 0 1 200px;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.last-seen-search:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.last-seen-series-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.last-seen-series {
+  padding: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.last-seen-series-head {
+  gap: 0.5rem;
+}
+
+.last-seen-series-title-wrap {
+  gap: 0.5rem;
+}
+
+.last-seen-series-poster {
+  width: 40px;
+  height: 60px;
+}
+
+/* Mark season watched */
+.mark-season-btn {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.mark-season-btn:hover {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+/* Settings sections */
+.settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.settings-group h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.6rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-row:last-child { border-bottom: none; }
+
+.settings-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.settings-value {
+  font-size: 0.85rem;
+  font-weight: 600;
 }

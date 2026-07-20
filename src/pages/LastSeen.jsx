@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { getLastSeen, markUnwatched, clearProgress } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
+import FilterDropdown from '../components/FilterDropdown';
+import { useToast } from '../components/Toast';
 
-const EPISODES_PER_PAGE = 6;
+const EPISODES_PER_PAGE = 8;
 
 function getShowTitle(item) {
   const rawTitle = item.meta?.title || item.title || `Show ${item.id}`;
@@ -21,6 +23,10 @@ export default function LastSeen() {
   const [pages, setPages] = useState({});
   const [hideWatched, setHideWatched] = useState({});
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('recent');
+  const [filterType, setFilterType] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const toast = useToast();
 
   useEffect(() => {
     document.title = 'Last Seen - StreamFlow';
@@ -52,17 +58,30 @@ export default function LastSeen() {
       }
     });
 
-    const groupedSeries = Array.from(seriesMap.values())
+    let groupedSeries = Array.from(seriesMap.values())
       .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
       .map((group) => ({
         ...group,
         episodes: group.episodes.sort((a, b) => (b.ts || 0) - (a.ts || 0)),
       }));
 
-    const sortedMovies = movieItems.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    let sortedMovies = movieItems.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      groupedSeries = groupedSeries.filter((s) => s.title.toLowerCase().includes(q));
+      sortedMovies = sortedMovies.filter((m) => (m.title || '').toLowerCase().includes(q));
+    }
+
+    if (sortBy === 'title') {
+      groupedSeries.sort((a, b) => a.title.localeCompare(b.title));
+      sortedMovies.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    } else if (sortBy === 'episodes') {
+      groupedSeries.sort((a, b) => b.episodes.length - a.episodes.length);
+    }
 
     return { series: groupedSeries, movies: sortedMovies };
-  }, [items]);
+  }, [items, sortBy, searchQuery]);
 
   function handleRemove(item) {
     if (item.type === 'movie') {
@@ -73,20 +92,23 @@ export default function LastSeen() {
       clearProgress('tv', item.id, item.season, item.episode);
     }
     setItems(getLastSeen());
+    toast('Removed from history');
   }
 
   function setPage(showId, nextPage) {
     setPages((current) => ({ ...current, [showId]: nextPage }));
   }
 
+  const showSeries = filterType === 'all' || filterType === 'tv';
+  const showMovies = filterType === 'all' || filterType === 'movies';
+  const hasActiveFilter = filterType !== 'all' || sortBy !== 'recent' || searchQuery.trim();
+
   return (
     <div className="page">
       <section className="section">
         <h2 className="section-title">Last Seen</h2>
         {loading ? (
-          <>
-            <CollectionSkeleton variant="history" count={3} />
-          </>
+          <CollectionSkeleton variant="history" count={3} />
         ) : items.length === 0 ? (
           <div className="empty-state">
             <h3>No history yet</h3>
@@ -95,65 +117,102 @@ export default function LastSeen() {
           </div>
         ) : (
           <>
-            {series.length > 0 && (
-              <div className="last-seen-groups">
-                {series.map((show) => {
-                  const hidden = hideWatched[show.id] || false;
-                  const filtered = hidden ? show.episodes.filter((ep) => ep.source === 'progress') : show.episodes;
-                  const currentPage = pages[show.id] || 0;
-                  const pageCount = Math.max(1, Math.ceil(filtered.length / EPISODES_PER_PAGE));
-                  const safePage = Math.min(currentPage, pageCount - 1);
-                  const visibleEpisodes = filtered.slice(safePage * EPISODES_PER_PAGE, (safePage + 1) * EPISODES_PER_PAGE);
+            <div className="last-seen-controls">
+              <input
+                type="text"
+                className="last-seen-search"
+                placeholder="Filter by title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <FilterDropdown
+                value={filterType}
+                options={[
+                  { value: 'all', label: 'All types' },
+                  { value: 'tv', label: 'TV Shows' },
+                  { value: 'movies', label: 'Movies' },
+                ]}
+                placeholder="All types"
+                onSelect={setFilterType}
+              />
+              <FilterDropdown
+                value={sortBy}
+                options={[
+                  { value: 'recent', label: 'Most recent' },
+                  { value: 'title', label: 'Title A-Z' },
+                  { value: 'episodes', label: 'Most episodes' },
+                ]}
+                placeholder="Sort by"
+                onSelect={setSortBy}
+              />
+              {hasActiveFilter && (
+                <button className="last-seen-clear-btn" onClick={() => { setFilterType('all'); setSortBy('recent'); setSearchQuery(''); }}>Clear filters</button>
+              )}
+            </div>
 
-                  return (
-                    <article key={show.id} className="last-seen-series">
-                      <div className="last-seen-series-head">
-                        <div className="last-seen-series-title-wrap">
-                          {show.poster && <img src={imageUrl(show.poster)} alt={show.title} className="last-seen-series-poster" />}
-                          <div>
-                            <h3 className="last-seen-series-title">{show.title}</h3>
-                            <p className="last-seen-series-subtitle">{show.episodes.length} saved episode{show.episodes.length === 1 ? '' : 's'}</p>
+            {showSeries && series.length > 0 && (
+              <>
+                <h3 className="sub-section-title">TV Series ({series.length})</h3>
+                <div className="last-seen-groups">
+                  {series.map((show, idx) => {
+                    const hidden = hideWatched[show.id] || false;
+                    const filtered = hidden ? show.episodes.filter((ep) => ep.source === 'progress') : show.episodes;
+                    const currentPage = pages[show.id] || 0;
+                    const pageCount = Math.max(1, Math.ceil(filtered.length / EPISODES_PER_PAGE));
+                    const safePage = Math.min(currentPage, pageCount - 1);
+                    const visibleEpisodes = filtered.slice(safePage * EPISODES_PER_PAGE, (safePage + 1) * EPISODES_PER_PAGE);
+
+                    return (
+                      <article key={show.id} className="last-seen-series">
+                        <div className="last-seen-series-head">
+                          <div className="last-seen-series-title-wrap">
+                            <span className="last-seen-series-index">{idx + 1}</span>
+                            {show.poster && <img src={imageUrl(show.poster)} alt={show.title} className="last-seen-series-poster" />}
+                            <div>
+                              <h3 className="last-seen-series-title">{show.title}</h3>
+                              <p className="last-seen-series-subtitle">{show.episodes.length} saved episode{show.episodes.length === 1 ? '' : 's'}</p>
+                            </div>
+                          </div>
+                          <div className="last-seen-series-actions">
+                            <button className={`watch-toggle ${hidden ? 'in-wl' : ''}`} onClick={() => setHideWatched((prev) => ({ ...prev, [show.id]: !hidden }))}>
+                              {hidden ? 'Show all' : 'Hide watched'}
+                            </button>
+                            <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
                           </div>
                         </div>
-                        <div className="last-seen-series-actions">
-                          <button className={`watch-toggle ${hidden ? 'in-wl' : ''}`} onClick={() => setHideWatched((prev) => ({ ...prev, [show.id]: !hidden }))}>
-                            {hidden ? 'Show all' : 'Hide watched'}
-                          </button>
-                          <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
-                        </div>
-                      </div>
 
-                      <div className="last-seen-episode-list">
-                        {visibleEpisodes.map((item) => (
-                          <div key={item.storageKey} className="last-seen-episode-row">
-                            <Link
-                              to={`/tv/${show.id}?season=${item.season}&episode=${item.episode}`}
-                              className="last-seen-episode"
-                            >
-                              <span className="ls-label">{formatEpisodeLabel(item)}</span>
-                              <span className="ls-meta">{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
-                            </Link>
-                            <button className="ls-remove" onClick={() => handleRemove(item)} title="Remove">&times;</button>
+                        <div className="last-seen-episode-list">
+                          {visibleEpisodes.map((item) => (
+                            <div key={item.storageKey} className="last-seen-episode-row">
+                              <Link
+                                to={`/tv/${show.id}?season=${item.season}&episode=${item.episode}`}
+                                className="last-seen-episode"
+                              >
+                                <span className="ls-label">{formatEpisodeLabel(item)}</span>
+                                <span className="ls-meta">{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
+                              </Link>
+                              <button className="ls-remove" onClick={() => handleRemove(item)} title="Remove">&times;</button>
+                            </div>
+                          ))}
+                        </div>
+
+                        {pageCount > 1 && (
+                          <div className="pagination last-seen-pagination">
+                            <button disabled={safePage === 0} onClick={() => setPage(show.id, safePage - 1)}>Previous</button>
+                            <span>Page {safePage + 1} of {pageCount}</span>
+                            <button disabled={safePage >= pageCount - 1} onClick={() => setPage(show.id, safePage + 1)}>Next</button>
                           </div>
-                        ))}
-                      </div>
-
-                      {pageCount > 1 && (
-                        <div className="pagination last-seen-pagination">
-                          <button disabled={safePage === 0} onClick={() => setPage(show.id, safePage - 1)}>Previous</button>
-                          <span>Page {safePage + 1} of {pageCount}</span>
-                          <button disabled={safePage >= pageCount - 1} onClick={() => setPage(show.id, safePage + 1)}>Next</button>
-                        </div>
-                      )}
-                    </article>
-                  );
-                })}
-              </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </>
             )}
 
-            {movies.length > 0 && (
+            {showMovies && movies.length > 0 && (
               <section className="section">
-                <h3 className="sub-section-title">Movies</h3>
+                <h3 className="sub-section-title">Movies ({movies.length})</h3>
                 <div className="media-grid">
                   {movies.map((item) => (
                     <div key={item.storageKey} className="media-card">

@@ -78,6 +78,8 @@ export default function MediaBrowse({ type }) {
             onGenreChange={(value) => { setGenre(value); setPage(1); }}
             countryOptions={countryOptions}
             genreOptions={genreOptions}
+            hasActiveFilters={!!country || !!genre || !!year || !!sortBy || !!releaseDateFrom || !!releaseDateUntil}
+            onClearFilters={() => { setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setPage(1); }}
           />
         </div>
         {showMore && (

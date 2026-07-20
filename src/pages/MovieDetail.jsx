@@ -5,11 +5,13 @@ import { getMovieEmbedUrl } from '../api/vidsrc';
 import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
+import { useToast } from '../components/Toast';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
 export default function MovieDetail() {
   const { id } = useParams();
+  const toast = useToast();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -83,10 +85,12 @@ export default function MovieDetail() {
       markUnwatched('movie', id);
       clearProgress('movie', id);
       setWatched(false);
+      toast('Removed from watched');
     } else {
       markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
       clearProgress('movie', id);
       setWatched(true);
+      toast('Marked as watched');
     }
   }
 
@@ -110,6 +114,9 @@ export default function MovieDetail() {
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
   const cast = movie.credits?.cast?.slice(0, 8) || [];
+  const crew = movie.credits?.crew || [];
+  const director = crew.find((c) => c.job === 'Director');
+  const writers = crew.filter((c) => c.job === 'Screenplay' || c.job === 'Writer').slice(0, 2);
   const genres = movie.genres?.map((g) => g.name).join(', ') || '';
   const recommendations = movie.recommendations?.results?.slice(0, 10) || [];
 
@@ -133,6 +140,12 @@ export default function MovieDetail() {
               <div className="detail-cast">
                 <strong>Cast:</strong> {cast.map((c) => c.name).join(', ')}
               </div>
+            )}
+            {director && (
+              <div className="detail-crew"><strong>Director:</strong> {director.name}</div>
+            )}
+            {writers.length > 0 && (
+              <div className="detail-crew"><strong>Writers:</strong> {writers.map((w) => w.name).join(', ')}</div>
             )}
           </div>
         </div>

@@ -2,16 +2,18 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
 import MediaCard from '../components/MediaCard';
+import { useToast } from '../components/Toast';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
 export default function TVDetail() {
   const { id } = useParams();
+  const toast = useToast();
   const [searchParams] = useSearchParams();
   const urlSeason = searchParams.get('season');
   const urlEpisode = searchParams.get('episode');
@@ -28,6 +30,7 @@ export default function TVDetail() {
   const [episodes, setEpisodes] = useState([]);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [showEpisodes, setShowEpisodes] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(null);
 
@@ -152,10 +155,12 @@ export default function TVDetail() {
       markUnwatched('tv', id, season, episode);
       clearProgress('tv', id, season, episode);
       setWatched(false);
+      toast('Removed from watched');
     } else {
       markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
       clearProgress('tv', id, season, episode);
       setWatched(true);
+      toast('Marked as watched');
     }
   }
 
@@ -207,6 +212,9 @@ export default function TVDetail() {
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
+  const crew = show.credits?.crew || [];
+  const created = show.created_by || [];
+  const networks = show.networks || [];
   const genres = show.genres?.map((g) => g.name).join(', ') || '';
   const recommendations = show.recommendations?.results?.slice(0, 10) || [];
 
@@ -231,6 +239,12 @@ export default function TVDetail() {
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast"><strong>Cast:</strong> {cast.map((c) => c.name).join(', ')}</div>
+            )}
+            {created.length > 0 && (
+              <div className="detail-crew"><strong>Created by:</strong> {created.map((c) => c.name).join(', ')}</div>
+            )}
+            {networks.length > 0 && (
+              <div className="detail-crew"><strong>Network:</strong> {networks.map((n) => n.name).join(', ')}</div>
             )}
           </div>
         </div>
@@ -278,6 +292,14 @@ export default function TVDetail() {
           <div className="sp-header">
             <span className="sp-label">Season {season}</span>
             <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
+            {watchedCount < episodeCount && (
+              <button className="mark-season-btn" onClick={() => {
+                markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
+                setWatchedCount(getWatchedCount(id, season, episodeCount));
+                setWatched(isWatched('tv', id, season, episode));
+                toast('Season marked as watched');
+              }}>Mark season watched</button>
+            )}
           </div>
           <div className="sp-bar">
             {episodeNums.map((ep) => (
@@ -316,6 +338,37 @@ export default function TVDetail() {
           <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
           <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
         </div>
+
+        {episodes.length > 0 && (
+          <div className="episode-list-toggle">
+            <button className="watch-toggle" onClick={() => setShowEpisodes((s) => !s)}>
+              {showEpisodes ? 'Hide episodes' : `Show episodes (${episodes.length})`}
+            </button>
+          </div>
+        )}
+
+        {showEpisodes && episodes.length > 0 && (
+          <div className="episode-list">
+            {episodes.map((ep) => (
+              <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''}`} onClick={() => { markCurrentWatched(); setEpisode(ep.episode_number); }}>
+                {ep.still_path && (
+                  <div className="episode-card-thumb">
+                    <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
+                  </div>
+                )}
+                <div className="episode-card-info">
+                  <h4>E{ep.episode_number}. {ep.name}</h4>
+                  <div className="ep-meta">
+                    {ep.air_date && <span>{ep.air_date}</span>}
+                    {ep.runtime && <span> &middot; {ep.runtime}m</span>}
+                    {ep.vote_average > 0 && <span> &middot; {ep.vote_average.toFixed(1)}</span>}
+                  </div>
+                  {ep.overview && <div className="ep-overview">{ep.overview}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {recommendations.length > 0 && (

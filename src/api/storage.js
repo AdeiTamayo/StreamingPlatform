@@ -232,3 +232,97 @@ export function getWatchedCount(showId, seasonNumber, episodeCount) {
   }
   return count;
 }
+
+// Mark all episodes in a season as watched
+export function markSeasonWatched(showId, seasonNumber, episodeCount, showName, poster) {
+  for (let i = 1; i <= episodeCount; i++) {
+    if (!isWatched('tv', showId, seasonNumber, i)) {
+      markWatched('tv', showId, showName, seasonNumber, i, { title: showName, poster });
+    }
+  }
+}
+
+// Search History
+const SEARCH_HISTORY_KEY = 'search_history';
+const SEARCH_HISTORY_MAX = 15;
+
+export function getSearchHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+export function addSearchHistory(query) {
+  const trimmed = query.trim();
+  if (!trimmed) return;
+  const list = getSearchHistory().filter((q) => q.toLowerCase() !== trimmed.toLowerCase());
+  list.unshift(trimmed);
+  if (list.length > SEARCH_HISTORY_MAX) list.length = SEARCH_HISTORY_MAX;
+  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(list));
+}
+
+// Export / Import
+const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history'];
+
+function isExportKey(k) {
+  return EXPORT_KEYS.some((prefix) => k === prefix || k.startsWith(prefix));
+}
+
+export function exportData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (isExportKey(k)) {
+      data[k] = localStorage.getItem(k);
+    }
+  }
+  return data;
+}
+
+export function importData(data, mode = 'merge') {
+  if (mode === 'replace') {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (isExportKey(k)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  }
+  Object.entries(data).forEach(([k, v]) => {
+    if (isExportKey(k)) localStorage.setItem(k, v);
+  });
+}
+
+export function getStorageUsage() {
+  let total = 0;
+  const breakdown = { watched: 0, progress: 0, watchlater: 0, epwl: 0, cache: 0, other: 0 };
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    const v = localStorage.getItem(k) || '';
+    const bytes = (k.length + v.length) * 2;
+    total += bytes;
+    if (k.startsWith('watched:')) breakdown.watched += bytes;
+    else if (k.startsWith('progress:')) breakdown.progress += bytes;
+    else if (k === 'watchlater') breakdown.watchlater += bytes;
+    else if (k.startsWith('epwl:')) breakdown.epwl += bytes;
+    else if (k.startsWith('tmdb:')) breakdown.cache += bytes;
+    else breakdown.other += bytes;
+  }
+  return { total, breakdown };
+}
+
+export function getStats() {
+  let moviesWatched = 0;
+  let episodesWatched = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k.startsWith('watched:')) continue;
+    if (k.includes('movie-')) moviesWatched++;
+    else if (k.match(/tv-\d+-S\d+E\d+/)) episodesWatched++;
+  }
+  const wl = getWatchLater();
+  const epWl = getEpisodeWatchLater();
+  return { moviesWatched, episodesWatched, watchLaterCount: wl.length + epWl.length };
+}
