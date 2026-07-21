@@ -224,7 +224,7 @@ export default function LastSeen() {
                           <h3>{item.title || `Movie ${item.id}`}</h3>
                         </div>
                       </Link>
-                      <button className="wl-remove" onClick={() => handleRemove(item)}>Remove</button>
+                      <button className="wl-remove" onClick={() => handleRemove(item)} title="Remove">&times;</button>
                     </div>
                   ))}
                 </div>

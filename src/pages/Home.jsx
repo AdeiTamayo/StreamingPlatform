@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
-import { getContinueWatching, getProgress } from '../api/storage';
+import { getContinueWatching, getProgress, clearProgress } from '../api/storage';
+import { useToast } from '../components/Toast';
 
 export default function Home() {
   const [trending, setTrending] = useState([]);
@@ -10,6 +11,7 @@ export default function Home() {
   const [continueWatching, setContinueWatching] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState('all');
+  const toast = useToast();
 
   useEffect(() => {
     document.title = 'StreamFlow';
@@ -41,6 +43,12 @@ export default function Home() {
     document.head.appendChild(link);
     return () => link.remove();
   }, [hero?.id, hero?.backdrop_path, hero?.poster_path]);
+
+  function handleRemoveCW(item) {
+    clearProgress(item.type, item.id, item.season, item.episode);
+    setContinueWatching(getContinueWatching());
+    toast('Removed from Continue Watching');
+  }
 
   const filteredCW = continueWatching.filter((item) => {
     if (cwFilter === 'all') return true;
@@ -135,28 +143,30 @@ export default function Home() {
               const prog = getProgress(item.type, item.id, item.season, item.episode);
               const pct = prog?.currentTime ? Math.min(99, Math.round((prog.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
               return (
-                <Link
-                  key={`${item.type}-${item.id}-${item.episode || ''}-${i}`}
-                  to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
-                  className="cw-card"
-                >
-                  <div className="cw-card-poster">
-                    {poster ? (
-                      <img src={imageUrl(poster)} alt={label} loading="lazy" />
-                    ) : (
-                      <div className="cw-card-placeholder" />
-                    )}
-                    {pct !== null && (
-                      <div className="cw-card-bar">
-                        <div className="cw-card-bar-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="cw-card-info">
-                    <span className="cw-card-label">{label}</span>
-                    {item.season && <span className="cw-card-meta">S{item.season}E{item.episode}</span>}
-                  </div>
-                </Link>
+                <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className="cw-card">
+                  <Link
+                    to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
+                    className="cw-card-link"
+                  >
+                    <div className="cw-card-poster">
+                      {poster ? (
+                        <img src={imageUrl(poster)} alt={label} loading="lazy" />
+                      ) : (
+                        <div className="cw-card-placeholder" />
+                      )}
+                      {pct !== null && (
+                        <div className="cw-card-bar">
+                          <div className="cw-card-bar-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="cw-card-info">
+                      <span className="cw-card-label">{label}</span>
+                      {item.season && <span className="cw-card-meta">S{item.season}E{item.episode}</span>}
+                    </div>
+                  </Link>
+                  <button className="cw-remove" onClick={() => handleRemoveCW(item)} title="Remove">&times;</button>
+                </div>
               );
             })}
             </div>

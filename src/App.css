@@ -815,6 +815,7 @@ button.date-picker-month:hover {
 
 /* Media Card */
 .media-card {
+  position: relative;
   border-radius: calc(var(--radius) + 2px);
   overflow: hidden;
   background: linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95));
@@ -1534,19 +1535,29 @@ button.date-picker-month:hover {
 }
 
 .wl-remove {
-  width: 100%;
-  padding: 0.3rem 0.5rem;
-  background: rgba(255, 255, 255, 0.06);
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 5;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.55);
   color: var(--text-muted);
-  font-size: 0.75rem;
-  border: none;
-  border-top: 1px solid var(--border);
-  transition: background 0.2s;
+  font-size: 0.85rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.18s, color 0.18s;
 }
 
 .wl-remove:hover {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.7);
+  color: #fff;
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Last Seen page */
@@ -1848,6 +1859,7 @@ button.date-picker-month:hover {
 }
 
 .cw-card {
+  position: relative;
   border-radius: calc(var(--radius) + 2px);
   overflow: hidden;
   background: var(--bg-card);
@@ -1859,6 +1871,37 @@ button.date-picker-month:hover {
   transform: translateY(-3px);
   border-color: rgba(125, 211, 252, 0.2);
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.cw-card-link {
+  display: block;
+  color: inherit;
+}
+
+.cw-remove {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 5;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.18s, color 0.18s;
+}
+
+.cw-remove:hover {
+  background: rgba(239, 68, 68, 0.7);
+  color: #fff;
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 .cw-card-poster {

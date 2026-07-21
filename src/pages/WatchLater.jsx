@@ -97,7 +97,7 @@ export default function WatchLater() {
                           {item.year && <span className="media-card-year">{item.year}</span>}
                         </div>
                       </Link>
-                      <button className="wl-remove" onClick={() => handleRemove(item.type, item.id)}>Remove</button>
+                      <button className="wl-remove" onClick={() => handleRemove(item.type, item.id)} title="Remove">&times;</button>
                     </div>
                   ))}
                 </div>
@@ -115,7 +115,7 @@ export default function WatchLater() {
                           <span className="media-card-year">S{item.season} E{item.episode}</span>
                         </div>
                       </Link>
-                      <button className="wl-remove" onClick={() => handleRemoveEp(item.showId, item.season, item.episode)}>Remove</button>
+                      <button className="wl-remove" onClick={() => handleRemoveEp(item.showId, item.season, item.episode)} title="Remove">&times;</button>
                     </div>
                   ))}
                 </div>
