@@ -20,37 +20,56 @@
 
 /* Desktop top navbar */
 .navbar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  width: 100%;
   z-index: 100;
   display: flex;
-  align-items: center;
-  gap: 1rem;
+  justify-content: center;
+  background-color: transparent;
+  box-sizing: border-box;
+  transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+}
+
+.navbar-inner {
+  position: relative;
   width: min(1280px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 0.6rem 0;
-  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.navbar.scrolled {
+  background-color: rgba(7, 17, 31, 0.7);
   border-bottom: 1px solid var(--border);
+}
+
+.navbar.hidden {
+  transform: translateY(-100%);
 }
 
 .nav-links {
   display: flex;
+  align-items: center;
   gap: 0.25rem;
+  flex: 1;
 }
 
 .nav-links a {
   padding: 0.4rem 0.7rem;
   border-radius: 999px;
   font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: color 0.2s, background 0.2s;
+  font-weight: 700;
+  color: #fff;
+  transition: background 0.2s;
 }
 
 .nav-links a:hover,
 .nav-links a.active {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .nav-links a.active {
@@ -58,25 +77,34 @@
 }
 
 .navbar-search {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 0 1 300px;
-  min-width: 0;
-  margin-left: auto;
 }
 
 .navbar-search input {
-  width: 100%;
+  width: 0;
   min-width: 0;
-  padding: 0.4rem 0.8rem;
+  padding: 0.5rem 0.9rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   outline: none;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  opacity: 0;
+  pointer-events: none;
+  transition: width 0.3s ease, opacity 0.3s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.navbar-search input.open {
+  width: 200px;
+  opacity: 1;
+  pointer-events: all;
 }
 
 .navbar-search input:focus {
@@ -88,18 +116,37 @@
   color: var(--text-dim);
 }
 
-.navbar-search button {
-  padding: 0.4rem 0.85rem;
+.search-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.search-toggle-btn:hover {
+  color: #fff;
+}
+
+.search-go-btn {
+  padding: 0.5rem 1rem;
   border-radius: 999px;
   background: rgba(125, 211, 252, 0.12);
   border: 1px solid rgba(125, 211, 252, 0.22);
   color: var(--text);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 600;
+  cursor: pointer;
   transition: background 0.18s, border-color 0.18s;
 }
 
-.navbar-search button:hover {
+.search-go-btn:hover {
   background: rgba(125, 211, 252, 0.22);
   border-color: rgba(125, 211, 252, 0.38);
 }
@@ -121,7 +168,7 @@
 .page {
   width: min(1280px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 1.5rem 0 2rem;
+  padding: 56px 0 2rem;
 }
 
 /* Sidebar mobile */
@@ -311,7 +358,7 @@
 .hero {
   position: relative;
   width: auto;
-  margin: 0 calc(-50vw + 50%);
+  margin: -56px calc(-50vw + 50%) 0;
   padding: 0;
   overflow: hidden;
 }
@@ -319,7 +366,7 @@
 .hero-backdrop {
   position: relative;
   width: 100%;
-  height: clamp(420px, 60vw, 680px);
+  height: clamp(520px, 75vw, 800px);
 }
 
 .hero-backdrop img {
@@ -340,7 +387,7 @@
   inset: 0;
   background:
     linear-gradient(to right, rgba(7, 17, 31, 0.92) 0%, rgba(7, 17, 31, 0.4) 50%, transparent 100%),
-    linear-gradient(to top, var(--bg) 0%, rgba(7, 17, 31, 0.5) 30%, transparent 60%);
+    linear-gradient(to top, rgb(7, 17, 31) 0%, rgba(7, 17, 31, 0.8) 20%, rgba(7, 17, 31, 0.4) 50%, transparent 80%);
   pointer-events: none;
 }
 
@@ -2152,7 +2199,7 @@ button.date-picker-month:hover {
   }
 
   .hero-title {
-    font-size: 1.2rem;
+  font-size: 1.5rem;
   }
 
   .hero-overview {
