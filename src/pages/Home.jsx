@@ -31,6 +31,17 @@ export default function Home() {
   const heroItems = trending.slice(0, 8);
   const hero = heroItems[heroIdx];
 
+  useEffect(() => {
+    if (!hero?.backdrop_path && !hero?.poster_path) return;
+    const url = imageUrl(hero.backdrop_path || hero.poster_path, 'original');
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = url;
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, [hero?.id, hero?.backdrop_path, hero?.poster_path]);
+
   const filteredCW = continueWatching.filter((item) => {
     if (cwFilter === 'all') return true;
     return item.type === cwFilter;
@@ -50,16 +61,25 @@ export default function Home() {
 
   return (
     <div className="page">
-      {hero && (
-        <section className="hero">
-          <div className="hero-backdrop">
-            <img
-              src={imageUrl(hero.backdrop_path || hero.poster_path, 'original')}
-              alt=""
-              key={hero.id}
-            />
-            <div className="hero-gradient" />
-          </div>
+      <section className="hero">
+        <div className="hero-backdrop">
+          {hero ? (
+            <>
+              <img
+                src={imageUrl(hero.backdrop_path || hero.poster_path, 'original')}
+                alt=""
+                key={hero.id}
+                fetchPriority="high"
+                width="1920"
+                height="1080"
+              />
+              <div className="hero-gradient" />
+            </>
+          ) : (
+            <div className="hero-placeholder" />
+          )}
+        </div>
+        {hero && (
           <div className="hero-content">
             <span className="hero-badge">{hero.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
             <h1 className="hero-title">{hero.title || hero.name}</h1>
@@ -88,8 +108,8 @@ export default function Home() {
               ))}
             </div>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {continueWatching.length > 0 && (
         <section className="section">

@@ -1,4 +1,5 @@
 const WL_KEY = 'watchlater';
+const PROGRESS_INDEX_KEY = 'progress_index';
 
 function watchedKey(type, id, season, episode) {
   if (type === 'movie') return `watched:movie-${id}`;
@@ -24,6 +25,40 @@ function parseProgressKey(k) {
   m = k.match(/^progress:movie-(.+)$/);
   if (m) return { type: 'movie', id: m[1], season: null, episode: null };
   return null;
+}
+
+function getProgressIndex() {
+  try {
+    const raw = localStorage.getItem(PROGRESS_INDEX_KEY);
+    if (raw) return JSON.parse(raw) || [];
+  } catch {
+    return [];
+  }
+  // Build index from existing progress keys if empty
+  const index = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith('progress:')) index.push(k);
+  }
+  if (index.length > 0) saveProgressIndex(index);
+  return index;
+}
+
+function saveProgressIndex(index) {
+  localStorage.setItem(PROGRESS_INDEX_KEY, JSON.stringify(index));
+}
+
+function addToProgressIndex(key) {
+  const index = getProgressIndex();
+  if (!index.includes(key)) {
+    index.push(key);
+    saveProgressIndex(index);
+  }
+}
+
+function removeFromProgressIndex(key) {
+  const index = getProgressIndex().filter((k) => k !== key);
+  saveProgressIndex(index);
 }
 
 export function isWatched(type, id, season, episode) {
@@ -65,6 +100,7 @@ export function saveProgress(type, id, currentTime, season, episode, meta) {
   if (meta) data.meta = meta;
   try {
     localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
+    addToProgressIndex(progressKey(type, id, season, episode));
     try {
       const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
       prev.push({ ts: Date.now(), msg: `saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}` });
@@ -91,6 +127,7 @@ export function getProgress(type, id, season, episode) {
 
 export function clearProgress(type, id, season, episode) {
   localStorage.removeItem(progressKey(type, id, season, episode));
+  removeFromProgressIndex(progressKey(type, id, season, episode));
 }
 
 // Watch Later
@@ -172,12 +209,11 @@ export function getLastSeen() {
 // Continue Watching (has progress > 30s but NOT marked watched)
 export function getContinueWatching() {
   const progressItems = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k.startsWith('progress:')) continue;
+  const keys = getProgressIndex();
+  for (const k of keys) {
     try {
       const data = JSON.parse(localStorage.getItem(k));
-      if (data.currentTime <= 30) continue;
+      if (!data || data.currentTime <= 30) continue;
       const wKey = k.replace('progress:', 'watched:');
       if (localStorage.getItem(wKey)) continue;
       const isMovie = k.includes('movie');
