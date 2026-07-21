@@ -2,6 +2,70 @@
 
 A personal streaming web app built with React. Browse movies and TV shows using TMDB metadata, watch via embedded players, and track your viewing progress — all client-side with no backend.
 
+
+  
+## Screenshots
+
+<table border="0">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="screenshots/LandingPage.png" alt="Landing Page" style="border-radius: 6px;" />
+      <br />
+      <sub><b>Landing Page</b></sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="screenshots/LastSeen.png" alt="Last Seen" style="border-radius: 6px;" />
+      <br />
+      <sub><b>Last Seen</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <img src="screenshots/TvSeriesView.png" alt="TV Series View" style="border-radius: 6px;" />
+      <br />
+      <sub><b>TV Series View</b></sub>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <img src="screenshots/MovieView.png" alt="Movie View" style="border-radius: 6px;" />
+      <br />
+      <sub><b>Movie View</b></sub>
+    </td>
+  </tr>
+</table>
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A[Browser] -->|React SPA| B[React Router]
+    B --> C[Home Page]
+    B --> D[Movies / TV Browse]
+    B --> E[Detail Pages]
+    B --> F[Search]
+    B --> G[Watch Later]
+    B --> H[Last Seen]
+    B --> I[Settings]
+
+    E --> J[TMDB API<br>metadata + images]
+    E --> K[VidSrc Embed<br>video player]
+    E --> L[localStorage<br>progress + watched]
+
+    C --> M[Continue Watching]
+    C --> N[Hero / Trending]
+
+    M --> L
+    N --> J
+
+    subgraph TMDB [External APIs]
+        J
+        K
+    end
+
+    subgraph Storage [Client-side]
+        L
+    end
+```
+
 ## Features
 
 - **Browse** movies and TV shows with filters (genre, country, year, sort order)
