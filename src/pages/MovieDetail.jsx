@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
-import { getMovieEmbedUrl } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
+import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
+import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource } from '../api/storage';
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
+import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/Toast';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
@@ -20,6 +21,7 @@ export default function MovieDetail() {
   const [inWL, setInWL] = useState(false);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [videoSource, setVideoSource] = useState(getVideoSource());
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
 
@@ -110,7 +112,7 @@ export default function MovieDetail() {
   );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
-  const embedUrl = getMovieEmbedUrl(id);
+  const embedUrl = getMovieEmbedUrl(id, videoSource);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
   const cast = movie.credits?.cast?.slice(0, 8) || [];
@@ -186,6 +188,15 @@ export default function MovieDetail() {
         {!showTrailer && (
           <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
         )}
+        <div className="source-selector">
+          <FilterDropdown
+            value={videoSource}
+            options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+            placeholder="Source"
+            onSelect={(val) => setVideoSource(val)}
+            className="source-dropdown"
+          />
+        </div>
       </section>
 
       {recommendations.length > 0 && (

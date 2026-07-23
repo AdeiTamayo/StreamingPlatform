@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
-import { getTVEmbedUrl } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched } from '../api/storage';
+import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
+import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
 import { useToast } from '../components/Toast';
 
@@ -30,6 +31,7 @@ export default function TVDetail() {
   const [episodes, setEpisodes] = useState([]);
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [videoSource, setVideoSource] = useState(getVideoSource());
   const [showEpisodes, setShowEpisodes] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(null);
@@ -208,7 +210,7 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(id, season, episode);
+  const embedUrl = getTVEmbedUrl(id, season, episode, videoSource);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
@@ -333,10 +335,19 @@ export default function TVDetail() {
           />
         )}
         <div className="ep-nav">
-          <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
-          <span className="ep-nav-label">S{season} E{episode}</span>
-          <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
-          <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
+          <div className="ep-nav-center">
+            <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
+            <span className="ep-nav-label">S{season} E{episode}</span>
+            <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
+            <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
+          </div>
+          <FilterDropdown
+            value={videoSource}
+            options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+            placeholder="Source"
+            onSelect={(val) => setVideoSource(val)}
+            className="source-dropdown"
+          />
         </div>
 
         {episodes.length > 0 && (
