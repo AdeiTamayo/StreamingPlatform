@@ -1,5 +1,6 @@
 const WL_KEY = 'watchlater';
 const PROGRESS_INDEX_KEY = 'progress_index';
+const VIDEO_SOURCE_KEY = 'video_source';
 
 function watchedKey(type, id, season, episode) {
   if (type === 'movie') return `watched:movie-${id}`;
@@ -361,4 +362,12 @@ export function getStats() {
   const wl = getWatchLater();
   const epWl = getEpisodeWatchLater();
   return { moviesWatched, episodesWatched, watchLaterCount: wl.length + epWl.length };
+}
+
+export function getVideoSource() {
+  return localStorage.getItem(VIDEO_SOURCE_KEY) || 'vidsrc';
+}
+
+export function setVideoSource(source) {
+  localStorage.setItem(VIDEO_SOURCE_KEY, source);
 }
