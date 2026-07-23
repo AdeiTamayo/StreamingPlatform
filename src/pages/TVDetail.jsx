@@ -258,7 +258,7 @@ export default function TVDetail() {
             <SeasonDropdown
               seasons={seasons}
               value={season}
-              onSelect={(s) => { markCurrentWatched(); setSeason(s); setEpisode(1); }}
+              onSelect={(s) => { setSeason(s); setEpisode(1); }}
             />
           </label>
           <label>
@@ -267,7 +267,7 @@ export default function TVDetail() {
               season={season}
               episode={episode}
               episodes={episodes}
-              onSelect={(ep) => { markCurrentWatched(); setEpisode(ep); }}
+              onSelect={(ep) => { setEpisode(ep); }}
             />
           </label>
           <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
@@ -350,7 +350,7 @@ export default function TVDetail() {
         {showEpisodes && episodes.length > 0 && (
           <div className="episode-list">
             {episodes.map((ep) => (
-              <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''}`} onClick={() => { markCurrentWatched(); setEpisode(ep.episode_number); }}>
+              <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''}`} onClick={() => { setEpisode(ep.episode_number); }}>
                 {ep.still_path && (
                   <div className="episode-card-thumb">
                     <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
