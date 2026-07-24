@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { exportData, importData, getStorageUsage, getStats } from '../api/storage';
+import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource } from '../api/storage';
+import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/Toast';
 
 function formatBytes(bytes) {
@@ -13,6 +14,7 @@ export default function Settings() {
   const [confirm, setConfirm] = useState(false);
   const [usage, setUsage] = useState(null);
   const [stats, setStats] = useState(null);
+  const [videoSource, setVideoSourceState] = useState(getVideoSource());
   const navigate = useNavigate();
   const toast = useToast();
   const fileInputRef = useRef(null);
@@ -124,6 +126,18 @@ export default function Settings() {
             <button className="watch-toggle" onClick={handleExport}>Export data</button>
             <button className="watch-toggle" onClick={() => fileInputRef.current?.click()}>Import data</button>
             <input ref={fileInputRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
+          </div>
+        </div>
+
+        <div className="settings-group">
+          <h3>Video Source</h3>
+          <div className="settings-row">
+            <span className="settings-label">Default embed source</span>
+            <select className="settings-select" value={videoSource} onChange={(e) => { setVideoSourceState(e.target.value); setVideoSource(e.target.value); }}>
+              {SOURCE_KEYS.map((key) => (
+                <option key={key} value={key}>{getSourceLabel(key)}</option>
+              ))}
+            </select>
           </div>
         </div>
 

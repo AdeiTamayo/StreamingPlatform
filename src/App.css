@@ -1763,10 +1763,17 @@ button.date-picker-month:hover {
 /* Episode nav */
 .ep-nav {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.ep-nav-center {
+  display: flex;
   align-items: center;
   gap: 1rem;
-  margin-top: 0.75rem;
+  margin: 0 auto;
 }
 
 .ep-nav-btn {
@@ -2572,4 +2579,40 @@ button.date-picker-month:hover {
 .settings-value {
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.settings-select {
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.settings-select:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+}
+
+.source-selector {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.source-dropdown .custom-select-trigger {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
+.source-dropdown .custom-select-trigger-label {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.source-dropdown .cs-arrow {
+  font-size: 0.65rem;
 }
