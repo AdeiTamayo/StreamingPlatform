@@ -17,6 +17,10 @@ const SOURCES = {
     movie: (id) => `https://vsembed.su/embed/movie/${id}`,
     tv: (id, s, e) => `https://vsembed.su/embed/tv/${id}/${s}/${e}`,
   },
+  embos: {
+    movie: (id) => `https://embos.top/movie/?mid=${id}`,
+    tv: (id, s, e) => `https://embos.top/tv/?mid=${id}&s=${s}&e=${e}`,
+  },
 };
 
 export function getMovieEmbedUrl(tmdbId, source = 'vidsrc') {
@@ -33,6 +37,7 @@ export function getSourceLabel(source) {
     '2embed': '2Embed',
     vsembed_ru: 'VSEmbed.ru',
     vsembed_su: 'VSEmbed.su',
+    embos: 'Embos',
   };
   return labels[source] || source;
 }
