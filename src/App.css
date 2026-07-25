@@ -2353,6 +2353,18 @@ button.date-picker-month:hover {
 }
 
 /* Episode list on TV detail */
+.browse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.browse-header .section-title {
+  margin-bottom: 0;
+}
+
 .episode-list-toggle {
   margin-top: 0.75rem;
 }
@@ -2372,11 +2384,32 @@ button.date-picker-month:hover {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   align-items: flex-start;
+  cursor: pointer;
 }
 
 .episode-card.current {
   border-color: rgba(125, 211, 252, 0.3);
   background: rgba(125, 211, 252, 0.04);
+}
+
+.episode-card.watched {
+  border-color: rgba(74, 222, 128, 0.25);
+  background: rgba(74, 222, 128, 0.04);
+}
+
+.ep-watched-badge {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--green);
+  color: #000;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.15rem;
 }
 
 .episode-card-thumb {
@@ -2579,21 +2612,6 @@ button.date-picker-month:hover {
 .settings-value {
   font-size: 0.85rem;
   font-weight: 600;
-}
-
-.settings-select {
-  padding: 0.3rem 0.6rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  font-size: 0.82rem;
-  outline: none;
-  cursor: pointer;
-}
-
-.settings-select:focus {
-  border-color: rgba(125, 211, 252, 0.55);
 }
 
 .source-selector {

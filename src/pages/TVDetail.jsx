@@ -32,7 +32,7 @@ export default function TVDetail() {
   const [trailerKey, setTrailerKey] = useState(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [videoSource, setVideoSource] = useState(getVideoSource());
-  const [showEpisodes, setShowEpisodes] = useState(false);
+  const [playerOpen, setPlayerOpen] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(null);
 
@@ -75,11 +75,13 @@ export default function TVDetail() {
         if (requestedSeasonExists && requestedEpisode > 0) {
           setSeason(requestedSeason);
           setEpisode(requestedEpisode);
+          setPlayerOpen(true);
         } else if (last && s.find((seasonItem) => seasonItem.season_number === last.season)) {
           setSeason(last.season);
           setEpisode(last.episode);
         } else {
           setSeason(firstSeason);
+          setEpisode(1);
         }
       })
       .catch(() => setError(true))
@@ -252,135 +254,170 @@ export default function TVDetail() {
         </div>
       </div>
 
-      <section className="section">
-        <h2 className="section-title">Watch Now</h2>
-        <div className="episode-selector">
-          <label>
-            Season:
+      {playerOpen ? (
+        <section className="section">
+          <h2 className="section-title">Watch Now</h2>
+          <div className="episode-selector">
+            <label>
+              Season:
+              <SeasonDropdown
+                seasons={seasons}
+                value={season}
+                onSelect={(s) => { setSeason(s); setEpisode(1); }}
+              />
+            </label>
+            <label>
+              <EpisodeDropdown
+                showId={id}
+                season={season}
+                episode={episode}
+                episodes={episodes}
+                onSelect={(ep) => { setEpisode(ep); }}
+              />
+            </label>
+            <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
+              {watched ? 'Watched' : 'Mark as watched'}
+            </button>
+            <button className={`watch-toggle ${inEpWL ? 'in-wl' : ''}`} onClick={() => {
+              if (inEpWL) { removeEpisodeWatchLater(id, season, episode); setInEpWL(false); }
+              else { addEpisodeWatchLater(id, season, episode, show.name); setInEpWL(true); }
+            }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
+            {trailerKey && (
+              <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
+                {showTrailer ? 'Hide Trailer' : 'Trailer'}
+              </button>
+            )}
+            {startAt && (
+              <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', id, season, episode); }}>
+                Restart
+              </button>
+            )}
+          </div>
+          <div className="season-progress">
+            <div className="sp-header">
+              <span className="sp-label">Season {season}</span>
+              <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
+              {watchedCount < episodeCount && (
+                <button className="mark-season-btn" onClick={() => {
+                  markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
+                  setWatchedCount(getWatchedCount(id, season, episodeCount));
+                  setWatched(isWatched('tv', id, season, episode));
+                  toast('Season marked as watched');
+                }}>Mark season watched</button>
+              )}
+            </div>
+            <div className="sp-bar">
+              {episodeNums.map((ep) => (
+                <button
+                  key={ep}
+                  className={`sp-dot ${ep === episode ? 'current' : ''} ${watchedStates[ep] ? 'done' : ''}`}
+                  onClick={() => setEpisode(ep)}
+                  title={`Episode ${ep}`}
+                />
+              ))}
+            </div>
+          </div>
+          {showTrailer && trailerKey ? (
+            <div className="trailer-wrapper">
+              <iframe
+                src={`https://www.youtube.com/embed/${trailerKey}`}
+                title="Trailer"
+                allow="autoplay; fullscreen; encrypted-media"
+                allowFullScreen
+                className="player-iframe"
+              />
+            </div>
+          ) : (
+            <Player
+              key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
+              src={embedUrl}
+              title={`${show.name} S${season}E${episode}`}
+              onProgress={handleProgress}
+              onEnded={handleEnded}
+              runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
+            />
+          )}
+          <div className="ep-nav">
+            <div className="ep-nav-center">
+              <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
+              <span className="ep-nav-label">S{season} E{episode}</span>
+              <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
+              <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
+            </div>
+            <FilterDropdown
+              value={videoSource}
+              options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+              placeholder="Source"
+              onSelect={(val) => setVideoSource(val)}
+              className="source-dropdown"
+            />
+          </div>
+
+          <div className="episode-list-toggle">
+            <button className="watch-toggle" onClick={() => setPlayerOpen(false)}>
+              Back to episodes
+            </button>
+          </div>
+        </section>
+      ) : (
+        <section className="section">
+          <div className="browse-header">
+            <h2 className="section-title">Episodes</h2>
             <SeasonDropdown
               seasons={seasons}
               value={season}
               onSelect={(s) => { setSeason(s); setEpisode(1); }}
             />
-          </label>
-          <label>
-            <EpisodeDropdown
-              showId={id}
-              season={season}
-              episode={episode}
-              episodes={episodes}
-              onSelect={(ep) => { setEpisode(ep); }}
-            />
-          </label>
-          <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
-            {watched ? 'Watched' : 'Mark as watched'}
-          </button>
-          <button className={`watch-toggle ${inEpWL ? 'in-wl' : ''}`} onClick={() => {
-            if (inEpWL) { removeEpisodeWatchLater(id, season, episode); setInEpWL(false); }
-            else { addEpisodeWatchLater(id, season, episode, show.name); setInEpWL(true); }
-          }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
-          {trailerKey && (
-            <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
-              {showTrailer ? 'Hide Trailer' : 'Trailer'}
-            </button>
-          )}
-          {startAt && (
-            <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', id, season, episode); }}>
-              Restart
-            </button>
-          )}
-        </div>
-        <div className="season-progress">
-          <div className="sp-header">
-            <span className="sp-label">Season {season}</span>
-            <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
-            {watchedCount < episodeCount && (
-              <button className="mark-season-btn" onClick={() => {
-                markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
-                setWatchedCount(getWatchedCount(id, season, episodeCount));
-                setWatched(isWatched('tv', id, season, episode));
-                toast('Season marked as watched');
-              }}>Mark season watched</button>
-            )}
           </div>
-          <div className="sp-bar">
-            {episodeNums.map((ep) => (
-              <button
-                key={ep}
-                className={`sp-dot ${ep === episode ? 'current' : ''} ${watchedStates[ep] ? 'done' : ''}`}
-                onClick={() => setEpisode(ep)}
-                title={`Episode ${ep}`}
-              />
-            ))}
+          <div className="season-progress">
+            <div className="sp-header">
+              <span className="sp-label">Season {season}</span>
+              <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
+              {watchedCount < episodeCount && (
+                <button className="mark-season-btn" onClick={() => {
+                  markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
+                  setWatchedCount(getWatchedCount(id, season, episodeCount));
+                  setWatched(isWatched('tv', id, season, episode));
+                  toast('Season marked as watched');
+                }}>Mark season watched</button>
+              )}
+            </div>
+            <div className="sp-bar">
+              {episodeNums.map((ep) => (
+                <button
+                  key={ep}
+                  className={`sp-dot ${watchedStates[ep] ? 'done' : ''}`}
+                  onClick={() => { setEpisode(ep); setPlayerOpen(true); }}
+                  title={`Episode ${ep}`}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-        {showTrailer && trailerKey ? (
-          <div className="trailer-wrapper">
-            <iframe
-              src={`https://www.youtube.com/embed/${trailerKey}`}
-              title="Trailer"
-              allow="autoplay; fullscreen; encrypted-media"
-              allowFullScreen
-              className="player-iframe"
-            />
-          </div>
-        ) : (
-          <Player
-            key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
-            src={embedUrl}
-            title={`${show.name} S${season}E${episode}`}
-            onProgress={handleProgress}
-            onEnded={handleEnded}
-            runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
-          />
-        )}
-        <div className="ep-nav">
-          <div className="ep-nav-center">
-            <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
-            <span className="ep-nav-label">S{season} E{episode}</span>
-            <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
-            <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
-          </div>
-          <FilterDropdown
-            value={videoSource}
-            options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
-            placeholder="Source"
-            onSelect={(val) => setVideoSource(val)}
-            className="source-dropdown"
-          />
-        </div>
-
-        {episodes.length > 0 && (
-          <div className="episode-list-toggle">
-            <button className="watch-toggle" onClick={() => setShowEpisodes((s) => !s)}>
-              {showEpisodes ? 'Hide episodes' : `Show episodes (${episodes.length})`}
-            </button>
-          </div>
-        )}
-
-        {showEpisodes && episodes.length > 0 && (
-          <div className="episode-list">
-            {episodes.map((ep) => (
-              <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''}`} onClick={() => { setEpisode(ep.episode_number); }}>
-                {ep.still_path && (
-                  <div className="episode-card-thumb">
-                    <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
+          {episodes.length > 0 && (
+            <div className="episode-list">
+              {episodes.map((ep) => (
+                <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''} ${watchedStates[ep.episode_number] ? 'watched' : ''}`} onClick={() => { setEpisode(ep.episode_number); setPlayerOpen(true); }}>
+                  {ep.still_path && (
+                    <div className="episode-card-thumb">
+                      <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
+                    </div>
+                  )}
+                  <div className="episode-card-info">
+                    <h4>E{ep.episode_number}. {ep.name}</h4>
+                    <div className="ep-meta">
+                      {ep.air_date && <span>{ep.air_date}</span>}
+                      {ep.runtime && <span> &middot; {ep.runtime}m</span>}
+                      {ep.vote_average > 0 && <span> &middot; {ep.vote_average.toFixed(1)}</span>}
+                    </div>
+                    {ep.overview && <div className="ep-overview">{ep.overview}</div>}
                   </div>
-                )}
-                <div className="episode-card-info">
-                  <h4>E{ep.episode_number}. {ep.name}</h4>
-                  <div className="ep-meta">
-                    {ep.air_date && <span>{ep.air_date}</span>}
-                    {ep.runtime && <span> &middot; {ep.runtime}m</span>}
-                    {ep.vote_average > 0 && <span> &middot; {ep.vote_average.toFixed(1)}</span>}
-                  </div>
-                  {ep.overview && <div className="ep-overview">{ep.overview}</div>}
+                  {watchedStates[ep.episode_number] && <span className="ep-watched-badge">&#10003;</span>}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {recommendations.length > 0 && (
         <section className="section">

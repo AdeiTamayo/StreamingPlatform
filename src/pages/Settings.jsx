@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource } from '../api/storage';
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/Toast';
+import FilterDropdown from '../components/FilterDropdown';
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -133,11 +134,12 @@ export default function Settings() {
           <h3>Video Source</h3>
           <div className="settings-row">
             <span className="settings-label">Default embed source</span>
-            <select className="settings-select" value={videoSource} onChange={(e) => { setVideoSourceState(e.target.value); setVideoSource(e.target.value); }}>
-              {SOURCE_KEYS.map((key) => (
-                <option key={key} value={key}>{getSourceLabel(key)}</option>
-              ))}
-            </select>
+            <FilterDropdown
+              value={videoSource}
+              options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+              placeholder="Select source"
+              onSelect={(val) => { setVideoSourceState(val); setVideoSource(val); }}
+            />
           </div>
         </div>
 
