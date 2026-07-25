@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
-import { getContinueWatching, getProgress, clearProgress } from '../api/storage';
+import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
 
 export default function Home() {
@@ -140,8 +140,7 @@ export default function Home() {
               {filteredCW.map((item, i) => {
               const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
               const poster = item.meta?.poster;
-              const prog = getProgress(item.type, item.id, item.season, item.episode);
-              const pct = prog?.currentTime ? Math.min(99, Math.round((prog.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
+              const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
               return (
                 <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className="cw-card">
                   <Link
