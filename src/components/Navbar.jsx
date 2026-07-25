@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import useClickOutside from '../hooks/useClickOutside';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home' },
@@ -18,12 +19,11 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarRef = useClickOutside(() => { if (menuOpen) setMenuOpen(false); });
   const searchRef = useRef(null);
-  const menuRef = useRef(null);
   const lastScrollRef = useRef(0);
   const searchBtnRef = useRef(null);
   const goBtnRef = useRef(null);
-  const formRef = useRef(null);
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -47,15 +47,6 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => { setMenuOpen(false); }, [location.pathname]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
 
   useEffect(() => {
     document.body.classList.toggle('sidebar-open', menuOpen);
@@ -143,7 +134,7 @@ export default function Navbar() {
         <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
       </button>
       {menuOpen && <div className="sidebar-overlay" />}
-      <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} ref={menuRef}>
+      <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} ref={sidebarRef}>
         <div className="sidebar-brand">StreamFlow</div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item) => (

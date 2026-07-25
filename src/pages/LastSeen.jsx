@@ -4,7 +4,7 @@ import { getLastSeen, markUnwatched, clearProgress } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
 
 const EPISODES_PER_PAGE = 8;
 

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource } from '../api/storage';
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
 import FilterDropdown from '../components/FilterDropdown';
 
 function formatBytes(bytes) {
@@ -16,7 +15,6 @@ export default function Settings() {
   const [usage, setUsage] = useState(null);
   const [stats, setStats] = useState(null);
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
-  const navigate = useNavigate();
   const toast = useToast();
   const fileInputRef = useRef(null);
 

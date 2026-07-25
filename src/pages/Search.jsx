@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';

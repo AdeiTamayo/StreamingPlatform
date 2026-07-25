@@ -34,7 +34,7 @@ export default function useSearchFilter(fetchFn, deps = {}) {
         .finally(() => setLoading(false));
     }, query?.trim() ? 400 : 0);
     return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
-  }, [page, filterKey]);
+  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil]);
 
   return { results, page, setPage, totalPages, loading };
 }

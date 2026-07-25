@@ -1,38 +1,12 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { isWatched } from '../api/storage';
+import useClickOutside from '../hooks/useClickOutside';
+import useDropdownSearch from '../hooks/useDropdownSearch';
 
 export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const ref = useRef(null);
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    setSearch('');
-    function handleKey(e) {
-      if (e.key === 'Escape') { setOpen(false); return; }
-      if (e.key === 'Backspace') { setSearch((s) => s.slice(0, -1)); resetTimer(); return; }
-      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-        setSearch((s) => (s + e.key).toLowerCase());
-        resetTimer();
-      }
-    }
-    function resetTimer() {
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setSearch(''), 1500);
-    }
-    document.addEventListener('keydown', handleKey);
-    return () => { document.removeEventListener('keydown', handleKey); clearTimeout(timerRef.current); };
-  }, [open]);
+  const ref = useClickOutside(() => setOpen(false));
+  const search = useDropdownSearch(open, () => setOpen(false));
 
   const filtered = useMemo(() => {
     if (!search) return episodes;

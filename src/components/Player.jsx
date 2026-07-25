@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { logDebug } from '../utils/logger';
 
 // How long to wait for the first postMessage before assuming this
 // embed session isn't sending events, and falling back to a wall-clock guess.
@@ -71,17 +72,6 @@ export default function Player({ src, title, onProgress, onEnded, runtimeMinutes
       expectedOrigin = new URL(src).origin;
     } catch {
       // malformed src - fall through to source-based check only
-    }
-
-    const DEBUG_KEY = 'player_debug';
-
-    function logDebug(msg) {
-      try {
-        const prev = JSON.parse(localStorage.getItem(DEBUG_KEY) || '[]');
-        prev.push({ ts: Date.now(), msg });
-        if (prev.length > 50) prev.splice(0, prev.length - 50);
-        localStorage.setItem(DEBUG_KEY, JSON.stringify(prev));
-      } catch { /* storage full or blocked */ }
     }
 
     function handleMessage(e) {

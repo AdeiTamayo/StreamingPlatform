@@ -4,7 +4,7 @@ import { getWatchLater, removeWatchLater, getEpisodeWatchLater, removeEpisodeWat
 import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
 
 export default function WatchLater() {
   const [items, setItems] = useState([]);

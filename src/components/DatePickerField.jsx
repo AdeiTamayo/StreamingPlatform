@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import useClickOutside from '../hooks/useClickOutside';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -40,15 +41,7 @@ export default function DatePickerField({ label, value, onChange, placeholder })
     const [open, setOpen] = useState(false);
     const [view, setView] = useState('day');
     const [viewDate, setViewDate] = useState(() => parseDateString(value) || new Date());
-    const ref = useRef(null);
-
-    useEffect(() => {
-        function handleClick(e) {
-            if (ref.current && !ref.current.contains(e.target)) setOpen(false);
-        }
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
+    const ref = useClickOutside(() => setOpen(false));
 
     useEffect(() => {
         const parsed = parseDateString(value);

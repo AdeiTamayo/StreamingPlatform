@@ -8,7 +8,8 @@ import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
 import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
+import { logDebug } from '../utils/logger';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
@@ -46,7 +47,7 @@ export default function TVDetail() {
     const map = {};
     episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id, season, ep); });
     return map;
-  }, [episodeNums, id, season, watchedCount]);
+  }, [episodeNums, id, season]);
 
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
@@ -134,12 +135,7 @@ export default function TVDetail() {
     const tmdbRuntime = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
-    try {
-      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
-      prev.push({ ts: Date.now(), msg: `autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}` });
-      if (prev.length > 50) prev.splice(0, prev.length - 50);
-      localStorage.setItem('player_debug', JSON.stringify(prev));
-    } catch { }
+    logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}`);
 
     if (!runtimeSeconds) return;
 
@@ -216,7 +212,6 @@ export default function TVDetail() {
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
-  const crew = show.credits?.crew || [];
   const created = show.created_by || [];
   const networks = show.networks || [];
   const genres = show.genres?.map((g) => g.name).join(', ') || '';

@@ -1,3 +1,5 @@
+import { logDebug } from '../utils/logger';
+
 const WL_KEY = 'watchlater';
 const PROGRESS_INDEX_KEY = 'progress_index';
 const VIDEO_SOURCE_KEY = 'video_source';
@@ -102,19 +104,9 @@ export function saveProgress(type, id, currentTime, season, episode, meta) {
   try {
     localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
     addToProgressIndex(progressKey(type, id, season, episode));
-    try {
-      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
-      prev.push({ ts: Date.now(), msg: `saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}` });
-      if (prev.length > 50) prev.splice(0, prev.length - 50);
-      localStorage.setItem('player_debug', JSON.stringify(prev));
-    } catch { /* debug log failure is fine */ }
+    logDebug(`saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}`);
   } catch (err) {
-    try {
-      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
-      prev.push({ ts: Date.now(), msg: `saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${err.message}` });
-      if (prev.length > 50) prev.splice(0, prev.length - 50);
-      localStorage.setItem('player_debug', JSON.stringify(prev));
-    } catch { /* nothing we can do */ }
+    logDebug(`saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${err.message}`);
   }
 }
 

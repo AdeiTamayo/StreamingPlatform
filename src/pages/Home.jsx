@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, getProgress, clearProgress } from '../api/storage';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
 
 export default function Home() {
   const [trending, setTrending] = useState([]);

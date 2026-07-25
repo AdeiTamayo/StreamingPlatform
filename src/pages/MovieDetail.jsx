@@ -6,7 +6,8 @@ import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clear
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
-import { useToast } from '../components/Toast';
+import { useToast } from '../components/useToast';
+import { logDebug } from '../utils/logger';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
@@ -64,12 +65,7 @@ export default function MovieDetail() {
     const tmdbRuntime = movie.runtime || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
-    try {
-      const prev = JSON.parse(localStorage.getItem('player_debug') || '[]');
-      prev.push({ ts: Date.now(), msg: `autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds}` });
-      if (prev.length > 50) prev.splice(0, prev.length - 50);
-      localStorage.setItem('player_debug', JSON.stringify(prev));
-    } catch { }
+    logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds}`);
 
     if (!runtimeSeconds) return;
     const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
