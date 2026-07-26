@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -18,6 +18,7 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 export default function App() {
   const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -27,8 +28,9 @@ export default function App() {
     <ToastProvider>
       <ErrorBoundary>
         <div className="app-shell">
+          <a href="#main-content" className="skip-link">Skip to content</a>
           <Navbar />
-          <div className="app-content">
+          <main id="main-content" className="app-content" ref={mainRef}>
             <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -43,7 +45,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
-          </div>
+          </main>
         </div>
       </ErrorBoundary>
     </ToastProvider>
