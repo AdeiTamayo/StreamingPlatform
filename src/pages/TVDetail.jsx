@@ -47,7 +47,8 @@ export default function TVDetail() {
     const map = {};
     episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id, season, ep); });
     return map;
-  }, [episodeNums, id, season]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episodeNums, id, season, watchedCount]);
 
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
