@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function useSearchFilter(fetchFn, deps = {}) {
+export default function useSearchFilter(fetchFn: any, deps: Record<string, any> = {}) {
   const [results, setResults] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
