@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
@@ -14,6 +14,7 @@ export default function Home() {
   const [continueWatching, setContinueWatching] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState('all');
+  const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
 
@@ -78,7 +79,10 @@ export default function Home() {
 
   return (
     <div className="page">
-      <section className={styles.hero}>
+      <section
+        className={styles.hero}
+        ref={heroRef}
+      >
         <div className={styles.heroBackdrop}>
           {hero ? (
             <>

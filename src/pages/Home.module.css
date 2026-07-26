@@ -134,33 +134,36 @@
 
 .hero-dots {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.15rem;
   margin-top: 0.75rem;
 }
 
 .hero-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
-  transition: background 0.25s, transform 0.25s;
+  width: 12px;
+  height: 12px;
   padding: 0;
-  border: none;
-}
-
-.active {
-  background: var(--accent);
-  transform: scale(1.35);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: none;
+  cursor: pointer;
+  transition: background 0.25s, border-color 0.25s, transform 0.25s;
+  flex-shrink: 0;
 }
 
 .hero-dot:hover {
-  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.hero-dot.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  transform: scale(1.35);
 }
 
 /* Continue Watching */
 .cw-toggles {
   display: flex;
-  gap: 0.35rem;
+  gap: 0.5rem;
 }
 
 .cw-toggle {

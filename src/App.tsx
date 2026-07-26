@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -19,10 +19,23 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 export default function App() {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+
+  useEffect(() => {
+    function onScroll() {
+      setShowBackToTop(window.scrollY > 600);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   return (
     <ToastProvider>
@@ -46,6 +59,13 @@ export default function App() {
               </Routes>
             </Suspense>
           </main>
+          <button
+            className={`back-to-top${showBackToTop ? ' visible' : ''}`}
+            onClick={scrollToTop}
+            aria-label="Back to top"
+          >
+            &#8593;
+          </button>
         </div>
       </ErrorBoundary>
     </ToastProvider>
