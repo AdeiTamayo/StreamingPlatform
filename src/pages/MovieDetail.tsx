@@ -8,6 +8,7 @@ import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
 import { logDebug } from '../utils/logger';
+import styles from './MovieDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
@@ -184,7 +185,7 @@ export default function MovieDetail() {
         {!showTrailer && (
           <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
         )}
-        <div className="source-selector">
+        <div className={styles.sourceSelector}>
           <FilterDropdown
             value={videoSource}
             options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}

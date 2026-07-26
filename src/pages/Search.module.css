@@ -1,0 +1,60 @@
+.search-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.search-tab {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.search-tab:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #03111e;
+  border-color: transparent;
+}
+
+.search-history {
+  margin-bottom: 1rem;
+}
+
+.search-history-title {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.4rem;
+}
+
+.search-history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.search-history-item {
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.search-history-item:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}

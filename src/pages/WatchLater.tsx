@@ -5,6 +5,7 @@ import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import styles from './WatchLater.module.css';
 
 export default function WatchLater() {
   const [items, setItems] = useState([]);
@@ -59,7 +60,7 @@ export default function WatchLater() {
           <>
             {items.length > 0 && (
               <>
-                <div className="wl-controls">
+                <div className={styles.wlControls}>
                   <FilterDropdown
                     value={filterType}
                     options={[
@@ -81,7 +82,7 @@ export default function WatchLater() {
                     onSelect={setSortBy}
                   />
                   {(filterType !== 'all' || sortBy !== 'recent') && (
-                    <button className="wl-clear-btn" onClick={() => { setFilterType('all'); setSortBy('recent'); }}>Clear filters</button>
+                    <button className={styles.wlClearBtn} onClick={() => { setFilterType('all'); setSortBy('recent'); }}>Clear filters</button>
                   )}
                 </div>
                 <div className="media-grid">
@@ -108,7 +109,7 @@ export default function WatchLater() {
                 <h3 className="sub-section-title">Episodes</h3>
                 <div className="media-grid">
                   {epItems.map((item) => (
-                    <div key={`${item.showId}-S${item.season}E${item.episode}`} className="media-card ep-wl-card">
+                    <div key={`${item.showId}-S${item.season}E${item.episode}`} className={`media-card ${styles.epWlCard}`}>
                       <Link to={`/tv/${item.showId}?season=${item.season}&episode=${item.episode}`}>
                         <div className="media-card-info">
                           <h3>{item.showTitle}</h3>

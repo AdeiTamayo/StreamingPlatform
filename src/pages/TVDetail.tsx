@@ -10,6 +10,7 @@ import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
 import { useToast } from '../components/useToast';
 import { logDebug } from '../utils/logger';
+import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
@@ -289,12 +290,12 @@ export default function TVDetail() {
               </button>
             )}
           </div>
-          <div className="season-progress">
-            <div className="sp-header">
-              <span className="sp-label">Season {season}</span>
-              <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
+          <div className={styles.seasonProgress}>
+            <div className={styles.spHeader}>
+              <span className={styles.spLabel}>Season {season}</span>
+              <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
               {watchedCount < episodeCount && (
-                <button className="mark-season-btn" onClick={() => {
+                <button className={styles.markSeasonBtn} onClick={() => {
                   markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
                   setWatchedCount(getWatchedCount(id, season, episodeCount));
                   setWatched(isWatched('tv', id, season, episode));
@@ -302,11 +303,11 @@ export default function TVDetail() {
                 }}>Mark season watched</button>
               )}
             </div>
-            <div className="sp-bar">
+            <div className={styles.spBar}>
               {episodeNums.map((ep) => (
                 <button
                   key={ep}
-                  className={`sp-dot ${ep === episode ? 'current' : ''} ${watchedStates[ep] ? 'done' : ''}`}
+                  className={`${styles.spDot} ${ep === episode ? styles.current : ''} ${watchedStates[ep] ? styles.done : ''}`}
                   onClick={() => setEpisode(ep)}
                   title={`Episode ${ep}`}
                 />
@@ -333,12 +334,12 @@ export default function TVDetail() {
               runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
             />
           )}
-          <div className="ep-nav">
-            <div className="ep-nav-center">
-              <button className="ep-nav-btn" disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
-              <span className="ep-nav-label">S{season} E{episode}</span>
-              <button className="ep-nav-btn" disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
-              <button className={`ep-nav-watch ${watched ? 'watched' : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
+          <div className={styles.epNav}>
+            <div className={styles.epNavCenter}>
+              <button className={styles.epNavBtn} disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
+              <span className={styles.epNavLabel}>S{season} E{episode}</span>
+              <button className={styles.epNavBtn} disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
+              <button className={`${styles.epNavWatch} ${watched ? styles.watched : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
             </div>
             <FilterDropdown
               value={videoSource}
@@ -349,7 +350,7 @@ export default function TVDetail() {
             />
           </div>
 
-          <div className="episode-list-toggle">
+          <div className={styles.episodeListToggle}>
             <button className="watch-toggle" onClick={() => setPlayerOpen(false)}>
               Back to episodes
             </button>
@@ -357,7 +358,7 @@ export default function TVDetail() {
         </section>
       ) : (
         <section className="section">
-          <div className="browse-header">
+          <div className={styles.browseHeader}>
             <h2 className="section-title">Episodes</h2>
             <SeasonDropdown
               seasons={seasons}
@@ -365,12 +366,12 @@ export default function TVDetail() {
               onSelect={(s) => { setSeason(s); setEpisode(1); }}
             />
           </div>
-          <div className="season-progress">
-            <div className="sp-header">
-              <span className="sp-label">Season {season}</span>
-              <span className="sp-count">{watchedCount}/{episodeCount} watched</span>
+          <div className={styles.seasonProgress}>
+            <div className={styles.spHeader}>
+              <span className={styles.spLabel}>Season {season}</span>
+              <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
               {watchedCount < episodeCount && (
-                <button className="mark-season-btn" onClick={() => {
+                <button className={styles.markSeasonBtn} onClick={() => {
                   markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
                   setWatchedCount(getWatchedCount(id, season, episodeCount));
                   setWatched(isWatched('tv', id, season, episode));
@@ -378,11 +379,11 @@ export default function TVDetail() {
                 }}>Mark season watched</button>
               )}
             </div>
-            <div className="sp-bar">
+            <div className={styles.spBar}>
               {episodeNums.map((ep) => (
                 <button
                   key={ep}
-                  className={`sp-dot ${watchedStates[ep] ? 'done' : ''}`}
+                  className={`${styles.spDot} ${watchedStates[ep] ? styles.done : ''}`}
                   onClick={() => { setEpisode(ep); setPlayerOpen(true); }}
                   title={`Episode ${ep}`}
                 />
@@ -390,24 +391,24 @@ export default function TVDetail() {
             </div>
           </div>
           {episodes.length > 0 && (
-            <div className="episode-list">
+            <div className={styles.episodeList}>
               {episodes.map((ep) => (
-                <div key={ep.episode_number} className={`episode-card ${ep.episode_number === episode ? 'current' : ''} ${watchedStates[ep.episode_number] ? 'watched' : ''}`} onClick={() => { setEpisode(ep.episode_number); setPlayerOpen(true); }}>
+                <div key={ep.episode_number} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${watchedStates[ep.episode_number] ? styles.watched : ''}`} onClick={() => { setEpisode(ep.episode_number); setPlayerOpen(true); }}>
                   {ep.still_path && (
-                    <div className="episode-card-thumb">
+                    <div className={styles.episodeCardThumb}>
                       <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
                     </div>
                   )}
-                  <div className="episode-card-info">
+                  <div className={styles.episodeCardInfo}>
                     <h4>E{ep.episode_number}. {ep.name}</h4>
-                    <div className="ep-meta">
+                    <div className={styles.epMeta}>
                       {ep.air_date && <span>{ep.air_date}</span>}
                       {ep.runtime && <span> &middot; {ep.runtime}m</span>}
                       {ep.vote_average > 0 && <span> &middot; {ep.vote_average.toFixed(1)}</span>}
                     </div>
-                    {ep.overview && <div className="ep-overview">{ep.overview}</div>}
+                    {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
                   </div>
-                  {watchedStates[ep.episode_number] && <span className="ep-watched-badge">&#10003;</span>}
+                  {watchedStates[ep.episode_number] && <span className={styles.epWatchedBadge}>&#10003;</span>}
                 </div>
               ))}
             </div>

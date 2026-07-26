@@ -5,6 +5,7 @@ import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import styles from './LastSeen.module.css';
 
 const EPISODES_PER_PAGE = 8;
 
@@ -123,10 +124,10 @@ export default function LastSeen() {
           </div>
         ) : (
           <>
-            <div className="last-seen-controls">
+            <div className={styles.lastSeenControls}>
               <input
                 type="text"
-                className="last-seen-search"
+                className={styles.lastSeenSearch}
                 placeholder="Filter by title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -152,7 +153,7 @@ export default function LastSeen() {
                 onSelect={setSortBy}
               />
               {hasActiveFilter && (
-                <button className="last-seen-clear-btn" onClick={() => { setFilterType('all'); setSortBy('recent'); setSearchQuery(''); }}>Clear filters</button>
+                <button className={styles.lastSeenClearBtn} onClick={() => { setFilterType('all'); setSortBy('recent'); setSearchQuery(''); }}>Clear filters</button>
               )}
             </div>
 
@@ -172,18 +173,18 @@ export default function LastSeen() {
                       <article key={show.id} className="last-seen-series">
                         <div className="last-seen-series-head">
                           <div className="last-seen-series-title-wrap">
-                            <span className="last-seen-series-index">{idx + 1}</span>
-                            {show.poster && <img src={imageUrl(show.poster)} alt={show.title} className="last-seen-series-poster" />}
+                            <span className={styles.lastSeenSeriesIndex}>{idx + 1}</span>
+                            {show.poster && <img src={imageUrl(show.poster)} alt={show.title} className={styles.lastSeenSeriesPoster} />}
                             <div>
-                              <h3 className="last-seen-series-title">{show.title}</h3>
-                              <p className="last-seen-series-subtitle">{show.episodes.length} saved episode{show.episodes.length === 1 ? '' : 's'}</p>
+                              <h3 className={styles.lastSeenSeriesTitle}>{show.title}</h3>
+                              <p className={styles.lastSeenSeriesSubtitle}>{show.episodes.length} saved episode{show.episodes.length === 1 ? '' : 's'}</p>
                             </div>
                           </div>
-                          <div className="last-seen-series-actions">
+                          <div className={styles.lastSeenSeriesActions}>
                             <button className={`watch-toggle ${hidden ? 'in-wl' : ''}`} onClick={() => setHideWatched((prev) => ({ ...prev, [show.id]: !hidden }))}>
                               {hidden ? 'Show all' : 'Hide watched'}
                             </button>
-                            <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
+                            <Link to={`/tv/${show.id}`} className={styles.lastSeenSeriesLink}>Open show</Link>
                             <button className="watch-toggle danger" onClick={() => { if (window.confirm(`Remove all ${show.episodes.length} saved episode${show.episodes.length === 1 ? '' : 's'} for "${show.title}"?`)) handleRemoveShow(show.id); }}>
                               Remove all
                             </button>
@@ -192,21 +193,21 @@ export default function LastSeen() {
 
                         <div className="last-seen-episode-list">
                           {visibleEpisodes.map((item) => (
-                            <div key={item.storageKey} className="last-seen-episode-row">
+                            <div key={item.storageKey} className={styles.lastSeenEpisodeRow}>
                               <Link
                                 to={`/tv/${show.id}?season=${item.season}&episode=${item.episode}`}
-                                className="last-seen-episode"
+                                className={styles.lastSeenEpisode}
                               >
-                                <span className="ls-label">{formatEpisodeLabel(item)}</span>
-                                <span className="ls-meta">{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
+                                <span className={styles.lsLabel}>{formatEpisodeLabel(item)}</span>
+                                <span className={styles.lsMeta}>{item.source === 'progress' ? 'Resume' : 'Watched'}</span>
                               </Link>
-                              <button className="ls-remove" onClick={() => handleRemove(item)} title="Remove">&times;</button>
+                              <button className={styles.lsRemove} onClick={() => handleRemove(item)} title="Remove">&times;</button>
                             </div>
                           ))}
                         </div>
 
                         {pageCount > 1 && (
-                          <div className="pagination last-seen-pagination">
+                          <div className={`pagination ${styles.lastSeenPagination}`}>
                             <button disabled={safePage === 0} onClick={() => setPage(show.id, safePage - 1)}>Previous</button>
                             <span>Page {safePage + 1} of {pageCount}</span>
                             <button disabled={safePage >= pageCount - 1} onClick={() => setPage(show.id, safePage + 1)}>Next</button>

@@ -3,6 +3,7 @@ import { exportData, importData, getStorageUsage, getStats, getVideoSource, setV
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/useToast';
 import FilterDropdown from '../components/FilterDropdown';
+import styles from './Settings.module.css';
 
 function formatBytes(bytes) {
   if (bytes < 1024) return bytes + ' B';
@@ -76,50 +77,50 @@ export default function Settings() {
         <h2 className="section-title">Settings</h2>
 
         {stats && (
-          <div className="settings-group">
+          <div className={styles.settingsGroup}>
             <h3>Statistics</h3>
-            <div className="settings-row">
-              <span className="settings-label">Movies watched</span>
-              <span className="settings-value">{stats.moviesWatched}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Movies watched</span>
+              <span className={styles.settingsValue}>{stats.moviesWatched}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">Episodes watched</span>
-              <span className="settings-value">{stats.episodesWatched}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Episodes watched</span>
+              <span className={styles.settingsValue}>{stats.episodesWatched}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">In Watch Later</span>
-              <span className="settings-value">{stats.watchLaterCount}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>In Watch Later</span>
+              <span className={styles.settingsValue}>{stats.watchLaterCount}</span>
             </div>
           </div>
         )}
 
         {usage && (
-          <div className="settings-group">
+          <div className={styles.settingsGroup}>
             <h3>Storage</h3>
-            <div className="settings-row">
-              <span className="settings-label">Total used</span>
-              <span className="settings-value">{formatBytes(usage.total)}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Total used</span>
+              <span className={styles.settingsValue}>{formatBytes(usage.total)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">Watch history</span>
-              <span className="settings-value">{formatBytes(usage.breakdown.watched)}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Watch history</span>
+              <span className={styles.settingsValue}>{formatBytes(usage.breakdown.watched)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">Progress</span>
-              <span className="settings-value">{formatBytes(usage.breakdown.progress)}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Progress</span>
+              <span className={styles.settingsValue}>{formatBytes(usage.breakdown.progress)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">Watch Later</span>
-              <span className="settings-value">{formatBytes(usage.breakdown.watchlater + usage.breakdown.epwl)}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>Watch Later</span>
+              <span className={styles.settingsValue}>{formatBytes(usage.breakdown.watchlater + usage.breakdown.epwl)}</span>
             </div>
-            <div className="settings-row">
-              <span className="settings-label">TMDB cache</span>
-              <span className="settings-value">{formatBytes(usage.breakdown.cache)}</span>
+            <div className={styles.settingsRow}>
+              <span className={styles.settingsLabel}>TMDB cache</span>
+              <span className={styles.settingsValue}>{formatBytes(usage.breakdown.cache)}</span>
             </div>
           </div>
         )}
 
-        <div className="settings-group">
+        <div className={styles.settingsGroup}>
           <h3>Backup</h3>
           <div className="detail-actions">
             <button className="watch-toggle" onClick={handleExport}>Export data</button>
@@ -128,10 +129,10 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className={styles.settingsGroup}>
           <h3>Video Source</h3>
-          <div className="settings-row">
-            <span className="settings-label">Default embed source</span>
+          <div className={styles.settingsRow}>
+            <span className={styles.settingsLabel}>Default embed source</span>
             <FilterDropdown
               value={videoSource}
               options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
@@ -141,15 +142,15 @@ export default function Settings() {
           </div>
         </div>
 
-        <div className="settings-group">
+        <div className={styles.settingsGroup}>
           <h3>Danger Zone</h3>
           {!confirm ? (
             <button className="watch-toggle danger" onClick={() => setConfirm(true)}>
               Clear all local data
             </button>
           ) : (
-            <div className="confirm-bar">
-              <span className="confirm-text">This removes watched marks, progress, watch later, and cache. Are you sure?</span>
+            <div className={styles.confirmBar}>
+              <span className={styles.confirmText}>This removes watched marks, progress, watch later, and cache. Are you sure?</span>
               <button className="watch-toggle danger" onClick={clearAll}>Yes, clear everything</button>
               <button className="watch-toggle" onClick={() => setConfirm(false)}>Cancel</button>
             </div>
