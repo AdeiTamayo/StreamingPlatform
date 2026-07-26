@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { logDebug } from '../utils/logger';
+import styles from './Player.module.css';
 
 // How long to wait for the first postMessage before assuming this
 // embed session isn't sending events, and falling back to a wall-clock guess.
@@ -141,7 +142,7 @@ export default function Player({ src, title, onProgress, onEnded, runtimeMinutes
   }, [src, clearFallbackTimers, startWallClockFallback]);
 
   return (
-    <div className="player-wrapper">
+    <div className={styles.playerWrapper}>
       <iframe
         ref={iframeRef}
         src={src}
