@@ -14,7 +14,6 @@ export default function Home() {
   const [continueWatching, setContinueWatching] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState('all');
-  const [heroPaused, setHeroPaused] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
@@ -34,12 +33,12 @@ export default function Home() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (trending.length < 2 || heroPaused) return;
+    if (trending.length < 2) return;
     const timer = setInterval(() => {
       setHeroIdx((i) => (i + 1) % Math.min(trending.length, 8));
     }, 6000);
     return () => clearInterval(timer);
-  }, [trending.length, heroPaused]);
+  }, [trending.length]);
 
   const heroItems = trending.slice(0, 8);
   const hero = heroItems[heroIdx];
@@ -83,8 +82,6 @@ export default function Home() {
       <section
         className={styles.hero}
         ref={heroRef}
-        onMouseEnter={() => setHeroPaused(true)}
-        onMouseLeave={() => setHeroPaused(false)}
       >
         <div className={styles.heroBackdrop}>
           {hero ? (
