@@ -7,6 +7,7 @@ import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
 import styles from './MovieDetail.module.css';
 
@@ -26,6 +27,7 @@ export default function MovieDetail() {
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
+  const { getSignal } = useAbortController();
 
   useEffect(() => {
     setLoading(true);
@@ -38,7 +40,7 @@ export default function MovieDetail() {
     autoWatchedRef.current = false;
     setTrailerKey(null);
     setShowTrailer(false);
-    getMovieDetail(id)
+    getMovieDetail(id, getSignal())
       .then((data) => {
         setMovie(data);
         document.title = `${data.title} - StreamFlow`;
@@ -46,9 +48,12 @@ export default function MovieDetail() {
         const yt = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
         if (yt) setTrailerKey(yt.key);
       })
-      .catch(() => setError(true))
+      .catch((err) => {
+        if (err?.name === 'AbortError') return;
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function autoMarkWatched() {
     if (!movie || watchedRef.current || autoWatchedRef.current) return;
@@ -96,13 +101,13 @@ export default function MovieDetail() {
   function retry() {
     setLoading(true);
     setError(false);
-    getMovieDetail(id).then(setMovie).catch(() => setError(true)).finally(() => setLoading(false));
+    getMovieDetail(id, getSignal()).then(setMovie).catch((err) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
   }
 
-  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
+  if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;
 
   if (error) return (
-    <div className="page">
+    <div className="page" role="alert">
       <div className="loading">Failed to load. Check your connection.</div>
       <div className="retry-bar"><button className="watch-toggle" onClick={retry}>Retry</button></div>
     </div>
@@ -150,8 +155,8 @@ export default function MovieDetail() {
         </div>
       </div>
 
-      <section className="section">
-        <h2 className="section-title">Watch Now</h2>
+      <section className="section" aria-labelledby="watch-heading">
+        <h2 id="watch-heading" className="section-title">Watch Now</h2>
         <div className="detail-actions">
           <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
             {watched ? 'Watched' : 'Mark as watched'}
@@ -197,8 +202,8 @@ export default function MovieDetail() {
       </section>
 
       {recommendations.length > 0 && (
-        <section className="section">
-          <h2 className="section-title">You might also like</h2>
+        <section className="section" aria-labelledby="recs-heading">
+          <h2 id="recs-heading" className="section-title">You might also like</h2>
           <div className="media-grid">
             {recommendations.map((item) => (
               <MediaCard key={item.id} item={item} mediaType="movie" />

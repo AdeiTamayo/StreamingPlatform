@@ -528,11 +528,37 @@
   color: var(--text);
   font-size: 0.8rem;
   font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .empty-state-action:hover {
   background: rgba(125, 211, 252, 0.12);
   border-color: rgba(125, 211, 252, 0.2);
+}
+
+.empty-state-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Skip to content */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent-strong);
+  color: var(--bg);
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  z-index: 10000;
+  transition: top 0.2s;
+}
+
+.skip-link:focus {
+  top: 0;
 }
 
 /* Home link */
@@ -837,6 +863,12 @@
 }
 
 .custom-select-item:hover {
+  background: rgba(125, 211, 252, 0.1);
+}
+
+.custom-select-item:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: -2px;
   background: rgba(125, 211, 252, 0.1);
 }
 
