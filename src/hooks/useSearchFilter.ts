@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAbortController } from './useAbortController';
 
 export default function useSearchFilter(fetchFn: any, deps: Record<string, any> = {}) {
@@ -26,8 +26,8 @@ export default function useSearchFilter(fetchFn: any, deps: Record<string, any> 
 
   useEffect(() => {
     if (fetchRef.current) clearTimeout(fetchRef.current);
+    setLoading(true);
     fetchRef.current = setTimeout(() => {
-      setLoading(true);
       setError(false);
       fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil }, getSignal())
         .then((data) => {
