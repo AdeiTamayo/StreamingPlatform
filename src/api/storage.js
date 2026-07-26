@@ -117,6 +117,33 @@ export function markUnwatched(type, id, season, episode) {
   removeFromWatchedIndex(key);
 }
 
+export function clearShowHistory(showId) {
+  const showIdStr = String(showId);
+  const watchedIndex = getWatchedIndex();
+  const remainingWatched = [];
+  for (const k of watchedIndex) {
+    const p = parseWatchedKey(k);
+    if (p && p.showId === showIdStr) {
+      localStorage.removeItem(k);
+    } else {
+      remainingWatched.push(k);
+    }
+  }
+  saveIndex(WATCHED_INDEX_KEY, remainingWatched);
+
+  const progressIndex = getProgressIndex();
+  const remainingProgress = [];
+  for (const k of progressIndex) {
+    const p = parseProgressKey(k);
+    if (p && p.showId === showIdStr) {
+      localStorage.removeItem(k);
+    } else {
+      remainingProgress.push(k);
+    }
+  }
+  saveIndex(PROGRESS_INDEX_KEY, remainingProgress);
+}
+
 export function getLastWatchedEpisode(showId) {
   let last = null;
   const index = getWatchedIndex();

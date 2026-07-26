@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getLastSeen, markUnwatched, clearProgress } from '../api/storage';
+import { getLastSeen, markUnwatched, clearProgress, clearShowHistory } from '../api/storage';
 import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
@@ -95,6 +95,12 @@ export default function LastSeen() {
     toast('Removed from history');
   }
 
+  function handleRemoveShow(showId) {
+    clearShowHistory(showId);
+    setItems(getLastSeen());
+    toast('Series removed from history');
+  }
+
   function setPage(showId, nextPage) {
     setPages((current) => ({ ...current, [showId]: nextPage }));
   }
@@ -178,6 +184,9 @@ export default function LastSeen() {
                               {hidden ? 'Show all' : 'Hide watched'}
                             </button>
                             <Link to={`/tv/${show.id}`} className="last-seen-series-link">Open show</Link>
+                            <button className="watch-toggle danger" onClick={() => { if (window.confirm(`Remove all ${show.episodes.length} saved episode${show.episodes.length === 1 ? '' : 's'} for "${show.title}"?`)) handleRemoveShow(show.id); }}>
+                              Remove all
+                            </button>
                           </div>
                         </div>
 
