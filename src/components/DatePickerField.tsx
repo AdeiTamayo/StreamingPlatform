@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
+import styles from './DatePickerField.module.css';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -76,36 +77,36 @@ export default function DatePickerField({ label, value, onChange, placeholder })
     }
 
     return (
-        <div className="date-picker" ref={ref}>
-            <button className="date-picker-trigger" onClick={openPicker}>
-                <span className="date-picker-inline-label">{label}</span>
-                <span className={`date-picker-value ${value ? '' : 'empty'}`}>{value || placeholder}</span>
-                <span className="date-picker-icon">&#128197;</span>
+        <div className={styles.datePicker} ref={ref}>
+            <button className={styles.datePickerTrigger} onClick={openPicker}>
+                <span className={styles.datePickerInlineLabel}>{label}</span>
+                <span className={`${styles.datePickerValue} ${value ? '' : styles.empty}`}>{value || placeholder}</span>
+                <span className={styles.datePickerIcon}>&#128197;</span>
             </button>
             {open && (
-                <div className="date-picker-popover">
+                <div className={styles.datePickerPopover}>
                     {view === 'day' && (
                         <>
-                            <div className="date-picker-header">
-                                <button className="date-picker-nav" onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}>&#10094;</button>
-                                <button className="date-picker-month" onClick={() => setView('month')}>
+                            <div className={styles.datePickerHeader}>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}>&#10094;</button>
+                                <button className={styles.datePickerMonth} onClick={() => setView('month')}>
                                     {viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
                                 </button>
-                                <button className="date-picker-nav" onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}>&#10095;</button>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}>&#10095;</button>
                             </div>
-                            <div className="date-picker-weekdays">
+                            <div className={styles.datePickerWeekdays}>
                                 {WEEKDAYS.map((weekday) => <span key={weekday}>{weekday}</span>)}
                             </div>
-                            <div className="date-picker-grid">
+                            <div className={styles.datePickerGrid}>
                                 {monthCells.map((day, index) => {
-                                    if (!day) return <span key={`empty-${index}`} className="date-picker-cell empty" />;
+                                    if (!day) return <span key={`empty-${index}`} className={`${styles.datePickerCell} ${styles.empty}`} />;
                                     const dayString = toDateString(day);
                                     const isSelected = selectedDate && dayString === toDateString(selectedDate);
                                     const isToday = dayString === todayString;
                                     return (
                                         <button
                                             key={dayString}
-                                            className={`date-picker-cell ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}`}
+                                            className={`${styles.datePickerCell} ${isSelected ? styles.selected : ''} ${isToday ? styles.today : ''}`}
                                             onClick={() => selectDate(day)}
                                         >
                                             {day.getDate()}
@@ -118,20 +119,20 @@ export default function DatePickerField({ label, value, onChange, placeholder })
 
                     {view === 'month' && (
                         <>
-                            <div className="date-picker-header">
-                                <button className="date-picker-nav" onClick={() => setView('year')}>&#10094;</button>
-                                <button className="date-picker-month" onClick={() => setView('year')}>
+                            <div className={styles.datePickerHeader}>
+                                <button className={styles.datePickerNav} onClick={() => setView('year')}>&#10094;</button>
+                                <button className={styles.datePickerMonth} onClick={() => setView('year')}>
                                     {viewDate.getFullYear()}
                                 </button>
-                                <span className="date-picker-nav" />
+                                <span className={styles.datePickerNav} />
                             </div>
-                            <div className="date-picker-grid months">
+                            <div className={`${styles.datePickerGrid} ${styles.months}`}>
                                 {MONTHS.map((name, i) => {
                                     const isCurrent = i === viewDate.getMonth();
                                     return (
                                         <button
                                             key={name}
-                                            className={`date-picker-cell month-cell ${isCurrent ? 'selected' : ''}`}
+                                            className={`${styles.datePickerCell} ${isCurrent ? styles.selected : ''}`}
                                             onClick={() => {
                                                 setViewDate((c) => new Date(c.getFullYear(), i, 1));
                                                 setView('day');
@@ -147,20 +148,20 @@ export default function DatePickerField({ label, value, onChange, placeholder })
 
                     {view === 'year' && (
                         <>
-                            <div className="date-picker-header">
-                                <button className="date-picker-nav" onClick={() => setViewDate((c) => new Date(c.getFullYear() - 20, c.getMonth(), 1))}>&#10094;</button>
-                                <span className="date-picker-month">
+                            <div className={styles.datePickerHeader}>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 20, c.getMonth(), 1))}>&#10094;</button>
+                                <span className={styles.datePickerMonth}>
                                     {yearRangeStart} – {yearRangeStart + 19}
                                 </span>
-                                <button className="date-picker-nav" onClick={() => setViewDate((c) => new Date(c.getFullYear() + 20, c.getMonth(), 1))}>&#10095;</button>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 20, c.getMonth(), 1))}>&#10095;</button>
                             </div>
-                            <div className="date-picker-grid years">
+                            <div className={`${styles.datePickerGrid} ${styles.years}`}>
                                 {Array.from({ length: 20 }, (_, i) => yearRangeStart + i).map((yr) => {
                                     const isCurrent = yr === viewDate.getFullYear();
                                     return (
                                         <button
                                             key={yr}
-                                            className={`date-picker-cell year-cell ${isCurrent ? 'selected' : ''}`}
+                                            className={`${styles.datePickerCell} ${isCurrent ? styles.selected : ''}`}
                                             onClick={() => {
                                                 setViewDate((c) => new Date(yr, c.getMonth(), 1));
                                                 setView('month');
@@ -174,9 +175,9 @@ export default function DatePickerField({ label, value, onChange, placeholder })
                         </>
                     )}
 
-                    <div className="date-picker-footer">
-                        <button className="date-picker-action" onClick={() => { onChange(''); setOpen(false); setView('day'); }}>Clear</button>
-                        <button className="date-picker-action primary" onClick={() => { onChange(toDateString(new Date())); setOpen(false); setView('day'); }}>Today</button>
+                    <div className={styles.datePickerFooter}>
+                        <button className={styles.datePickerAction} onClick={() => { onChange(''); setOpen(false); setView('day'); }}>Clear</button>
+                        <button className={`${styles.datePickerAction} ${styles.primary}`} onClick={() => { onChange(toDateString(new Date())); setOpen(false); setView('day'); }}>Today</button>
                     </div>
                 </div>
             )}

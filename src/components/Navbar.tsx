@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useClickOutside from '../hooks/useClickOutside';
+import styles from './Navbar.module.css';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Home' },
@@ -98,56 +99,56 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className={`navbar ${scrolled ? 'scrolled' : ''} ${hidden ? 'hidden' : ''}`}>
-        <div className="navbar-inner">
-          <div className="nav-links">
+      <nav className={`${styles.navbar} ${scrolled ? styles.scrolled : ''} ${hidden ? styles.hidden : ''}`}>
+        <div className={styles.navbarInner}>
+          <div className={styles.navLinks}>
             {NAV_ITEMS.map((item) => (
-              <Link key={item.to} to={item.to} className={isActive(item.to) ? 'active' : ''}>
+              <Link key={item.to} to={item.to} className={isActive(item.to) ? styles.active : ''}>
                 {item.label}
               </Link>
             ))}
           </div>
-          <form className="navbar-search" onSubmit={handleSubmit}>
+          <form className={styles.navbarSearch} onSubmit={handleSubmit}>
             <input
               ref={searchRef}
               type="text"
               placeholder="Search... (/)"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className={searchOpen ? 'open' : ''}
+              className={searchOpen ? styles.open : ''}
             />
             {!searchOpen && (
-              <button ref={searchBtnRef} type="button" className="search-toggle-btn" onClick={toggleSearch}>
+              <button ref={searchBtnRef} type="button" className={styles.searchToggleBtn} onClick={toggleSearch}>
                 {'\u2315'}
               </button>
             )}
             {searchOpen && (
-              <button ref={goBtnRef} type="submit" className="search-go-btn">Go</button>
+              <button ref={goBtnRef} type="submit" className={styles.searchGoBtn}>Go</button>
             )}
           </form>
         </div>
       </nav>
 
-      <button className="sidebar-hamburger" onClick={() => setMenuOpen((s) => !s)} aria-label="Toggle menu">
-        <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
-        <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
-        <span className={`hamburger-line ${menuOpen ? 'open' : ''}`} />
+      <button className={styles.sidebarHamburger} onClick={() => setMenuOpen((s) => !s)} aria-label="Toggle menu">
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.open : ''}`} />
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.open : ''}`} />
+        <span className={`${styles.hamburgerLine} ${menuOpen ? styles.open : ''}`} />
       </button>
-      {menuOpen && <div className="sidebar-overlay" />}
-      <aside className={`sidebar ${menuOpen ? 'sidebar-open' : ''}`} ref={sidebarRef}>
-        <div className="sidebar-brand">StreamFlow</div>
-        <nav className="sidebar-nav">
+      {menuOpen && <div className={styles.sidebarOverlay} />}
+      <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`} ref={sidebarRef}>
+        <div className={styles.sidebarBrand}>StreamFlow</div>
+        <nav className={styles.sidebarNav}>
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
               to={item.to}
-              className={`sidebar-link ${isActive(item.to) ? 'active' : ''}`}
+              className={`${styles.sidebarLink} ${isActive(item.to) ? styles.active : ''}`}
             >
               {item.label}
             </Link>
           ))}
         </nav>
-        <form className="sidebar-search" onSubmit={handleSubmit}>
+        <form className={styles.sidebarSearch} onSubmit={handleSubmit}>
           <input
             type="text"
             placeholder="Search..."

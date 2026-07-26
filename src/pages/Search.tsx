@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getSearchHistory, addSearchHistory } from '../api/storage';
+import styles from './Search.module.css';
 
 const TABS = [
   { key: 'all', label: 'All' },
@@ -57,17 +58,17 @@ export default function Search() {
     <div className="page">
       <section className="section">
         <h2 className="section-title">Search Results for "{query}"</h2>
-        <div className="search-tabs">
+        <div className={styles.searchTabs}>
           {TABS.map((t) => (
-            <button key={t.key} className={`search-tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+            <button key={t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
         {!query && history.length > 0 && (
-          <div className="search-history">
-            <div className="search-history-title">Recent searches</div>
-            <div className="search-history-list">
+          <div className={styles.searchHistory}>
+            <div className={styles.searchHistoryTitle}>Recent searches</div>
+            <div className={styles.searchHistoryList}>
               {history.map((q) => (
-                <button key={q} className="search-history-item" onClick={() => handleHistoryClick(q)}>{q}</button>
+                <button key={q} className={styles.searchHistoryItem} onClick={() => handleHistoryClick(q)}>{q}</button>
               ))}
             </div>
           </div>

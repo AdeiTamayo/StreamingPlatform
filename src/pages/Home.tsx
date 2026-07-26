@@ -4,6 +4,7 @@ import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
+import styles from './Home.module.css';
 
 export default function Home() {
   const [trending, setTrending] = useState([]);
@@ -69,8 +70,8 @@ export default function Home() {
 
   return (
     <div className="page">
-      <section className="hero">
-        <div className="hero-backdrop">
+      <section className={styles.hero}>
+        <div className={styles.heroBackdrop}>
           {hero ? (
             <>
               <img
@@ -81,36 +82,36 @@ export default function Home() {
                 width="1920"
                 height="1080"
               />
-              <div className="hero-gradient" />
+              <div className={styles.heroGradient} />
             </>
           ) : (
-            <div className="hero-placeholder" />
+            <div className={styles.heroPlaceholder} />
           )}
         </div>
         {hero && (
-          <div className="hero-content">
-            <span className="hero-badge">{hero.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
-            <h1 className="hero-title">{hero.title || hero.name}</h1>
-            <div className="hero-meta">
+          <div className={styles.heroContent}>
+            <span className={styles.heroBadge}>{hero.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
+            <h1 className={styles.heroTitle}>{hero.title || hero.name}</h1>
+            <div className={styles.heroMeta}>
               {hero.vote_average > 0 && (
-                <span className="hero-rating">{hero.vote_average.toFixed(1)}</span>
+                <span className={styles.heroRating}>{hero.vote_average.toFixed(1)}</span>
               )}
-              <span className="hero-year">{(hero.release_date || hero.first_air_date || '').slice(0, 4)}</span>
+              <span className={styles.heroYear}>{(hero.release_date || hero.first_air_date || '').slice(0, 4)}</span>
             </div>
-            {hero.overview && <p className="hero-overview">{hero.overview}</p>}
-            <div className="hero-actions">
+            {hero.overview && <p className={styles.heroOverview}>{hero.overview}</p>}
+            <div className={styles.heroActions}>
               <Link
                 to={`/${hero.media_type === 'tv' ? 'tv' : 'movie'}/${hero.id}`}
-                className="hero-btn hero-btn-primary"
+                className={`${styles.heroBtn} ${styles.heroBtnPrimary}`}
               >
                 &#9654; Play
               </Link>
             </div>
-            <div className="hero-dots">
+            <div className={styles.heroDots}>
               {heroItems.map((_, i) => (
                 <button
                   key={i}
-                  className={`hero-dot ${i === heroIdx ? 'active' : ''}`}
+                  className={`${styles.heroDot} ${i === heroIdx ? styles.active : ''}`}
                   onClick={() => setHeroIdx(i)}
                 />
               ))}
@@ -123,11 +124,11 @@ export default function Home() {
         <section className="section">
           <div className="section-header">
             <h2 className="section-title">Continue Watching</h2>
-            <div className="cw-toggles">
+            <div className={styles.cwToggles}>
               {CW_TABS.map((t) => (
                 <button
                   key={t.key}
-                  className={`cw-toggle ${cwFilter === t.key ? 'active' : ''}`}
+                  className={`${styles.cwToggle} ${cwFilter === t.key ? styles.active : ''}`}
                   onClick={() => setCwFilter(t.key)}
                 >
                   {t.label}
@@ -136,35 +137,35 @@ export default function Home() {
             </div>
           </div>
           {filteredCW.length > 0 ? (
-            <div className="cw-grid">
+            <div className={styles.cwGrid}>
               {filteredCW.map((item, i) => {
               const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
               const poster = item.meta?.poster;
               const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
               return (
-                <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className="cw-card">
+                <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className={styles.cwCard}>
                   <Link
                     to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
-                    className="cw-card-link"
+                    className={styles.cwCardLink}
                   >
-                    <div className="cw-card-poster">
+                    <div className={styles.cwCardPoster}>
                       {poster ? (
                         <img src={imageUrl(poster)} alt={label} loading="lazy" />
                       ) : (
-                        <div className="cw-card-placeholder" />
+                        <div className={styles.cwCardPlaceholder} />
                       )}
                       {pct !== null && (
-                        <div className="cw-card-bar">
-                          <div className="cw-card-bar-fill" style={{ width: `${pct}%` }} />
+                        <div className={styles.cwCardBar}>
+                          <div className={styles.cwCardBarFill} style={{ width: `${pct}%` }} />
                         </div>
                       )}
                     </div>
-                    <div className="cw-card-info">
-                      <span className="cw-card-label">{label}</span>
-                      {item.season && <span className="cw-card-meta">S{item.season}E{item.episode}</span>}
+                    <div className={styles.cwCardInfo}>
+                      <span className={styles.cwCardLabel}>{label}</span>
+                      {item.season && <span className={styles.cwCardMeta}>S{item.season}E{item.episode}</span>}
                     </div>
                   </Link>
-                  <button className="cw-remove" onClick={() => handleRemoveCW(item)} title="Remove">&times;</button>
+                  <button className={styles.cwRemove} onClick={() => handleRemoveCW(item)} title="Remove">&times;</button>
                 </div>
               );
             })}

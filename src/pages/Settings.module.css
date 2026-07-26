@@ -1,0 +1,55 @@
+.settings-group {
+  margin-bottom: 1.5rem;
+}
+
+.settings-group h3 {
+  font-size: 0.95rem;
+  margin-bottom: 0.6rem;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-row:last-child { border-bottom: none; }
+
+.settings-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.settings-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.settings-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.settings-section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+.confirm-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.confirm-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
