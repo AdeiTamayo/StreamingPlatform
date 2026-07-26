@@ -49,13 +49,18 @@ function pruneCache() {
   toRemove.forEach((e) => localStorage.removeItem(e.k));
 }
 
-async function fetchJson(url, retries = 2) {
+async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = null) {
   for (let i = 0; i <= retries; i++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const onAbort = () => controller.abort();
+      signal?.addEventListener('abort', onAbort, { once: true });
+
       const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(timeout);
+      clearTimeout(timeoutId);
+      signal?.removeEventListener('abort', onAbort);
+
       if (!res.ok) throw new Error(`TMDB error: ${res.status}`);
       const data = await res.json();
       setCache(url, data);
@@ -67,62 +72,62 @@ async function fetchJson(url, retries = 2) {
   }
 }
 
-async function fetchWithFallback(url) {
+async function fetchWithFallback(url: string, signal?: AbortSignal) {
   const cached = getCached(url);
   if (cached) return cached;
-  return fetchJson(url);
+  return fetchJson(url, 2, signal ?? null);
 }
 
-export async function getPopularMovies(page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/popular?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`);
+export async function getPopularMovies(page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/popular?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`, signal);
 }
 
-export async function getPopularTV(page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/popular?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`);
+export async function getPopularTV(page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/popular?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`, signal);
 }
 
-export async function getTrending(mediaType = 'all', page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/trending/${mediaType}/week?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`);
+export async function getTrending(mediaType = 'all', page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/trending/${mediaType}/week?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`, signal);
 }
 
-export async function searchMulti(query, page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/multi?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
+export async function searchMulti(query: string, page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/multi?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`, signal);
 }
 
-export async function searchMovies(query, page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/movie?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
+export async function searchMovies(query: string, page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/movie?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`, signal);
 }
 
-export async function searchTV(query, page = 1) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/tv?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`);
+export async function searchTV(query: string, page = 1, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/tv?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}&page=${page}`, signal);
 }
 
-export async function getMovieDetail(id) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`);
+export async function getMovieDetail(id: string | number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/movie/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`, signal);
 }
 
-export async function getTVDetail(id) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`);
+export async function getTVDetail(id: string | number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}&append_to_response=credits,recommendations,videos`, signal);
 }
 
-export async function getSeasonDetails(id, seasonNumber) {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}?api_key=${CONFIG.TMDB_API_KEY}`);
+export async function getSeasonDetails(id: string | number, seasonNumber: number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
 
-export async function getMovieGenres() {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/movie/list?api_key=${CONFIG.TMDB_API_KEY}`);
+export async function getMovieGenres(signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/movie/list?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
 
-export async function getTVGenres() {
-  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/tv/list?api_key=${CONFIG.TMDB_API_KEY}`);
+export async function getTVGenres(signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/tv/list?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
 
-export async function getCountries() {
-  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/countries?api_key=${CONFIG.TMDB_API_KEY}`);
+export async function getCountries(signal?: AbortSignal) {
+  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/countries?api_key=${CONFIG.TMDB_API_KEY}`, signal);
   return data.sort((a, b) => a.english_name.localeCompare(b.english_name));
 }
 
-export async function discover(type, filters, page = 1) {
+export async function discover(type: string, filters: Record<string, any>, page = 1, signal?: AbortSignal) {
   let url = `${CONFIG.TMDB_BASE_URL}/discover/${type}?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`;
   if (filters?.genreId) url += `&with_genres=${filters.genreId}`;
   if (filters?.country) url += `&with_origin_country=${filters.country}`;
@@ -130,7 +135,7 @@ export async function discover(type, filters, page = 1) {
   if (filters?.sortBy) url += `&sort_by=${filters.sortBy}`;
   if (filters?.releaseDateGte) url += type === 'tv' ? `&first_air_date.gte=${filters.releaseDateGte}` : `&primary_release_date.gte=${filters.releaseDateGte}`;
   if (filters?.releaseDateLte) url += type === 'tv' ? `&first_air_date.lte=${filters.releaseDateLte}` : `&primary_release_date.lte=${filters.releaseDateLte}`;
-  return fetchWithFallback(url);
+  return fetchWithFallback(url, signal);
 }
 
 export function imageUrl(path, size = 'w500') {
