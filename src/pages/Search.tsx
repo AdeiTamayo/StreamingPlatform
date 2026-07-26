@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getSearchHistory, addSearchHistory } from '../api/storage';
+import { useAbortController } from '../hooks/useAbortController';
 import styles from './Search.module.css';
 
 const TABS = [
@@ -19,23 +20,33 @@ export default function Search() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [history, setHistory] = useState([]);
+  const { getSignal } = useAbortController();
 
   useEffect(() => { document.title = `Search: ${query} - StreamFlow`; }, [query]);
   useEffect(() => { setHistory(getSearchHistory()); }, []);
 
   useEffect(() => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      setResults([]);
+      setTotalPages(1);
+      return;
+    }
     setLoading(true);
+    setError(false);
     const fetcher = tab === 'all' ? searchMulti : tab === 'movie' ? searchMovies : searchTV;
-    fetcher(query, page)
+    fetcher(query, page, getSignal())
       .then((data) => {
         setResults(data.results || []);
         setTotalPages(data.total_pages || 1);
       })
-      .catch(console.error)
+      .catch((err) => {
+        if (err?.name === 'AbortError') return;
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, [query, page, tab]);
+  }, [query, page, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setPage(1); }, [query, tab]);
 
@@ -58,9 +69,9 @@ export default function Search() {
     <div className="page">
       <section className="section">
         <h2 className="section-title">Search Results for "{query}"</h2>
-        <div className={styles.searchTabs}>
+        <div className={styles.searchTabs} role="tablist" aria-label="Search categories">
           {TABS.map((t) => (
-            <button key={t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+            <button key={t.key} role="tab" aria-selected={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
         {!query && history.length > 0 && (
@@ -73,10 +84,12 @@ export default function Search() {
             </div>
           </div>
         )}
-        {loading ? (
-          <div className="loading">Searching...</div>
+        {error ? (
+          <div className="loading" role="alert">Search failed. Check your connection.</div>
+        ) : loading ? (
+          <div className="loading" role="status">Searching...</div>
         ) : filtered.length === 0 ? (
-          <div className="loading">No results found</div>
+          <div className="loading" role="status">No results found</div>
         ) : (
           <>
             <div className="media-grid">

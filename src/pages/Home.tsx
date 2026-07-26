@@ -4,24 +4,32 @@ import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
+import { useAbortController } from '../hooks/useAbortController';
 import styles from './Home.module.css';
 
 export default function Home() {
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [continueWatching, setContinueWatching] = useState([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState('all');
   const toast = useToast();
+  const { getSignal } = useAbortController();
 
   useEffect(() => {
     document.title = 'StreamFlow';
     setContinueWatching(getContinueWatching());
-    getTrending('all')
+    setLoading(true);
+    setError(false);
+    getTrending('all', 1, getSignal())
       .then((data) => setTrending(data.results || []))
-      .catch(console.error)
+      .catch(() => {
+        setError(true);
+        toast('Failed to load trending');
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (trending.length < 2) return;
@@ -107,12 +115,15 @@ export default function Home() {
                 &#9654; Play
               </Link>
             </div>
-            <div className={styles.heroDots}>
+            <div className={styles.heroDots} role="tablist" aria-label="Featured items">
               {heroItems.map((_, i) => (
                 <button
                   key={i}
+                  role="tab"
+                  aria-selected={i === heroIdx}
                   className={`${styles.heroDot} ${i === heroIdx ? styles.active : ''}`}
                   onClick={() => setHeroIdx(i)}
+                  aria-label={`Show item ${i + 1}`}
                 />
               ))}
             </div>
@@ -124,10 +135,12 @@ export default function Home() {
         <section className="section">
           <div className="section-header">
             <h2 className="section-title">Continue Watching</h2>
-            <div className={styles.cwToggles}>
+            <div className={styles.cwToggles} role="tablist" aria-label="Filter by type">
               {CW_TABS.map((t) => (
                 <button
                   key={t.key}
+                  role="tab"
+                  aria-selected={cwFilter === t.key}
                   className={`${styles.cwToggle} ${cwFilter === t.key ? styles.active : ''}`}
                   onClick={() => setCwFilter(t.key)}
                 >
@@ -171,15 +184,17 @@ export default function Home() {
             })}
             </div>
           ) : (
-            <div className="loading">Nothing in this category</div>
+            <div className="loading" role="status">Nothing in this category</div>
           )}
         </section>
       )}
 
-      <section className="section">
-        <h2 className="section-title">Trending This Week</h2>
+      <section className="section" aria-labelledby="trending-heading">
+        <h2 id="trending-heading" className="section-title">Trending This Week</h2>
         {loading ? (
-          <div className="loading">Loading...</div>
+          <div className="loading" role="status">Loading...</div>
+        ) : error ? (
+          <div className="loading" role="alert">Failed to load trending. Check your connection.</div>
         ) : (
           <div className="media-grid">
             {trending.map((item) => (

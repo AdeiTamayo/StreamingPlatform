@@ -1,13 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAbortController } from './useAbortController';
 
 export default function useSearchFilter(fetchFn: any, deps: Record<string, any> = {}) {
   const [results, setResults] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const fetchRef = useRef(null);
   const fetchFnRef = useRef(fetchFn);
   fetchFnRef.current = fetchFn;
+  const { getSignal } = useAbortController();
 
   const { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil } = deps;
   const filterKey = `${query}||${genre}||${country}||${year}||${sortBy}||${releaseDateFrom}||${releaseDateUntil}`;
@@ -25,16 +28,20 @@ export default function useSearchFilter(fetchFn: any, deps: Record<string, any> 
     if (fetchRef.current) clearTimeout(fetchRef.current);
     fetchRef.current = setTimeout(() => {
       setLoading(true);
-      fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil })
+      setError(false);
+      fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil }, getSignal())
         .then((data) => {
           setResults(data.results || []);
           setTotalPages(data.total_pages || 1);
         })
-        .catch(console.error)
+        .catch((err) => {
+          if (err?.name === 'AbortError') return;
+          setError(true);
+        })
         .finally(() => setLoading(false));
     }, query?.trim() ? 400 : 0);
     return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
-  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil]);
+  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { results, page, setPage, totalPages, loading };
+  return { results, page, setPage, totalPages, loading, error };
 }

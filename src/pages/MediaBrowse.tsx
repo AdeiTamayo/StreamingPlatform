@@ -51,24 +51,25 @@ export default function MediaBrowse({ type }) {
   const countryOptions = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
   const genreOptions = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
 
-  const fetchFn = useCallback((page, { query: q, genre: g, country: c, year: y, sortBy: s, releaseDateFrom: rdf, releaseDateUntil: rdu }) => {
+  const fetchFn = useCallback((page, filters, signal) => {
+    const { query: q, genre: g, country: c, year: y, sortBy: s, releaseDateFrom: rdf, releaseDateUntil: rdu } = filters;
     if (q?.trim()) {
-      return (isMovie ? searchMovies : searchTV)(q.trim(), page);
+      return (isMovie ? searchMovies : searchTV)(q.trim(), page, signal);
     }
     const hasFilters = g || c || y || s || rdf || rdu;
     if (hasFilters) {
-      return discover(type, { genreId: g || undefined, country: c || undefined, year: y || undefined, sortBy: s || undefined, releaseDateGte: rdf || undefined, releaseDateLte: rdu || undefined }, page);
+      return discover(type, { genreId: g || undefined, country: c || undefined, year: y || undefined, sortBy: s || undefined, releaseDateGte: rdf || undefined, releaseDateLte: rdu || undefined }, page, signal);
     }
-    return (isMovie ? getPopularMovies : getPopularTV)(page);
+    return (isMovie ? getPopularMovies : getPopularTV)(page, signal);
   }, [isMovie, type]);
 
-  const { results, page, setPage, totalPages, loading } = useSearchFilter(fetchFn, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil });
+  const { results, page, setPage, totalPages, loading, error } = useSearchFilter(fetchFn, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil });
 
   return (
     <div className="page">
-      <section className="section">
+      <section className="section" aria-labelledby="browse-heading">
         <div className="section-header">
-          <h2 className="section-title">{isMovie ? 'Movies' : 'TV Shows'}</h2>
+          <h2 id="browse-heading" className="section-title">{isMovie ? 'Movies' : 'TV Shows'}</h2>
           <FilterBar
             countryValue={country}
             genreValue={genre}
@@ -99,10 +100,12 @@ export default function MediaBrowse({ type }) {
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
           />
         </div>
-        {loading ? (
-          <div className="loading">Loading...</div>
+        {error ? (
+          <div className="loading" role="alert">Failed to load. Check your connection.</div>
+        ) : loading ? (
+          <div className="loading" role="status">Loading...</div>
         ) : results.length === 0 ? (
-          <div className="loading">No results found</div>
+          <div className="loading" role="status">No results found</div>
         ) : (
           <>
             <div className="media-grid">

@@ -9,6 +9,7 @@ import SeasonDropdown from '../components/SeasonDropdown';
 import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
 import { useToast } from '../components/useToast';
+import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
 import styles from './TVDetail.module.css';
 
@@ -37,6 +38,7 @@ export default function TVDetail() {
   const [playerOpen, setPlayerOpen] = useState(false);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(null);
+  const { getSignal } = useAbortController();
 
   const seasons = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
   const currentSeason = useMemo(() => seasons.find((s) => s.season_number === season), [seasons, season]);
@@ -60,7 +62,7 @@ export default function TVDetail() {
     autoWatchedRef.current = null;
     setTrailerKey(null);
     setShowTrailer(false);
-    getTVDetail(id)
+    getTVDetail(id, getSignal())
       .then((data) => {
         setShow(data);
         document.title = `${data.name} - StreamFlow`;
@@ -87,9 +89,12 @@ export default function TVDetail() {
           setEpisode(1);
         }
       })
-      .catch(() => setError(true))
+      .catch((err) => {
+        if (err?.name === 'AbortError') return;
+        setError(true);
+      })
       .finally(() => setLoading(false));
-  }, [id, urlSeason, urlEpisode]);
+  }, [id, urlSeason, urlEpisode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setWatched(isWatched('tv', id, season, episode));
@@ -113,10 +118,10 @@ export default function TVDetail() {
   }, [id, season, episodeCount, watched]);
 
   useEffect(() => {
-    getSeasonDetails(id, season).then((data) => {
+    getSeasonDetails(id, season, getSignal()).then((data) => {
       setEpisodes(data.episodes || []);
     }).catch(() => { });
-  }, [id, season]);
+  }, [id, season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
@@ -197,13 +202,13 @@ export default function TVDetail() {
   function retry() {
     setLoading(true);
     setError(false);
-    getTVDetail(id).then((data) => { setShow(data); }).catch(() => setError(true)).finally(() => setLoading(false));
+    getTVDetail(id, getSignal()).then((data) => { setShow(data); }).catch((err) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
   }
 
-  if (loading) return <div className="page"><div className="loading">Loading...</div></div>;
+  if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;
 
   if (error) return (
-    <div className="page">
+    <div className="page" role="alert">
       <div className="loading">Failed to load. Check your connection.</div>
       <div className="retry-bar"><button className="watch-toggle" onClick={retry}>Retry</button></div>
     </div>
@@ -252,8 +257,8 @@ export default function TVDetail() {
       </div>
 
       {playerOpen ? (
-        <section className="section">
-          <h2 className="section-title">Watch Now</h2>
+        <section className="section" aria-labelledby="watch-heading-tv">
+          <h2 id="watch-heading-tv" className="section-title">Watch Now</h2>
           <div className="episode-selector">
             <label>
               Season:
@@ -303,10 +308,11 @@ export default function TVDetail() {
                 }}>Mark season watched</button>
               )}
             </div>
-            <div className={styles.spBar}>
+            <div className={styles.spBar} role="list" aria-label="Episode progress">
               {episodeNums.map((ep) => (
                 <button
                   key={ep}
+                  role="listitem"
                   className={`${styles.spDot} ${ep === episode ? styles.current : ''} ${watchedStates[ep] ? styles.done : ''}`}
                   onClick={() => setEpisode(ep)}
                   title={`Episode ${ep}`}
@@ -357,9 +363,9 @@ export default function TVDetail() {
           </div>
         </section>
       ) : (
-        <section className="section">
+        <section className="section" aria-labelledby="episodes-heading">
           <div className={styles.browseHeader}>
-            <h2 className="section-title">Episodes</h2>
+            <h2 id="episodes-heading" className="section-title">Episodes</h2>
             <SeasonDropdown
               seasons={seasons}
               value={season}
@@ -417,8 +423,8 @@ export default function TVDetail() {
       )}
 
       {recommendations.length > 0 && (
-        <section className="section">
-          <h2 className="section-title">You might also like</h2>
+        <section className="section" aria-labelledby="recs-heading-tv">
+          <h2 id="recs-heading-tv" className="section-title">You might also like</h2>
           <div className="media-grid">
             {recommendations.map((item) => (
               <MediaCard key={item.id} item={item} mediaType="tv" />
