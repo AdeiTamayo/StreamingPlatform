@@ -99,19 +99,18 @@ function removeFromWatchedIndex(key) {
 
 // ── Watched marks ───────────────────────────────────────
 
-export function isWatched(type, id, season, episode) {
+export function isWatched(type, id, season?, episode?) {
   return localStorage.getItem(watchedKey(type, id, season, episode)) !== null;
 }
 
-export function markWatched(type, id, title, season, episode, meta) {
-  const data = { type, id, title, season, episode, watchedAt: Date.now() };
-  if (meta) data.meta = meta;
+export function markWatched(type, id, title, season?, episode?, meta?) {
+  const data = { type, id, title, season, episode, watchedAt: Date.now(), ...(meta ? { meta } : {}) };
   const key = watchedKey(type, id, season, episode);
   localStorage.setItem(key, JSON.stringify(data));
   addToWatchedIndex(key);
 }
 
-export function markUnwatched(type, id, season, episode) {
+export function markUnwatched(type, id, season?, episode?) {
   const key = watchedKey(type, id, season, episode);
   localStorage.removeItem(key);
   removeFromWatchedIndex(key);
@@ -163,9 +162,8 @@ export function getLastWatchedEpisode(showId) {
 
 // ── Progress ────────────────────────────────────────────
 
-export function saveProgress(type, id, currentTime, season, episode, meta) {
-  const data = { type, id, currentTime, savedAt: Date.now(), season, episode };
-  if (meta) data.meta = meta;
+export function saveProgress(type, id, currentTime, season?, episode?, meta?) {
+  const data = { type, id, currentTime, savedAt: Date.now(), season, episode, ...(meta ? { meta } : {}) };
   try {
     localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
     addToProgressIndex(progressKey(type, id, season, episode));
@@ -175,7 +173,7 @@ export function saveProgress(type, id, currentTime, season, episode, meta) {
   }
 }
 
-export function getProgress(type, id, season, episode) {
+export function getProgress(type, id, season?, episode?) {
   try {
     return JSON.parse(localStorage.getItem(progressKey(type, id, season, episode))) || null;
   } catch {
@@ -183,7 +181,7 @@ export function getProgress(type, id, season, episode) {
   }
 }
 
-export function clearProgress(type, id, season, episode) {
+export function clearProgress(type, id, season?, episode?) {
   localStorage.removeItem(progressKey(type, id, season, episode));
   removeFromProgressIndex(progressKey(type, id, season, episode));
 }
@@ -398,7 +396,7 @@ export function importData(data, mode = 'merge') {
     keys.forEach((k) => localStorage.removeItem(k));
   }
   Object.entries(data).forEach(([k, v]) => {
-    if (isExportKey(k)) localStorage.setItem(k, v);
+    if (isExportKey(k)) localStorage.setItem(k, String(v));
   });
 }
 

@@ -57,7 +57,7 @@ export default function Settings() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const data = JSON.parse(reader.result);
+        const data = JSON.parse(reader.result as string);
         importData(data, 'merge');
         setUsage(getStorageUsage());
         setStats(getStats());

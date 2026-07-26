@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 
-const MediaCard = memo(function MediaCard({ item, mediaType }) {
+const MediaCard = memo(function MediaCard({ item, mediaType }: { item: any; mediaType?: string }) {
   const [loaded, setLoaded] = useState(false);
   const [inWL, setInWL] = useState(() => isInWatchLater(mediaType || item.media_type || 'movie', item.id));
   const [isWatchedState, setIsWatchedState] = useState(() => isWatched(mediaType || item.media_type || 'movie', item.id));
