@@ -38,7 +38,10 @@
 }
 
 .nav-links a {
-  padding: 0.4rem 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  height: 2.4rem;
+  padding: 0 0.7rem;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 700;
@@ -49,7 +52,7 @@
 .nav-links a:hover,
 .nav-links a.active {
   color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-links a.active {
@@ -57,10 +60,6 @@
 }
 
 .navbar-search {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -106,12 +105,44 @@
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 1.2rem;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 .search-toggle-btn:hover {
-  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.search-toggle-btn svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  transition: background 0.2s;
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.iconBtn.active {
+  color: var(--accent);
+  background: rgba(125, 211, 252, 0.08);
+}
+
+.iconBtn svg {
+  width: 1.35rem;
+  height: 1.35rem;
 }
 
 .search-go-btn {
@@ -247,6 +278,12 @@
   .sidebar-link.active {
     color: var(--accent);
     background: rgba(125, 211, 252, 0.08);
+  }
+
+  .sidebar-notif {
+    padding: 0.5rem 0.4rem;
+    display: flex;
+    align-items: center;
   }
 
   .sidebar-search {
