@@ -369,7 +369,7 @@ export function addSearchHistory(query) {
 
 // ── Export / Import ─────────────────────────────────────
 
-const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history', 'watched_index', 'progress_index'];
+const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history', 'watched_index', 'progress_index', 'notifications'];
 
 function isExportKey(k) {
   return EXPORT_KEYS.some((prefix) => k === prefix || k.startsWith(prefix));
@@ -404,7 +404,7 @@ export function importData(data, mode = 'merge') {
 
 export function getStorageUsage() {
   let total = 0;
-  const breakdown = { watched: 0, progress: 0, watchlater: 0, epwl: 0, cache: 0, other: 0 };
+  const breakdown = { watched: 0, progress: 0, watchlater: 0, epwl: 0, notifications: 0, cache: 0, other: 0 };
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
     const v = localStorage.getItem(k) || '';
@@ -414,6 +414,7 @@ export function getStorageUsage() {
     else if (k.startsWith('progress:')) breakdown.progress += bytes;
     else if (k === 'watchlater') breakdown.watchlater += bytes;
     else if (k.startsWith('epwl:')) breakdown.epwl += bytes;
+    else if (k === 'notifications') breakdown.notifications += bytes;
     else if (k.startsWith('tmdb:')) breakdown.cache += bytes;
     else breakdown.other += bytes;
   }
@@ -443,4 +444,54 @@ export function getVideoSource() {
 
 export function setVideoSource(source) {
   localStorage.setItem(VIDEO_SOURCE_KEY, source);
+}
+
+// ── Notifications ───────────────────────────────────────
+
+const NOTIFICATIONS_KEY = 'notifications';
+
+export function getNotifications() {
+  try {
+    return JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY)) || [];
+  } catch {
+    return [];
+  }
+}
+
+export function addNotification(showId, showTitle, season, episode, episodeTitle, type, airDate) {
+  const list = getNotifications();
+  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  list.unshift({
+    id,
+    showId: String(showId),
+    showTitle,
+    season,
+    episode,
+    episodeTitle: episodeTitle || null,
+    type: type || 'new_episode',
+    airDate: airDate || null,
+    createdAt: Date.now(),
+    read: false,
+  });
+  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+  return id;
+}
+
+export function removeNotification(id) {
+  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(getNotifications().filter((n) => n.id !== id)));
+}
+
+export function markAllNotificationsRead() {
+  const list = getNotifications();
+  list.forEach((n) => { n.read = true; });
+  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+}
+
+export function clearAllNotifications() {
+  localStorage.removeItem(NOTIFICATIONS_KEY);
+}
+
+export function isAlreadyNotified(showId, season, episode) {
+  const sid = String(showId);
+  return getNotifications().some((n) => n.showId === sid && n.season === season && n.episode === episode);
 }
