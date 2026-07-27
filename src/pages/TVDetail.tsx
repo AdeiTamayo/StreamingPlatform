@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -122,6 +122,54 @@ export default function TVDetail() {
       setEpisodes(data.episodes || []);
     }).catch(() => { });
   }, [id, season]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Check for new episodes of watch-later shows
+  useEffect(() => {
+    if (!show) return;
+    const now = new Date();
+    let added = 0;
+
+    // For full-series watch later: check latest season
+    if (inWL) {
+      const latestSeason = seasons[seasons.length - 1];
+      if (latestSeason) {
+        getSeasonDetails(id, latestSeason.season_number, getSignal()).then((data) => {
+          const eps = data.episodes || [];
+          for (const ep of eps) {
+            if (!ep.air_date) continue;
+            if (new Date(ep.air_date) > now) continue;
+            if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
+            if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
+            if (added >= 5) break;
+            addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
+            added++;
+          }
+        }).catch(() => {});
+      }
+    }
+
+    // For episode watch later items: check saved episodes of this show
+    const epwlItems = getEpisodeWatchLater().filter((item) => String(item.showId) === String(id));
+    if (epwlItems.length > 0) {
+      const seasonsToCheck = [...new Set(epwlItems.map((item) => item.season))];
+      seasonsToCheck.forEach((seasonNum) => {
+        getSeasonDetails(id, seasonNum, getSignal()).then((data) => {
+          const eps = data.episodes || [];
+          for (const epwl of epwlItems) {
+            if (epwl.season !== seasonNum) continue;
+            const ep = eps.find((e) => e.episode_number === epwl.episode);
+            if (!ep || !ep.air_date) continue;
+            if (new Date(ep.air_date) > now) continue;
+            if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
+            if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
+            if (added >= 5) break;
+            addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
+            added++;
+          }
+        }).catch(() => {});
+      });
+    }
+  }, [show, inWL]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
