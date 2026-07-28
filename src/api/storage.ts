@@ -1,4 +1,5 @@
 import { logDebug } from '../utils/logger';
+import { getTMDBCacheSize } from './tmdbCache';
 
 const WL_KEY = 'watchlater';
 const PROGRESS_INDEX_KEY = 'progress_index';
@@ -402,7 +403,7 @@ export function importData(data, mode = 'merge') {
 
 // ── Storage Usage ───────────────────────────────────────
 
-export function getStorageUsage() {
+export async function getStorageUsage() {
   let total = 0;
   const breakdown = { watched: 0, progress: 0, watchlater: 0, epwl: 0, notifications: 0, cache: 0, other: 0 };
   for (let i = 0; i < localStorage.length; i++) {
@@ -415,9 +416,11 @@ export function getStorageUsage() {
     else if (k === 'watchlater') breakdown.watchlater += bytes;
     else if (k.startsWith('epwl:')) breakdown.epwl += bytes;
     else if (k === 'notifications') breakdown.notifications += bytes;
-    else if (k.startsWith('tmdb:')) breakdown.cache += bytes;
     else breakdown.other += bytes;
   }
+  const cacheBytes = await getTMDBCacheSize();
+  breakdown.cache = cacheBytes;
+  total += cacheBytes;
   return { total, breakdown };
 }
 
