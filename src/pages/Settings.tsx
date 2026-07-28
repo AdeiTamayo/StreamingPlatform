@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource } from '../api/storage';
+import { clearTMDBCache } from '../api/tmdbCache';
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/useToast';
 import FilterDropdown from '../components/FilterDropdown';
@@ -21,32 +22,28 @@ export default function Settings() {
 
   useEffect(() => {
     document.title = 'Settings - StreamFlow';
-    setUsage(getStorageUsage());
+    getStorageUsage().then(setUsage);
     setStats(getStats());
   }, []);
 
-  function clearCache() {
-    const keys = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('tmdb:')) keys.push(k);
-    }
-    keys.forEach((k) => localStorage.removeItem(k));
-    setUsage(getStorageUsage());
+  async function clearCache() {
+    await clearTMDBCache();
+    setUsage(await getStorageUsage());
     toast('TMDB cache cleared');
   }
 
-  function clearAll() {
+  async function clearAll() {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k.startsWith('tmdb:') || k === 'search_history') {
+      if (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k === 'search_history') {
         keys.push(k);
       }
     }
     keys.forEach((k) => localStorage.removeItem(k));
+    await clearTMDBCache();
     setConfirm(false);
-    setUsage(getStorageUsage());
+    setUsage(await getStorageUsage());
     setStats(getStats());
     toast('All data cleared');
   }
@@ -63,15 +60,15 @@ export default function Settings() {
     toast('Data exported');
   }
 
-  function handleImport(e) {
+  async function handleImport(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(reader.result as string);
         importData(data, 'merge');
-        setUsage(getStorageUsage());
+        setUsage(await getStorageUsage());
         setStats(getStats());
         toast('Data imported successfully');
       } catch {
