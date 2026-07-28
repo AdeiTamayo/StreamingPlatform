@@ -25,6 +25,17 @@ export default function Settings() {
     setStats(getStats());
   }, []);
 
+  function clearCache() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('tmdb:')) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+    setUsage(getStorageUsage());
+    toast('TMDB cache cleared');
+  }
+
   function clearAll() {
     const keys = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -116,6 +127,7 @@ export default function Settings() {
             <div className={styles.settingsRow}>
               <span className={styles.settingsLabel}>TMDB cache</span>
               <span className={styles.settingsValue}>{formatBytes(usage.breakdown.cache)}</span>
+              <button className="watch-toggle" onClick={clearCache} style={{ marginLeft: 8 }}>Clear</button>
             </div>
           </div>
         )}
