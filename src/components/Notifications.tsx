@@ -22,11 +22,6 @@ function formatRelativeTime(timestamp) {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
-function getNotificationLabel(notification) {
-  if (notification.type === 'new_episode') return 'New episode';
-  return 'Notification';
-}
-
 export default function Notifications() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -122,7 +117,7 @@ export default function Notifications() {
                     ? 'You will see episode alerts here.'
                     : unreadCount > 0
                       ? `${unreadCount} unread ${unreadCount === 1 ? 'alert' : 'alerts'}`
-                      : 'Everything is caught up.'}
+                      : ''}
                 </p>
               </div>
               <div className={styles.headerActions}>
@@ -146,9 +141,6 @@ export default function Notifications() {
               <ul className={styles.list}>
                 {notifications.map((n) => (
                   <li key={n.id} className={`${styles.item} ${!n.read ? styles.unread : ''}`}>
-                    <div className={styles.itemRail} aria-hidden="true">
-                      <span className={styles.itemDot} />
-                    </div>
                     <div className={styles.itemContent}>
                       <div className={styles.itemTitle}>{n.showTitle}</div>
                       <div className={styles.itemSub}>
@@ -160,28 +152,25 @@ export default function Notifications() {
                         <span>{formatRelativeTime(n.createdAt)}</span>
                       </div>
                     </div>
-                    <div className={styles.itemActions}>
-                      <div className={styles.itemType}>{getNotificationLabel(n)}</div>
-                      <div className={styles.itemActionsButtons}>
-                        <Link
-                          to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
-                          className={styles.openBtn}
-                          onClick={() => setOpen(false)}
-                        >
-                          Open
-                        </Link>
-                        <button
-                          className={styles.removeBtn}
-                          onClick={() => handleRemove(n.id)}
-                          aria-label={`Remove notification for ${n.showTitle}`}
-                          title="Remove"
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M18 6 6 18" />
-                            <path d="M6 6 18 18" />
-                          </svg>
-                        </button>
-                      </div>
+                    <div className={styles.itemActionsButtons}>
+                      <Link
+                        to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
+                        className={styles.openBtn}
+                        onClick={() => setOpen(false)}
+                      >
+                        Open
+                      </Link>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => handleRemove(n.id)}
+                        aria-label={`Remove notification for ${n.showTitle}`}
+                        title="Remove"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6 6 18" />
+                          <path d="M6 6 18 18" />
+                        </svg>
+                      </button>
                     </div>
                   </li>
                 ))}
