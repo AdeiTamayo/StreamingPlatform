@@ -61,7 +61,10 @@ flowchart TD
 
     subgraph Storage [Client-side]
         L
+        DB[(IndexedDB<br>TMDB cache)]
     end
+
+    J --> DB
 ```
 
 ## Features
@@ -89,7 +92,8 @@ flowchart TD
 - [TMDB API](https://developer.themoviedb.org) for metadata, images, and search
 - [VidSrc](https://vidsrc.fyi) for video embeds
 - CSS Modules for scoped styling
-- localStorage for all persistence (watched marks, progress, watch later lists)
+- localStorage for user data (watched marks, progress, watch later lists)
+- IndexedDB for TMDB API response cache (larger quota than localStorage)
 
 ## Getting Started
 
@@ -150,7 +154,8 @@ src/
   api/
     tmdb.ts          # TMDB API calls with caching + AbortSignal support
     vidsrc.ts        # Embed URL builders
-    storage.ts       # localStorage persistence
+    storage.ts       # localStorage persistence (user data)
+    tmdbCache.ts     # IndexedDB cache for TMDB API responses
   components/
     Navbar.tsx       # Sticky top navigation with sidebar
     Player.tsx       # Video player with progress tracking
@@ -188,7 +193,7 @@ src/
 ## Notes
 
 - All data is stored locally in your browser — no accounts, no server
-- TMDB API responses are cached in localStorage for 24 hours (max 100 entries)
+- TMDB API responses are cached in IndexedDB for 24 hours (max 100 entries, virtually unlimited space)
 - The app uses a privacy-conscious setup: noindex tags, no analytics, no tracking
 - Video playback quality and availability depend on the embed source
 - Errors are logged to localStorage under `app_errors` for debugging

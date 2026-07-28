@@ -1,53 +1,10 @@
 import CONFIG from '../config';
-
-const CACHE_TTL = 24 * 60 * 60 * 1000;
+import { getCached, setCache } from './tmdbCache';
 
 const options = {
   method: 'GET',
   headers: { accept: 'application/json' },
 };
-
-function cacheKey(url) {
-  return `tmdb:${url}`;
-}
-
-function getCached(url) {
-  try {
-    const raw = localStorage.getItem(cacheKey(url));
-    if (!raw) return null;
-    const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > CACHE_TTL) {
-      localStorage.removeItem(cacheKey(url));
-      return null;
-    }
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function setCache(url, data) {
-  try {
-    localStorage.setItem(cacheKey(url), JSON.stringify({ data, ts: Date.now() }));
-    pruneCache();
-  } catch {}
-}
-
-function pruneCache() {
-  const entries = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith('tmdb:')) continue;
-    try {
-      const { ts } = JSON.parse(localStorage.getItem(k));
-      entries.push({ k, ts });
-    } catch {}
-  }
-  if (entries.length <= 120) return;
-  entries.sort((a, b) => a.ts - b.ts);
-  const toRemove = entries.slice(0, entries.length - 100);
-  toRemove.forEach((e) => localStorage.removeItem(e.k));
-}
 
 async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = null) {
   for (let i = 0; i <= retries; i++) {
@@ -73,7 +30,7 @@ async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = 
 }
 
 async function fetchWithFallback(url: string, signal?: AbortSignal) {
-  const cached = getCached(url);
+  const cached = await getCached(url);
   if (cached) return cached;
   return fetchJson(url, 2, signal ?? null);
 }
