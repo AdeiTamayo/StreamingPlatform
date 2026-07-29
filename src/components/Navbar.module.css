@@ -60,13 +60,24 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.navIconBtn:hover svg {
+  animation: navIconBob 0.5s ease;
+}
+
 .navIconBtn svg {
   width: 1.2rem;
   height: 1.2rem;
+  transition: transform 0.2s;
 }
 
 .navIconBtn span {
   line-height: 1;
+}
+
+@keyframes navIconBob {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.15) rotate(-5deg); }
+  60% { transform: scale(1.15) rotate(5deg); }
 }
 
 .active {
@@ -151,9 +162,14 @@
   transform: scale(1.08);
 }
 
+.searchToggleBtn:hover svg {
+  animation: navIconBob 0.5s ease;
+}
+
 .searchToggleBtn svg {
   width: 1.35rem;
   height: 1.35rem;
+  transition: transform 0.2s;
 }
 
 

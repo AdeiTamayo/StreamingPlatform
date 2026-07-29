@@ -24,6 +24,10 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+.bellBtn:hover svg {
+  animation: bellWobble 0.5s ease;
+}
+
 .bellBtn:active {
   transform: scale(0.94);
 }
@@ -44,6 +48,7 @@
 .bellIcon svg {
   width: 1.35rem;
   height: 1.35rem;
+  transition: transform 0.2s;
 }
 
 .badge {
@@ -422,6 +427,12 @@
   100% {
     transform: scale(1);
   }
+}
+
+@keyframes bellWobble {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.15) rotate(-5deg); }
+  60% { transform: scale(1.15) rotate(5deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
