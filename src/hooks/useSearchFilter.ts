@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAbortController } from './useAbortController';
+import type { TMDBPaginatedResponse, TMDBMovie, TMDBSeries } from '../types';
 
-export default function useSearchFilter(fetchFn: any, deps: Record<string, any> = {}) {
-  const [results, setResults] = useState([]);
+type FetchFn = (page: number, filters: Record<string, string | undefined>, signal: AbortSignal) => Promise<TMDBPaginatedResponse<TMDBMovie | TMDBSeries>>;
+
+export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, string> = {}) {
+  const [results, setResults] = useState<(TMDBMovie | TMDBSeries)[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const fetchRef = useRef(null);
-  const fetchFnRef = useRef(fetchFn);
+  const fetchRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const fetchFnRef = useRef<FetchFn>(fetchFn);
   fetchFnRef.current = fetchFn;
   const { getSignal } = useAbortController();
 
@@ -34,7 +37,7 @@ export default function useSearchFilter(fetchFn: any, deps: Record<string, any> 
           setResults(data.results || []);
           setTotalPages(data.total_pages || 1);
         })
-        .catch((err) => {
+        .catch((err: Error) => {
           if (err?.name === 'AbortError') return;
           setError(true);
         })

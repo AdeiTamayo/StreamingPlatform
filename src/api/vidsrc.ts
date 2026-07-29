@@ -1,6 +1,11 @@
 import CONFIG from '../config';
 
-const SOURCES = {
+type SourceEntry = {
+  movie: (id: string | number) => string;
+  tv: (id: string | number, s: number, e: number) => string;
+};
+
+const SOURCES: Record<string, SourceEntry> = {
   vidsrc: {
     movie: (id) => `${CONFIG.VIDSRC_BASE}/embed/movie/${id}`,
     tv: (id, s, e) => `${CONFIG.VIDSRC_BASE}/embed/tv/${id}/${s}/${e}`,
@@ -23,16 +28,16 @@ const SOURCES = {
   },
 };
 
-export function getMovieEmbedUrl(tmdbId, source = 'vidsrc') {
+export function getMovieEmbedUrl(tmdbId: string | number, source: string = 'vidsrc'): string {
   return SOURCES[source]?.movie(tmdbId) ?? SOURCES.vidsrc.movie(tmdbId);
 }
 
-export function getTVEmbedUrl(tmdbId, season, episode, source = 'vidsrc') {
+export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: number, source: string = 'vidsrc'): string {
   return SOURCES[source]?.tv(tmdbId, season, episode) ?? SOURCES.vidsrc.tv(tmdbId, season, episode);
 }
 
-export function getSourceLabel(source) {
-  const labels = {
+export function getSourceLabel(source: string): string {
+  const labels: Record<string, string> = {
     vidsrc: 'VidSrc',
     '2embed': '2Embed',
     vsembed_ru: 'VSEmbed.ru',
@@ -42,4 +47,4 @@ export function getSourceLabel(source) {
   return labels[source] || source;
 }
 
-export const SOURCE_KEYS = Object.keys(SOURCES);
+export const SOURCE_KEYS: string[] = Object.keys(SOURCES);

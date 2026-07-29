@@ -5,10 +5,11 @@ import FilterBar from '../components/FilterBar';
 import FilterDropdown from '../components/FilterDropdown';
 import DatePickerField from '../components/DatePickerField';
 import useSearchFilter from '../hooks/useSearchFilter';
+import type { MediaType, TMDBGenre, TMDBCountry, FilterOption } from '../types';
 
 const years = Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i);
 
-const movieSortOptions = [
+const movieSortOptions: FilterOption[] = [
   { value: 'popularity.desc', label: 'Popularity' },
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'primary_release_date.desc', label: 'Release date (newest)' },
@@ -16,7 +17,7 @@ const movieSortOptions = [
   { value: 'original_title.asc', label: 'Title A-Z' },
 ];
 
-const tvSortOptions = [
+const tvSortOptions: FilterOption[] = [
   { value: 'popularity.desc', label: 'Popularity' },
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'first_air_date.desc', label: 'Release date (newest)' },
@@ -24,12 +25,16 @@ const tvSortOptions = [
   { value: 'original_name.asc', label: 'Name A-Z' },
 ];
 
-const yearOptions = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
+const yearOptions: FilterOption[] = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
 
-export default function MediaBrowse({ type }) {
+interface MediaBrowseProps {
+  type: MediaType;
+}
+
+export default function MediaBrowse({ type }: MediaBrowseProps) {
   const isMovie = type === 'movie';
-  const [genres, setGenres] = useState([]);
-  const [countries, setCountries] = useState([]);
+  const [genres, setGenres] = useState<TMDBGenre[]>([]);
+  const [countries, setCountries] = useState<TMDBCountry[]>([]);
   const [genre, setGenre] = useState('');
   const [country, setCountry] = useState('');
   const [year, setYear] = useState('');
@@ -42,16 +47,16 @@ export default function MediaBrowse({ type }) {
   useEffect(() => {
     document.title = `${isMovie ? 'Movies' : 'TV Shows'} - StreamFlow`;
     const genreFn = isMovie ? getMovieGenres : getTVGenres;
-    genreFn().then((data) => setGenres(data.genres || [])).catch(() => {});
-    getCountries().then(setCountries).catch(() => {});
+    genreFn().then((data: { genres: TMDBGenre[] }) => setGenres(data.genres || [])).catch(() => {});
+    getCountries().then((data) => setCountries(data as TMDBCountry[])).catch(() => {});
   }, [isMovie]);
 
   const sortOptions = isMovie ? movieSortOptions : tvSortOptions;
-  const sortOptionList = [{ value: '', label: 'Sort by' }, ...sortOptions];
-  const countryOptions = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
-  const genreOptions = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
+  const sortOptionList: FilterOption[] = [{ value: '', label: 'Sort by' }, ...sortOptions];
+  const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
+  const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
 
-  const fetchFn = useCallback((page, filters, signal) => {
+  const fetchFn = useCallback((page: number, filters: Record<string, string | undefined>, signal: AbortSignal) => {
     const { query: q, genre: g, country: c, year: y, sortBy: s, releaseDateFrom: rdf, releaseDateUntil: rdu } = filters;
     if (q?.trim()) {
       return (isMovie ? searchMovies : searchTV)(q.trim(), page, signal);

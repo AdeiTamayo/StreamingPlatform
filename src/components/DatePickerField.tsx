@@ -5,30 +5,30 @@ import styles from './DatePickerField.module.css';
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function pad(value) {
+function pad(value: number): string {
     return String(value).padStart(2, '0');
 }
 
-function toDateString(date) {
+function toDateString(date: Date): string {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function parseDateString(value) {
+function parseDateString(value: string): Date | null {
     if (!value) return null;
     const [year, month, day] = value.split('-').map(Number);
     if (!year || !month || !day) return null;
     return new Date(year, month - 1, day);
 }
 
-function startOfMonth(date) {
+function startOfMonth(date: Date): Date {
     return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function buildMonthCells(viewDate) {
+function buildMonthCells(viewDate: Date): (Date | null)[] {
     const firstDay = startOfMonth(viewDate);
     const offset = firstDay.getDay();
     const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
-    const cells = [];
+    const cells: (Date | null)[] = [];
 
     for (let i = 0; i < offset; i += 1) cells.push(null);
     for (let day = 1; day <= daysInMonth; day += 1) {
@@ -38,9 +38,16 @@ function buildMonthCells(viewDate) {
     return cells;
 }
 
-export default function DatePickerField({ label, value, onChange, placeholder }) {
+interface DatePickerFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}
+
+export default function DatePickerField({ label, value, onChange, placeholder }: DatePickerFieldProps) {
     const [open, setOpen] = useState(false);
-    const [view, setView] = useState('day');
+    const [view, setView] = useState<'day' | 'month' | 'year'>('day');
     const [viewDate, setViewDate] = useState(() => parseDateString(value) || new Date());
     const ref = useClickOutside(() => setOpen(false));
 
@@ -51,7 +58,7 @@ export default function DatePickerField({ label, value, onChange, placeholder })
 
     useEffect(() => {
         if (!open) return;
-        function handleKey(e) {
+        function handleKey(e: KeyboardEvent) {
             if (e.key === 'Escape') setOpen(false);
         }
         document.addEventListener('keydown', handleKey);
@@ -64,7 +71,7 @@ export default function DatePickerField({ label, value, onChange, placeholder })
     const monthCells = useMemo(() => buildMonthCells(viewDate), [viewDate]);
     const yearRangeStart = Math.floor(viewDate.getFullYear() / 20) * 20;
 
-    function selectDate(date) {
+    function selectDate(date: Date) {
         onChange(toDateString(date));
         setViewDate(date);
         setOpen(false);

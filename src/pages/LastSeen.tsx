@@ -5,23 +5,32 @@ import { imageUrl } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import type { LastSeenItem } from '../types';
 import styles from './LastSeen.module.css';
 
 const MOVIES_PER_PAGE = 20;
 
-function formatEpisodeLabel(item) {
+interface SeriesGroup {
+  id: number | string;
+  title: string;
+  poster: string | null;
+  latestTs: number;
+  episodes: LastSeenItem[];
+}
+
+function formatEpisodeLabel(item: LastSeenItem): string {
   if (item.season && item.episode) return `S${item.season}E${item.episode}`;
   return 'Episode';
 }
 
 export default function LastSeen() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] = useState<LastSeenItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('recent');
   const [filterType, setFilterType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [moviePage, setMoviePage] = useState(0);
-  const [selectedSeries, setSelectedSeries] = useState(null);
+  const [selectedSeries, setSelectedSeries] = useState<SeriesGroup | null>(null);
   const toast = useToast();
 
   useEffect(() => {
@@ -31,23 +40,23 @@ export default function LastSeen() {
   }, []);
 
   const { series, movies } = useMemo(() => {
-    const seriesMap = new Map();
-    const movieItems = [];
+    const seriesMap = new Map<string, SeriesGroup>();
+    const movieItems: LastSeenItem[] = [];
 
-    items.forEach((item) => {
+    items.forEach((item: LastSeenItem) => {
       if (item.type === 'tv' && item.season && item.episode) {
         const key = String(item.id);
-        const rawTitle = item.meta?.title || item.title || `Show ${item.id}`;
-        const title = rawTitle.replace(/\sS\d+E\d+$/, '');
-        const existing = seriesMap.get(key) || {
+        const rawTitle = (item.meta?.title as string) || item.title || `Show ${item.id}`;
+        const title = rawTitle.replace(/\sS\d+E\d+$/, '') || `Show ${item.id}`;
+        const existing = seriesMap.get(key) || ({
           id: item.id,
           title,
-          poster: item.meta?.poster || null,
+          poster: (item.meta?.poster as string) || null,
           latestTs: item.ts || 0,
-          episodes: [],
-        };
+          episodes: [] as LastSeenItem[],
+        } as SeriesGroup);
         existing.title = existing.title || title;
-        existing.poster = existing.poster || item.meta?.poster || null;
+        existing.poster = existing.poster || (item.meta?.poster as string) || null;
         existing.latestTs = Math.max(existing.latestTs, item.ts || 0);
         existing.episodes.push(item);
         seriesMap.set(key, existing);
@@ -56,19 +65,19 @@ export default function LastSeen() {
       }
     });
 
-    let groupedSeries = Array.from(seriesMap.values())
+    let groupedSeries: SeriesGroup[] = Array.from(seriesMap.values())
       .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
-      .map((group) => ({
+      .map((group: SeriesGroup) => ({
         ...group,
         episodes: group.episodes.sort((a, b) => (b.ts || 0) - (a.ts || 0)),
       }));
 
-    let sortedMovies = movieItems.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    let sortedMovies = [...movieItems].sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      groupedSeries = groupedSeries.filter((s) => s.title.toLowerCase().includes(q));
-      sortedMovies = sortedMovies.filter((m) => (m.title || '').toLowerCase().includes(q));
+      groupedSeries = groupedSeries.filter((s: SeriesGroup) => s.title.toLowerCase().includes(q));
+      sortedMovies = sortedMovies.filter((m: LastSeenItem) => (m.title || '').toLowerCase().includes(q));
     }
 
     if (sortBy === 'title') {
@@ -77,7 +86,7 @@ export default function LastSeen() {
     } else if (sortBy === 'episodes') {
       groupedSeries.sort((a, b) => b.episodes.length - a.episodes.length);
     } else if (sortBy === 'year') {
-      sortedMovies.sort((a, b) => ((b.meta?.year || b.year || '0').toString().localeCompare((a.meta?.year || a.year || '0').toString())));
+      sortedMovies.sort((a: LastSeenItem, b: LastSeenItem) => ((b.meta?.year || '').toString().localeCompare((a.meta?.year || '').toString())));
     }
 
     return { series: groupedSeries, movies: sortedMovies };
@@ -87,7 +96,7 @@ export default function LastSeen() {
   const safeMoviePage = Math.min(moviePage, totalMoviePages - 1);
   const visibleMovies = movies.slice(safeMoviePage * MOVIES_PER_PAGE, (safeMoviePage + 1) * MOVIES_PER_PAGE);
 
-  function handleRemove(item) {
+  function handleRemove(item: LastSeenItem) {
     if (item.type === 'movie') {
       markUnwatched('movie', item.id);
       clearProgress('movie', item.id);
@@ -96,19 +105,19 @@ export default function LastSeen() {
       clearProgress('tv', item.id, item.season, item.episode);
     }
     setItems(getLastSeen());
-    toast('Removed from history');
+    toast?.('Removed from history');
   }
 
-  function handleRemoveShow(showId) {
+  function handleRemoveShow(showId: string | number) {
     clearShowHistory(showId);
     setItems(getLastSeen());
     if (selectedSeries && String(selectedSeries.id) === String(showId)) {
       setSelectedSeries(null);
     }
-    toast('Series removed from history');
+    toast?.('Series removed from history');
   }
 
-  function showSeriesEpisodes(show) {
+  function showSeriesEpisodes(show: SeriesGroup) {
     setSelectedSeries(show);
     setMoviePage(0);
   }
@@ -244,7 +253,7 @@ export default function LastSeen() {
                     <div key={item.storageKey} className="media-card">
                       <Link to={`/movie/${item.id}`}>
                         <div className="media-card-poster">
-                          <img src={imageUrl(item.meta?.poster)} alt={item.title} loading="lazy" />
+                          <img src={imageUrl(item.meta?.poster as string | null)} alt={item.title || ''} loading="lazy" />
                         </div>
                         <div className="media-card-info">
                           <h3>{item.title || `Movie ${item.id}`}</h3>

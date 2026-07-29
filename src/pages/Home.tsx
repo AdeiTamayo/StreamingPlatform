@@ -5,15 +5,16 @@ import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
+import type { TMDBMovie, TMDBSeries, ContinueWatchingItem, TMDBGenre, TMDBCountry, FilterOption } from '../types';
 import styles from './Home.module.css';
 
 export default function Home() {
-  const [trending, setTrending] = useState([]);
+  const [trending, setTrending] = useState<(TMDBMovie | TMDBSeries)[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [continueWatching, setContinueWatching] = useState([]);
+  const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
   const [heroIdx, setHeroIdx] = useState(0);
-  const [cwFilter, setCwFilter] = useState('all');
+  const [cwFilter, setCwFilter] = useState<string>('all');
   const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
@@ -24,10 +25,10 @@ export default function Home() {
     setLoading(true);
     setError(false);
     getTrending('all', 1, getSignal())
-      .then((data) => setTrending(data.results || []))
+      .then((data) => setTrending((data as { results: (TMDBMovie | TMDBSeries)[] }).results || []))
       .catch(() => {
         setError(true);
-        toast('Failed to load trending');
+        toast?.('Failed to load trending');
       })
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -54,24 +55,24 @@ export default function Home() {
     return () => link.remove();
   }, [hero?.id, hero?.backdrop_path, hero?.poster_path]);
 
-  function handleRemoveCW(item) {
-    clearProgress(item.type, item.id, item.season, item.episode);
+  function handleRemoveCW(item: ContinueWatchingItem) {
+    clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
-    toast('Removed from Continue Watching');
+    toast?.('Removed from Continue Watching');
   }
 
-  const filteredCW = continueWatching.filter((item) => {
+  const filteredCW = continueWatching.filter((item: ContinueWatchingItem) => {
     if (cwFilter === 'all') return true;
     return item.type === cwFilter;
   });
 
   const cwCounts = {
     all: continueWatching.length,
-    movie: continueWatching.filter((i) => i.type === 'movie').length,
-    tv: continueWatching.filter((i) => i.type === 'tv').length,
+    movie: continueWatching.filter((i: ContinueWatchingItem) => i.type === 'movie').length,
+    tv: continueWatching.filter((i: ContinueWatchingItem) => i.type === 'tv').length,
   };
 
-  const CW_TABS = [
+  const CW_TABS: { key: string; label: string }[] = [
     { key: 'all', label: `All (${cwCounts.all})` },
     { key: 'movie', label: `Movies (${cwCounts.movie})` },
     { key: 'tv', label: `Series (${cwCounts.tv})` },
@@ -102,18 +103,18 @@ export default function Home() {
         </div>
         {hero && (
           <div className={styles.heroContent}>
-            <span className={styles.heroBadge}>{hero.media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
-            <h1 className={styles.heroTitle}>{hero.title || hero.name}</h1>
+            <span className={styles.heroBadge}>{(hero as unknown as { media_type?: string }).media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
+            <h1 className={styles.heroTitle}>{(hero as TMDBMovie).title || (hero as TMDBSeries).name}</h1>
             <div className={styles.heroMeta}>
               {hero.vote_average > 0 && (
                 <span className={styles.heroRating}>{hero.vote_average.toFixed(1)}</span>
               )}
-              <span className={styles.heroYear}>{(hero.release_date || hero.first_air_date || '').slice(0, 4)}</span>
+              <span className={styles.heroYear}>{((hero as TMDBMovie).release_date || (hero as TMDBSeries).first_air_date || '').slice(0, 4)}</span>
             </div>
             {hero.overview && <p className={styles.heroOverview}>{hero.overview}</p>}
             <div className={styles.heroActions}>
               <Link
-                to={`/${hero.media_type === 'tv' ? 'tv' : 'movie'}/${hero.id}`}
+                to={`/${(hero as unknown as { media_type?: string }).media_type === 'tv' ? 'tv' : 'movie'}/${hero.id}`}
                 className={`${styles.heroBtn} ${styles.heroBtnPrimary}`}
               >
                 &#9654; Play
@@ -156,8 +157,8 @@ export default function Home() {
           {filteredCW.length > 0 ? (
             <div className={styles.cwGrid}>
               {filteredCW.map((item, i) => {
-              const label = item.meta?.title || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
-              const poster = item.meta?.poster;
+              const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
+              const poster = item.meta?.poster as string | undefined;
               const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
               return (
                 <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className={styles.cwCard}>
@@ -167,7 +168,7 @@ export default function Home() {
                   >
                     <div className={styles.cwCardPoster}>
                       {poster ? (
-                        <img src={imageUrl(poster)} alt={label} loading="lazy" />
+                        <img src={imageUrl(poster ?? null)} alt={label} loading="lazy" />
                       ) : (
                         <div className={styles.cwCardPlaceholder} />
                       )}

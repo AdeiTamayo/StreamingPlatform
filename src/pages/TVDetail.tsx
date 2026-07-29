@@ -11,44 +11,45 @@ import MediaCard from '../components/MediaCard';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
+import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
 import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
 export default function TVDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const urlSeason = searchParams.get('season');
   const urlEpisode = searchParams.get('episode');
-  const [show, setShow] = useState(null);
+  const [show, setShow] = useState<TMDBSeries | null>(null);
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
-  const [startAt, setStartAt] = useState(null);
+  const [startAt, setStartAt] = useState<number | null>(null);
   const [inWL, setInWL] = useState(false);
   const [inEpWL, setInEpWL] = useState(false);
   const [watchedCount, setWatchedCount] = useState(0);
-  const [episodes, setEpisodes] = useState([]);
-  const [trailerKey, setTrailerKey] = useState(null);
+  const [episodes, setEpisodes] = useState<TMDBEpisode[]>([]);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
   const watchedRef = useRef(false);
-  const autoWatchedRef = useRef(null);
+  const autoWatchedRef = useRef<string | null>(null);
   const { getSignal } = useAbortController();
 
-  const seasons = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
+  const seasons: TMDBSeason[] = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
   const currentSeason = useMemo(() => seasons.find((s) => s.season_number === season), [seasons, season]);
   const episodeCount = currentSeason?.episode_count || 12;
   const seasonIdx = seasons.findIndex((s) => s.season_number === season);
   const hasPrev = episode > 1 || seasonIdx > 0;
   const episodeNums = useMemo(() => Array.from({ length: episodeCount }, (_, i) => i + 1), [episodeCount]);
   const watchedStates = useMemo(() => {
-    const map = {};
-    episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id, season, ep); });
+    const map: Record<number, boolean> = {};
+    episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id!, season, ep); });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episodeNums, id, season, watchedCount]);
@@ -56,6 +57,7 @@ export default function TVDetail() {
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
   useEffect(() => {
+    if (!id) return;
     setLoading(true);
     setError(false);
     watchedRef.current = false;
@@ -64,24 +66,25 @@ export default function TVDetail() {
     setShowTrailer(false);
     getTVDetail(id, getSignal())
       .then((data) => {
-        setShow(data);
-        document.title = `${data.name} - StreamFlow`;
+        const showData = data as TMDBSeries;
+        setShow(showData);
+        document.title = `${showData.name} - StreamFlow`;
         setInWL(isInWatchLater('tv', id));
-        const vids = data.videos?.results || [];
-        const yt = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+        const vids = showData.videos?.results || [];
+        const yt = vids.find((v: TMDBVideo) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
         if (yt) setTrailerKey(yt.key);
-        const s = data.seasons?.filter((s) => s.season_number > 0) || [];
+        const s: TMDBSeason[] = showData.seasons?.filter((s: TMDBSeason) => s.season_number > 0) || [];
         if (s.length === 0) return;
         const firstSeason = s[0].season_number;
         const requestedSeason = Number(urlSeason);
         const requestedEpisode = Number(urlEpisode);
-        const requestedSeasonExists = requestedSeason > 0 && s.some((seasonItem) => seasonItem.season_number === requestedSeason);
+        const requestedSeasonExists = requestedSeason > 0 && s.some((seasonItem: TMDBSeason) => seasonItem.season_number === requestedSeason);
         const last = getLastWatchedEpisode(id);
         if (requestedSeasonExists && requestedEpisode > 0) {
           setSeason(requestedSeason);
           setEpisode(requestedEpisode);
           setPlayerOpen(true);
-        } else if (last && s.find((seasonItem) => seasonItem.season_number === last.season)) {
+        } else if (last && s.find((seasonItem: TMDBSeason) => seasonItem.season_number === last.season)) {
           setSeason(last.season);
           setEpisode(last.episode);
         } else {
@@ -89,7 +92,7 @@ export default function TVDetail() {
           setEpisode(1);
         }
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (err?.name === 'AbortError') return;
         setError(true);
       })
@@ -97,6 +100,7 @@ export default function TVDetail() {
   }, [id, urlSeason, urlEpisode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!id) return;
     setWatched(isWatched('tv', id, season, episode));
     setInEpWL(isInEpisodeWatchLater(id, season, episode));
     const prog = getProgress('tv', id, season, episode);
@@ -114,18 +118,20 @@ export default function TVDetail() {
   }, [season, episode]);
 
   useEffect(() => {
+    if (!id) return;
     setWatchedCount(getWatchedCount(id, season, episodeCount));
   }, [id, season, episodeCount, watched]);
 
   useEffect(() => {
+    if (!id) return;
     getSeasonDetails(id, season, getSignal()).then((data) => {
-      setEpisodes(data.episodes || []);
+      setEpisodes((data as { episodes: TMDBEpisode[] }).episodes || []);
     }).catch(() => { });
   }, [id, season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check for new episodes of watch-later shows
   useEffect(() => {
-    if (!show) return;
+    if (!show || !id) return;
     const now = new Date();
     let added = 0;
 
@@ -134,7 +140,7 @@ export default function TVDetail() {
       const latestSeason = seasons[seasons.length - 1];
       if (latestSeason) {
         getSeasonDetails(id, latestSeason.season_number, getSignal()).then((data) => {
-          const eps = data.episodes || [];
+          const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
           for (const ep of eps) {
             if (!ep.air_date) continue;
             if (new Date(ep.air_date) > now) continue;
@@ -149,15 +155,15 @@ export default function TVDetail() {
     }
 
     // For episode watch later items: check saved episodes of this show
-    const epwlItems = getEpisodeWatchLater().filter((item) => String(item.showId) === String(id));
+    const epwlItems: EpisodeWatchLaterItem[] = getEpisodeWatchLater().filter((item: EpisodeWatchLaterItem) => String(item.showId) === String(id));
     if (epwlItems.length > 0) {
-      const seasonsToCheck = [...new Set(epwlItems.map((item) => item.season))];
+      const seasonsToCheck = [...new Set(epwlItems.map((item: EpisodeWatchLaterItem) => item.season))];
       seasonsToCheck.forEach((seasonNum) => {
         getSeasonDetails(id, seasonNum, getSignal()).then((data) => {
-          const eps = data.episodes || [];
+          const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
           for (const epwl of epwlItems) {
             if (epwl.season !== seasonNum) continue;
-            const ep = eps.find((e) => e.episode_number === epwl.episode);
+            const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
             if (!ep || !ep.air_date) continue;
             if (new Date(ep.air_date) > now) continue;
             if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
@@ -173,7 +179,7 @@ export default function TVDetail() {
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
-    if (!show || watchedRef.current || autoWatchedRef.current === episodeKey) return;
+    if (!show || !id || watchedRef.current || autoWatchedRef.current === episodeKey) return;
     autoWatchedRef.current = episodeKey;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
     clearProgress('tv', id, season, episode);
@@ -182,8 +188,8 @@ export default function TVDetail() {
     setStartAt(null);
   }
 
-  function handleProgress(currentTime, duration) {
-    if (watchedRef.current || !show) return;
+  function handleProgress(currentTime: number, duration: number) {
+    if (watchedRef.current || !show || !id) return;
     saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path });
 
     const currentEpisode = episodes.find((item) => item.episode_number === episode);
@@ -205,17 +211,20 @@ export default function TVDetail() {
     autoMarkWatched();
   }
 
+  const safeId = id!;
+
   function toggleWatched() {
+    if (!show || !id) return;
     if (watched) {
       markUnwatched('tv', id, season, episode);
       clearProgress('tv', id, season, episode);
       setWatched(false);
-      toast('Removed from watched');
+      toast?.('Removed from watched');
     } else {
       markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
       clearProgress('tv', id, season, episode);
       setWatched(true);
-      toast('Marked as watched');
+      toast?.('Marked as watched');
     }
   }
 
@@ -230,7 +239,7 @@ export default function TVDetail() {
   }
 
   function markCurrentWatched() {
-    if (watchedRef.current || !show) return;
+    if (watchedRef.current || !show || !id) return;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
     clearProgress('tv', id, season, episode);
     watchedRef.current = true;
@@ -248,9 +257,10 @@ export default function TVDetail() {
   }
 
   function retry() {
+    if (!id) return;
     setLoading(true);
     setError(false);
-    getTVDetail(id, getSignal()).then((data) => { setShow(data); }).catch((err) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
+    getTVDetail(id, getSignal()).then((data) => { setShow(data as TMDBSeries); }).catch((err: Error) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
   }
 
   if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;
@@ -263,7 +273,8 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(id, season, episode, videoSource);
+  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
+  const safeIdTV = id!;
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
@@ -286,8 +297,8 @@ export default function TVDetail() {
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
               <button className={`badge-btn ${inWL ? 'in-wl' : ''}`} onClick={() => {
-                if (inWL) { removeWatchLater('tv', id); setInWL(false); }
-                else { addWatchLater('tv', id, show.name, year, imageUrl(show.poster_path)); setInWL(true); }
+                if (inWL) { removeWatchLater('tv', safeId); setInWL(false); }
+                else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); }
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : '+ Watch'}</button>
             </div>
             <p className="detail-overview">{show.overview}</p>
@@ -313,32 +324,32 @@ export default function TVDetail() {
               <SeasonDropdown
                 seasons={seasons}
                 value={season}
-                onSelect={(s) => { setSeason(s); setEpisode(1); }}
+                onSelect={(s: number) => { setSeason(s); setEpisode(1); }}
               />
             </label>
             <label>
-              <EpisodeDropdown
-                showId={id}
+                <EpisodeDropdown
+                showId={safeId}
                 season={season}
                 episode={episode}
                 episodes={episodes}
-                onSelect={(ep) => { setEpisode(ep); }}
+                onSelect={(ep: number) => { setEpisode(ep); }}
               />
             </label>
             <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
               {watched ? 'Watched' : 'Mark as watched'}
             </button>
             <button className={`watch-toggle ${inEpWL ? 'in-wl' : ''}`} onClick={() => {
-              if (inEpWL) { removeEpisodeWatchLater(id, season, episode); setInEpWL(false); }
-              else { addEpisodeWatchLater(id, season, episode, show.name); setInEpWL(true); }
+              if (inEpWL) { removeEpisodeWatchLater(safeId, season, episode); setInEpWL(false); }
+              else { addEpisodeWatchLater(safeId, season, episode, show.name); setInEpWL(true); }
             }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
             {trailerKey && (
-              <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
+              <button className="watch-toggle"           onClick={() => setShowTrailer((s: boolean) => !s)}>
                 {showTrailer ? 'Hide Trailer' : 'Trailer'}
               </button>
             )}
             {startAt && (
-              <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', id, season, episode); }}>
+              <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', safeId, season, episode); }}>
                 Restart
               </button>
             )}
@@ -349,10 +360,10 @@ export default function TVDetail() {
               <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
               {watchedCount < episodeCount && (
                 <button className={styles.markSeasonBtn} onClick={() => {
-                  markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
-                  setWatchedCount(getWatchedCount(id, season, episodeCount));
-                  setWatched(isWatched('tv', id, season, episode));
-                  toast('Season marked as watched');
+                  markSeasonWatched(safeIdTV, season, episodeCount, show.name, show?.poster_path ?? '');
+                  setWatchedCount(getWatchedCount(safeIdTV, season, episodeCount));
+                  setWatched(isWatched('tv', safeIdTV, season, episode));
+                  toast?.('Season marked as watched');
                 }}>Mark season watched</button>
               )}
             </div>
@@ -391,7 +402,7 @@ export default function TVDetail() {
           <div className={styles.epNav}>
             <div className={styles.epNavCenter}>
               <button className={styles.epNavBtn} disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
-              <span className={styles.epNavLabel}>S{season} E{episode}</span>
+              <span className={styles.epNavLabel as string}>S{season} E{episode}</span>
               <button className={styles.epNavBtn} disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
               <button className={`${styles.epNavWatch} ${watched ? styles.watched : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
             </div>
@@ -399,7 +410,7 @@ export default function TVDetail() {
               value={videoSource}
               options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
               placeholder="Source"
-              onSelect={(val) => setVideoSource(val)}
+              onSelect={(val: string) => setVideoSource(val)}
               className="source-dropdown"
             />
           </div>
@@ -417,19 +428,19 @@ export default function TVDetail() {
             <SeasonDropdown
               seasons={seasons}
               value={season}
-              onSelect={(s) => { setSeason(s); setEpisode(1); }}
+              onSelect={(s: number) => { setSeason(s); setEpisode(1); }}
             />
           </div>
           <div className={styles.seasonProgress}>
             <div className={styles.spHeader}>
               <span className={styles.spLabel}>Season {season}</span>
               <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
-              {watchedCount < episodeCount && (
+              {watchedCount < episodeCount && !!id && (
                 <button className={styles.markSeasonBtn} onClick={() => {
-                  markSeasonWatched(id, season, episodeCount, show.name, show?.poster_path);
-                  setWatchedCount(getWatchedCount(id, season, episodeCount));
-                  setWatched(isWatched('tv', id, season, episode));
-                  toast('Season marked as watched');
+                  markSeasonWatched(safeIdTV, season, episodeCount, show.name, show?.poster_path ?? '');
+                  setWatchedCount(getWatchedCount(safeIdTV, season, episodeCount));
+                  setWatched(isWatched('tv', safeIdTV, season, episode));
+                  toast?.('Season marked as watched');
                 }}>Mark season watched</button>
               )}
             </div>
@@ -475,7 +486,7 @@ export default function TVDetail() {
           <h2 id="recs-heading-tv" className="section-title">You might also like</h2>
           <div className="media-grid">
             {recommendations.map((item) => (
-              <MediaCard key={item.id} item={item} mediaType="tv" />
+              <MediaCard key={(item as { id: number }).id} item={item as TMDBMovie | TMDBSeries} mediaType="tv" />
             ))}
           </div>
         </section>

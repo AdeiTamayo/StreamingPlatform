@@ -5,18 +5,8 @@ import { imageUrl, getMovieDetail, getTVDetail, getSeasonDetails } from '../api/
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import type { WatchLaterItem, EpisodeWatchLaterItem, CalendarItem, TMDBSeason, TMDBEpisode, MediaType } from '../types';
 import styles from './WatchLater.module.css';
-
-interface CalendarItem {
-  date: string;
-  title: string;
-  type: 'movie' | 'episode';
-  id: string | number;
-  season?: number;
-  episode?: number;
-  episodeTitle?: string;
-  poster?: string;
-}
 
 function isFuture(dateStr: string) {
   const d = new Date(dateStr);
@@ -47,8 +37,8 @@ function getMonthDays(year: number, month: number) {
 }
 
 export default function WatchLater() {
-  const [items, setItems] = useState([]);
-  const [epItems, setEpItems] = useState([]);
+  const [items, setItems] = useState<WatchLaterItem[]>([]);
+  const [epItems, setEpItems] = useState<EpisodeWatchLaterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
@@ -65,13 +55,13 @@ export default function WatchLater() {
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
 
-  const fetchTVFutureEpisodes = useCallback(async (id: string | number): Promise<CalendarItem[]> => {
+  const fetchTVFutureEpisodes = useCallback(async (showId: string | number): Promise<CalendarItem[]> => {
     const results: CalendarItem[] = [];
     try {
-      const detail = await getTVDetail(id);
+      const detail = await getTVDetail(showId);
       if (!detail) return results;
       const now = new Date();
-      const seasons = (detail.seasons || []).filter((s) => s.season_number > 0);
+      const seasons = ((detail as Record<string, unknown>).seasons as TMDBSeason[] || []).filter((s: TMDBSeason) => s.season_number > 0);
 
       for (const season of seasons) {
         if (!season.air_date) continue;
@@ -82,15 +72,15 @@ export default function WatchLater() {
         }
 
         try {
-          const seasonDetail = await getSeasonDetails(id, season.season_number);
-          const episodes = seasonDetail?.episodes || [];
+          const seasonDetail = await getSeasonDetails(showId, season.season_number);
+          const episodes = (seasonDetail as Record<string, unknown>)?.episodes as TMDBEpisode[] || [];
           for (const ep of episodes) {
             if (ep.air_date && isFuture(ep.air_date)) {
-              results.push({
+            results.push({
                 date: ep.air_date,
-                title: detail.name,
+                title: (detail as Record<string, unknown>).name as string,
                 type: 'episode',
-                id,
+                id: showId,
                 season: season.season_number,
                 episode: ep.episode_number,
                 episodeTitle: ep.name,
@@ -100,16 +90,17 @@ export default function WatchLater() {
         } catch {}
       }
 
-      if (detail.next_episode_to_air?.air_date && isFuture(detail.next_episode_to_air.air_date)) {
-        const n = detail.next_episode_to_air;
+      const nextEp = (detail as Record<string, unknown>).next_episode_to_air as { air_date: string; season_number: number; episode_number: number; name: string } | undefined;
+      if (nextEp?.air_date && isFuture(nextEp.air_date)) {
+        const n = nextEp;
         const dup = results.some((r) => r.season === n.season_number && r.episode === n.episode_number && r.date === n.air_date);
         if (!dup) {
           results.push({
             date: n.air_date,
             title: detail.name,
             type: 'episode',
-            id,
-            season: n.season_number,
+                id: showId,
+                season: n.season_number,
             episode: n.episode_number,
             episodeTitle: n.name,
           });
@@ -119,16 +110,16 @@ export default function WatchLater() {
     return results;
   }, []);
 
-  const fetchMovieRelease = useCallback(async (item: any): Promise<CalendarItem | null> => {
+  const fetchMovieRelease = useCallback(async (item: WatchLaterItem): Promise<CalendarItem | null> => {
     try {
-      const detail = await getMovieDetail(item.id);
+      const detail = await getMovieDetail(item.id) as { release_date?: string; title?: string; poster_path?: string | null };
       if (detail?.release_date && isFuture(detail.release_date)) {
         return {
           date: detail.release_date,
-          title: detail.title,
+          title: detail.title || '',
           type: 'movie',
           id: item.id,
-          poster: detail.poster_path,
+          poster: detail.poster_path || undefined,
         };
       }
     } catch {}
@@ -144,7 +135,7 @@ export default function WatchLater() {
 
     for (let i = 0; i < wlItems.length; i += CONCURRENCY) {
       const batch = wlItems.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.allSettled(batch.map(async (item) => {
+      const batchResults = await Promise.allSettled(batch.map(async (item: WatchLaterItem) => {
         if (item.type === 'movie') return fetchMovieRelease(item);
         return fetchTVFutureEpisodes(item.id);
       }));
@@ -159,10 +150,10 @@ export default function WatchLater() {
 
     for (let i = 0; i < epwlItems.length; i += CONCURRENCY) {
       const batch = epwlItems.slice(i, i + CONCURRENCY);
-      const batchResults = await Promise.allSettled(batch.map(async (epwl) => {
+      const batchResults = await Promise.allSettled(batch.map(async (epwl: EpisodeWatchLaterItem) => {
         try {
-          const season = await getSeasonDetails(epwl.showId, epwl.season);
-          const ep = season?.episodes?.find((e) => e.episode_number === epwl.episode);
+          const seasonDetail = await getSeasonDetails(epwl.showId, epwl.season) as { episodes?: { episode_number: number; air_date?: string; name?: string }[] };
+          const ep = seasonDetail?.episodes?.find((e) => e.episode_number === epwl.episode);
           if (ep?.air_date && isFuture(ep.air_date)) {
             return {
               date: ep.air_date,
@@ -196,7 +187,7 @@ export default function WatchLater() {
   }, [loadCalendarItems]);
 
   useEffect(() => {
-    if (calendarItems.length > 0 && view === 'calendar') {
+    if (calendarItems.length > 0 && view === 'calendar' && calendarItems[0]?.date) {
       const firstDate = calendarItems[0].date;
       const d = new Date(firstDate);
       setCalYear(d.getFullYear());
@@ -205,18 +196,18 @@ export default function WatchLater() {
     }
   }, [calendarItems, view]);
 
-  function handleRemove(type, id) {
-    removeWatchLater(type, id);
+  function handleRemove(type: string, id: string | number) {
+    removeWatchLater(type as MediaType, id);
     setItems(getWatchLater());
     loadCalendarItems();
-    toast('Removed from Watch Later');
+    toast?.('Removed from Watch Later');
   }
 
-  function handleRemoveEp(showId, season, episode) {
+  function handleRemoveEp(showId: string | number, season: number, episode: number) {
     removeEpisodeWatchLater(showId, season, episode);
     setEpItems(getEpisodeWatchLater());
     loadCalendarItems();
-    toast('Removed from Watch Later');
+    toast?.('Removed from Watch Later');
   }
 
   const itemsByDate = useMemo(() => {
@@ -230,8 +221,8 @@ export default function WatchLater() {
 
   const sortedItems = useMemo(() => {
     let list = [...items];
-    if (filterType === 'movies') list = list.filter((i) => i.type === 'movie');
-    else if (filterType === 'tv') list = list.filter((i) => i.type === 'tv');
+    if (filterType === 'movies') list = list.filter((i: WatchLaterItem) => i.type === 'movie');
+    else if (filterType === 'tv') list = list.filter((i: WatchLaterItem) => i.type === 'tv');
     if (sortBy === 'title') list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     else if (sortBy === 'year') list.sort((a, b) => (b.year || '0').localeCompare(a.year || '0'));
     else list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
@@ -395,7 +386,7 @@ export default function WatchLater() {
                       { value: 'tv', label: 'TV Shows' },
                     ]}
                     placeholder="All types"
-                    onSelect={(v) => { setFilterType(v); setPage(1); }}
+                    onSelect={(v: string) => { setFilterType(v); setPage(1); }}
                   />
                   <FilterDropdown
                     value={sortBy}
@@ -405,7 +396,7 @@ export default function WatchLater() {
                       { value: 'year', label: 'Year' },
                     ]}
                     placeholder="Sort by"
-                    onSelect={(v) => { setSortBy(v); setPage(1); }}
+                    onSelect={(v: string) => { setSortBy(v); setPage(1); }}
                   />
                   {(filterType !== 'all' || sortBy !== 'recent') && (
                     <button className={styles.wlClearBtn} onClick={() => { setFilterType('all'); setSortBy('recent'); setPage(1); }}>Clear filters</button>
@@ -413,18 +404,18 @@ export default function WatchLater() {
                 </div>
                 <div className="media-grid">
                   {sortedItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((item) => (
-                    <div key={`${item.type}-${item.id}`} className="media-card">
-                      <Link to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}`}>
+                    <div key={`${(item as WatchLaterItem).type}-${(item as WatchLaterItem).id}`} className="media-card">
+                      <Link to={`/${(item as WatchLaterItem).type === 'tv' ? 'tv' : 'movie'}/${(item as WatchLaterItem).id}`}>
                         <div className="media-card-poster">
-                          <img src={item.poster || imageUrl(null)} alt={item.title} loading="lazy" />
-                          <span className={`media-card-type ${item.type}`}>{item.type === 'tv' ? 'TV' : 'Movie'}</span>
+                          <img src={(item as WatchLaterItem).poster || imageUrl(null)} alt={(item as WatchLaterItem).title} loading="lazy" />
+                          <span className={`media-card-type ${(item as WatchLaterItem).type}`}>{(item as WatchLaterItem).type === 'tv' ? 'TV' : 'Movie'}</span>
                         </div>
                         <div className="media-card-info">
-                          <h3>{item.title}</h3>
-                          {item.year && <span className="media-card-year">{item.year}</span>}
+                          <h3>{(item as WatchLaterItem).title}</h3>
+                          {(item as WatchLaterItem).year && <span className="media-card-year">{(item as WatchLaterItem).year}</span>}
                         </div>
                       </Link>
-                      <button className="wl-remove" onClick={() => handleRemove(item.type, item.id)} title="Remove">&times;</button>
+                      <button className="wl-remove" onClick={() => handleRemove((item as WatchLaterItem).type, (item as WatchLaterItem).id)} title="Remove">&times;</button>
                     </div>
                   ))}
                 </div>
@@ -442,14 +433,14 @@ export default function WatchLater() {
                 <h3 className="sub-section-title">Episodes</h3>
                 <div className="media-grid">
                   {epItems.map((item) => (
-                    <div key={`${item.showId}-S${item.season}E${item.episode}`} className={`media-card ${styles.epWlCard}`}>
-                      <Link to={`/tv/${item.showId}?season=${item.season}&episode=${item.episode}`}>
+                    <div key={`${(item as EpisodeWatchLaterItem).showId}-S${(item as EpisodeWatchLaterItem).season}E${(item as EpisodeWatchLaterItem).episode}`} className={`media-card ${styles.epWlCard}`}>
+                      <Link to={`/tv/${(item as EpisodeWatchLaterItem).showId}?season=${(item as EpisodeWatchLaterItem).season}&episode=${(item as EpisodeWatchLaterItem).episode}`}>
                         <div className="media-card-info">
-                          <h3>{item.showTitle}</h3>
-                          <span className="media-card-year">S{item.season} E{item.episode}</span>
+                          <h3>{(item as EpisodeWatchLaterItem).showTitle}</h3>
+                          <span className="media-card-year">S{(item as EpisodeWatchLaterItem).season} E{(item as EpisodeWatchLaterItem).episode}</span>
                         </div>
                       </Link>
-                      <button className="wl-remove" onClick={() => handleRemoveEp(item.showId, item.season, item.episode)} title="Remove">&times;</button>
+                      <button className="wl-remove" onClick={() => handleRemoveEp((item as EpisodeWatchLaterItem).showId, (item as EpisodeWatchLaterItem).season, (item as EpisodeWatchLaterItem).episode)} title="Remove">&times;</button>
                     </div>
                   ))}
                 </div>

@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 
-export default function useDropdownSearch(open, onClose) {
+export default function useDropdownSearch(open: boolean, onClose: () => void) {
   const [search, setSearch] = useState('');
-  const timerRef = useRef(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   useEffect(() => {
     if (!open) return;
     setSearch('');
 
     function resetTimer() {
-      clearTimeout(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setSearch(''), 1500);
     }
 
-    function handleKey(e) {
+    function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') { onClose?.(); return; }
       if (e.key === 'Backspace') {
         setSearch((s) => s.slice(0, -1));
@@ -29,7 +29,7 @@ export default function useDropdownSearch(open, onClose) {
     document.addEventListener('keydown', handleKey);
     return () => {
       document.removeEventListener('keydown', handleKey);
-      clearTimeout(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [open, onClose]);
 

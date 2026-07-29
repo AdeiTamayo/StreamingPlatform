@@ -81,10 +81,10 @@ export async function getTVGenres(signal?: AbortSignal) {
 
 export async function getCountries(signal?: AbortSignal) {
   const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/countries?api_key=${CONFIG.TMDB_API_KEY}`, signal);
-  return data.sort((a, b) => a.english_name.localeCompare(b.english_name));
+  return (data as { english_name: string }[]).sort((a, b) => a.english_name.localeCompare(b.english_name));
 }
 
-export async function discover(type: string, filters: Record<string, any>, page = 1, signal?: AbortSignal) {
+export async function discover(type: string, filters: Record<string, string | undefined>, page = 1, signal?: AbortSignal) {
   let url = `${CONFIG.TMDB_BASE_URL}/discover/${type}?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`;
   if (filters?.genreId) url += `&with_genres=${filters.genreId}`;
   if (filters?.country) url += `&with_origin_country=${filters.country}`;
@@ -95,7 +95,7 @@ export async function discover(type: string, filters: Record<string, any>, page 
   return fetchWithFallback(url, signal);
 }
 
-export function imageUrl(path, size = 'w500') {
+export function imageUrl(path: string | null, size = 'w500') {
   if (!path) return 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
   return `${CONFIG.TMDB_IMAGE_BASE}/${size}${path}`;
 }

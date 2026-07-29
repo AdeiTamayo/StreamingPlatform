@@ -4,9 +4,10 @@ import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getSearchHistory, addSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
+import type { TMDBMovie, TMDBSeries } from '../types';
 import styles from './Search.module.css';
 
-const TABS = [
+const TABS: { key: string; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'movie', label: 'Movies' },
   { key: 'tv', label: 'TV Shows' },
@@ -16,12 +17,12 @@ export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [tab, setTab] = useState('all');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState<(TMDBMovie | TMDBSeries)[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [history, setHistory] = useState([]);
+  const [history, setHistory] = useState<string[]>([]);
   const { getSignal } = useAbortController();
 
   useEffect(() => { document.title = `Search: ${query} - StreamFlow`; }, [query]);
@@ -57,12 +58,12 @@ export default function Search() {
     }
   }, [query]);
 
-  function handleHistoryClick(q) {
+  function handleHistoryClick(q: string) {
     setSearchParams({ q });
   }
 
   const filtered = tab === 'all'
-    ? results.filter((item) => item.media_type !== 'person')
+    ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
     : results;
 
   return (
@@ -94,7 +95,7 @@ export default function Search() {
           <>
             <div className="media-grid">
               {filtered.map((item) => (
-                <MediaCard key={`${item.media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab : undefined} />
+                <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
               ))}
             </div>
             {totalPages > 1 && (

@@ -1,4 +1,18 @@
 import FilterDropdown from './FilterDropdown';
+import type { FilterOption } from '../types';
+
+interface FilterBarProps {
+  countryValue: string;
+  genreValue: string;
+  showMore: boolean;
+  onToggleShowMore: () => void;
+  onCountryChange: (value: string) => void;
+  onGenreChange: (value: string) => void;
+  countryOptions: FilterOption[];
+  genreOptions: FilterOption[];
+  hasActiveFilters: boolean;
+  onClearFilters: () => void;
+}
 
 export default function FilterBar({
     countryValue,
@@ -11,7 +25,7 @@ export default function FilterBar({
     genreOptions,
     hasActiveFilters,
     onClearFilters,
-}) {
+}: FilterBarProps) {
     return (
         <div className="filter-row">
             <FilterDropdown value={countryValue} options={countryOptions} placeholder="All countries" onSelect={onCountryChange} />

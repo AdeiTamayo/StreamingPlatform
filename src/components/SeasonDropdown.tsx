@@ -1,8 +1,15 @@
 import { useState, useMemo, useId } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
+import type { TMDBSeason } from '../types';
 
-export default function SeasonDropdown({ seasons, value, onSelect }) {
+interface SeasonDropdownProps {
+  seasons: TMDBSeason[];
+  value: number;
+  onSelect: (seasonNumber: number) => void;
+}
+
+export default function SeasonDropdown({ seasons, value, onSelect }: SeasonDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useClickOutside(() => setOpen(false));
   const search = useDropdownSearch(open, () => setOpen(false));
@@ -16,7 +23,7 @@ export default function SeasonDropdown({ seasons, value, onSelect }) {
     return seasons.filter((s) => (s.name || `Season ${s.season_number}`).toLowerCase().includes(search));
   }, [seasons, search]);
 
-  const highlightNum = search && filtered.length > 0 ? filtered[0].season_number : null;
+  const highlightNum: number | null = search && filtered.length > 0 ? filtered[0].season_number : null;
 
   return (
     <div className="custom-select" ref={ref}>

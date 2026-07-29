@@ -4,9 +4,10 @@ import { clearTMDBCache } from '../api/tmdbCache';
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/useToast';
 import FilterDropdown from '../components/FilterDropdown';
+import type { StorageUsage, Stats } from '../types';
 import styles from './Settings.module.css';
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
@@ -14,11 +15,11 @@ function formatBytes(bytes) {
 
 export default function Settings() {
   const [confirm, setConfirm] = useState(false);
-  const [usage, setUsage] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [usage, setUsage] = useState<StorageUsage | null>(null);
+  const [stats, setStats] = useState<Stats | null>(null);
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
   const toast = useToast();
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     document.title = 'Settings - StreamFlow';
@@ -29,23 +30,23 @@ export default function Settings() {
   async function clearCache() {
     await clearTMDBCache();
     setUsage(await getStorageUsage());
-    toast('TMDB cache cleared');
+    toast?.('TMDB cache cleared');
   }
 
   async function clearAll() {
-    const keys = [];
+    const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k === 'search_history') {
+      if (k && (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k === 'search_history')) {
         keys.push(k);
       }
     }
-    keys.forEach((k) => localStorage.removeItem(k));
+    keys.forEach((k: string) => localStorage.removeItem(k));
     await clearTMDBCache();
     setConfirm(false);
     setUsage(await getStorageUsage());
     setStats(getStats());
-    toast('All data cleared');
+    toast?.('All data cleared');
   }
 
   function handleExport() {
@@ -57,10 +58,10 @@ export default function Settings() {
     a.download = `streamflow-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast('Data exported');
+    toast?.('Data exported');
   }
 
-  async function handleImport(e) {
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -70,9 +71,9 @@ export default function Settings() {
         importData(data, 'merge');
         setUsage(await getStorageUsage());
         setStats(getStats());
-        toast('Data imported successfully');
+        toast?.('Data imported successfully');
       } catch {
-        toast('Invalid backup file');
+        toast?.('Invalid backup file');
       }
     };
     reader.readAsText(file);
@@ -146,7 +147,7 @@ export default function Settings() {
               value={videoSource}
               options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
               placeholder="Select source"
-              onSelect={(val) => { setVideoSourceState(val); setVideoSource(val); }}
+              onSelect={(val: string) => { setVideoSourceState(val); setVideoSource(val); }}
             />
           </div>
         </div>

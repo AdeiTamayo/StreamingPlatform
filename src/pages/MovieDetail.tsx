@@ -9,20 +9,21 @@ import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
+import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
 export default function MovieDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const toast = useToast();
-  const [movie, setMovie] = useState(null);
+  const [movie, setMovie] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
-  const [startAt, setStartAt] = useState(null);
+  const [startAt, setStartAt] = useState<number | null>(null);
   const [inWL, setInWL] = useState(false);
-  const [trailerKey, setTrailerKey] = useState(null);
+  const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const watchedRef = useRef(false);
@@ -30,6 +31,7 @@ export default function MovieDetail() {
   const { getSignal } = useAbortController();
 
   useEffect(() => {
+    if (!id) return;
     setLoading(true);
     setError(false);
     setWatched(isWatched('movie', id));
@@ -40,34 +42,36 @@ export default function MovieDetail() {
     autoWatchedRef.current = false;
     setTrailerKey(null);
     setShowTrailer(false);
-    getMovieDetail(id, getSignal())
+    getMovieDetail(id!, getSignal())
       .then((data) => {
-        setMovie(data);
-        document.title = `${data.title} - StreamFlow`;
-        const vids = data.videos?.results || [];
+        setMovie(data as TMDBMovie);
+        document.title = `${(data as TMDBMovie).title} - StreamFlow`;
+        const vids = (data as TMDBMovie).videos?.results || [];
         const yt = vids.find((v) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
         if (yt) setTrailerKey(yt.key);
       })
-      .catch((err) => {
+      .catch((err: Error) => {
         if (err?.name === 'AbortError') return;
         setError(true);
       })
       .finally(() => setLoading(false));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const safeId = id!;
+
   function autoMarkWatched() {
     if (!movie || watchedRef.current || autoWatchedRef.current) return;
     autoWatchedRef.current = true;
-    markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
-    clearProgress('movie', id);
+    markWatched('movie', safeId, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
+    clearProgress('movie', safeId);
     watchedRef.current = true;
     setWatched(true);
     setStartAt(null);
   }
 
-  function handleProgress(currentTime, duration) {
+  function handleProgress(currentTime: number, duration: number) {
     if (watchedRef.current || !movie) return;
-    saveProgress('movie', id, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
+    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
     const tmdbRuntime = movie.runtime || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
@@ -85,23 +89,25 @@ export default function MovieDetail() {
   }
 
   function toggleWatched() {
+    if (!movie || !id) return;
     if (watched) {
       markUnwatched('movie', id);
       clearProgress('movie', id);
       setWatched(false);
-      toast('Removed from watched');
+      toast?.('Removed from watched');
     } else {
       markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
       clearProgress('movie', id);
       setWatched(true);
-      toast('Marked as watched');
+      toast?.('Marked as watched');
     }
   }
 
   function retry() {
+    if (!id) return;
     setLoading(true);
     setError(false);
-    getMovieDetail(id, getSignal()).then(setMovie).catch((err) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
+    getMovieDetail(id, getSignal()).then(setMovie).catch((err: Error) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
   }
 
   if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;
@@ -114,11 +120,11 @@ export default function MovieDetail() {
   );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
-  const embedUrl = getMovieEmbedUrl(id, videoSource);
+  const embedUrl = getMovieEmbedUrl(safeId, videoSource);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
-  const cast = movie.credits?.cast?.slice(0, 8) || [];
-  const crew = movie.credits?.crew || [];
+  const cast: TMDBCastMember[] = movie.credits?.cast?.slice(0, 8) || [];
+  const crew: TMDBCrewMember[] = movie.credits?.crew || [];
   const director = crew.find((c) => c.job === 'Director');
   const writers = crew.filter((c) => c.job === 'Screenplay' || c.job === 'Writer').slice(0, 2);
   const genres = movie.genres?.map((g) => g.name).join(', ') || '';
@@ -162,8 +168,8 @@ export default function MovieDetail() {
             {watched ? 'Watched' : 'Mark as watched'}
           </button>
           <button className={`watch-toggle ${inWL ? 'in-wl' : ''}`} onClick={() => {
-            if (inWL) { removeWatchLater('movie', id); setInWL(false); }
-            else { addWatchLater('movie', id, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
+            if (inWL) { removeWatchLater('movie', safeId); setInWL(false); }
+            else { addWatchLater('movie', safeId, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
           }}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
           {trailerKey && (
             <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
@@ -171,7 +177,7 @@ export default function MovieDetail() {
             </button>
           )}
           {startAt && (
-            <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', id); }}>
+            <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', safeId); }}>
               Restart from beginning
             </button>
           )}
@@ -188,14 +194,14 @@ export default function MovieDetail() {
           </div>
         )}
         {!showTrailer && (
-          <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime} />
+          <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime ?? null} />
         )}
         <div className={styles.sourceSelector}>
           <FilterDropdown
             value={videoSource}
-            options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+            options={SOURCE_KEYS.map((key: string) => ({ value: key, label: getSourceLabel(key) }))}
             placeholder="Source"
-            onSelect={(val) => setVideoSource(val)}
+            onSelect={(val: string) => setVideoSource(val)}
             className="source-dropdown"
           />
         </div>
@@ -206,7 +212,7 @@ export default function MovieDetail() {
           <h2 id="recs-heading" className="section-title">You might also like</h2>
           <div className="media-grid">
             {recommendations.map((item) => (
-              <MediaCard key={item.id} item={item} mediaType="movie" />
+              <MediaCard key={(item as { id: number }).id} item={item as TMDBMovie} mediaType="movie" />
             ))}
           </div>
         </section>

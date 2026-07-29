@@ -1,8 +1,17 @@
 import { useMemo, useState, useId } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
+import type { FilterOption } from '../types';
 
-export default function FilterDropdown({ value, options, placeholder, onSelect, className = '' }) {
+interface FilterDropdownProps {
+  value: string;
+  options: FilterOption[];
+  placeholder: string;
+  onSelect: (value: string) => void;
+  className?: string;
+}
+
+export default function FilterDropdown({ value, options, placeholder, onSelect, className = '' }: FilterDropdownProps) {
     const [open, setOpen] = useState(false);
     const ref = useClickOutside(() => setOpen(false));
     const search = useDropdownSearch(open, () => setOpen(false));
@@ -16,7 +25,7 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
         return options.filter((o) => o.label.toLowerCase().includes(search));
     }, [options, search]);
 
-    const highlightKey = search && filtered.length > 0 ? filtered[0].value || filtered[0].label : null;
+    const highlightKey: string | null = search && filtered.length > 0 ? filtered[0].value || filtered[0].label : null;
 
     return (
         <div className={`custom-select ${className}`.trim()} ref={ref}>

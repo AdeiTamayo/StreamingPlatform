@@ -2,8 +2,17 @@ import { useState, useMemo, useId } from 'react';
 import { isWatched } from '../api/storage';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
+import type { TMDBEpisode } from '../types';
 
-export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }) {
+interface EpisodeDropdownProps {
+  showId: number | string;
+  season: number;
+  episode: number;
+  episodes: TMDBEpisode[];
+  onSelect: (episodeNumber: number) => void;
+}
+
+export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }: EpisodeDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useClickOutside(() => setOpen(false));
   const search = useDropdownSearch(open, () => setOpen(false));
@@ -18,7 +27,7 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
     });
   }, [episodes, search]);
 
-  const highlightNum = search && filtered.length > 0 ? filtered[0].episode_number : null;
+  const highlightNum: number | null = search && filtered.length > 0 ? filtered[0].episode_number : null;
 
   const current = episodes.find((e) => e.episode_number === episode);
   const triggerLabel = current ? `${current.episode_number}. ${current.name}` : `Episode ${episode}`;

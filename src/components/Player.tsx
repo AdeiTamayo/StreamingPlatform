@@ -13,8 +13,22 @@ const POSTMESSAGE_STALE_MS = 20_000;
 const FALLBACK_POLL_MS = 10_000;
 const COMPLETION_RATIO = 0.9;
 
-export default function Player({ src, title, onProgress, onEnded, runtimeMinutes }) {
-  const iframeRef = useRef(null);
+interface PlayerProps {
+  src: string;
+  title: string;
+  onProgress: (currentTime: number, duration: number) => void;
+  onEnded: () => void;
+  runtimeMinutes: number | null;
+}
+
+interface PlayerState {
+  currentTime: number;
+  duration: number;
+  ended: boolean;
+}
+
+export default function Player({ src, title, onProgress, onEnded, runtimeMinutes }: PlayerProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const savedOnProgress = useRef(onProgress);
   const savedOnEnded = useRef(onEnded);
   savedOnProgress.current = onProgress;
@@ -22,11 +36,11 @@ export default function Player({ src, title, onProgress, onEnded, runtimeMinutes
 
   // Mutable playback state - kept out of React state so ticks/messages
   // don't cause re-renders.
-  const state = useRef({ currentTime: 0, duration: 0, ended: false });
+  const state = useRef<PlayerState>({ currentTime: 0, duration: 0, ended: false });
 
-  const fallbackIntervalRef = useRef(null);
-  const graceTimerRef = useRef(null);
-  const staleTimerRef = useRef(null);
+  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval>>(null);
+  const graceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const staleTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const clearFallbackTimers = useCallback(() => {
     if (fallbackIntervalRef.current) clearInterval(fallbackIntervalRef.current);
@@ -68,14 +82,14 @@ export default function Player({ src, title, onProgress, onEnded, runtimeMinutes
 
   // --- postMessage listener ---
   useEffect(() => {
-    let expectedOrigin = null;
+    let expectedOrigin: string | null = null;
     try {
       expectedOrigin = new URL(src).origin;
     } catch {
       // malformed src - fall through to source-based check only
     }
 
-    function handleMessage(e) {
+    function handleMessage(e: MessageEvent) {
       const isSameWindow = e.source === iframeRef.current?.contentWindow;
       logDebug(`msg origin=${e.origin} sameWindow=${isSameWindow} type=${typeof e.data} data=${JSON.stringify(e.data)?.slice(0, 200)}`);
 

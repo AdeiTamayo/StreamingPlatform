@@ -2,19 +2,26 @@ import { useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
+import type { TMDBMovie, TMDBSeries, MediaType } from '../types';
 
-const MediaCard = memo(function MediaCard({ item, mediaType }: { item: any; mediaType?: string }) {
+interface MediaCardProps {
+  item: TMDBMovie | TMDBSeries;
+  mediaType?: MediaType;
+}
+
+const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const [loaded, setLoaded] = useState(false);
-  const [inWL, setInWL] = useState(() => isInWatchLater(mediaType || item.media_type || 'movie', item.id));
-  const [isWatchedState, setIsWatchedState] = useState(() => isWatched(mediaType || item.media_type || 'movie', item.id));
-  const type = mediaType || item.media_type || 'movie';
+  const inferredType: MediaType = mediaType || ((item as unknown as Record<string, string>).media_type as MediaType) || 'movie';
+  const [inWL, setInWL] = useState(() => isInWatchLater(inferredType, item.id));
+  const [isWatchedState, setIsWatchedState] = useState(() => isWatched(inferredType, item.id));
+  const type = inferredType;
   const id = item.id;
-  const title = item.title || item.name;
-  const year = (item.release_date || item.first_air_date || '').slice(0, 4);
+  const title = (item as TMDBMovie).title || (item as TMDBSeries).name || '';
+  const year = ((item as TMDBMovie).release_date || (item as TMDBSeries).first_air_date || '').slice(0, 4);
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '?';
   const poster = imageUrl(item.poster_path);
 
-  function toggleWL(e) {
+  function toggleWL(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (inWL) {
@@ -26,7 +33,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: { item: any; medi
     }
   }
 
-  function toggleWatched(e) {
+  function toggleWatched(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (isWatchedState) {

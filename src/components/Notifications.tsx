@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
+import type { NotificationItem } from '../types';
 import styles from './Notifications.module.css';
 
-function formatRelativeTime(timestamp) {
+function formatRelativeTime(timestamp: number): string {
   if (!timestamp) return '';
 
   const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -24,13 +25,13 @@ function formatRelativeTime(timestamp) {
 
 export default function Notifications({ sidebar }: { sidebar?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const panelRef = useRef(null);
-  const btnRef = useRef(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   function load() {
-    const list = getNotifications();
+    const list: NotificationItem[] = getNotifications();
     setNotifications(list);
     setUnreadCount(list.filter((n) => !n.read).length);
   }
@@ -44,14 +45,14 @@ export default function Notifications({ sidebar }: { sidebar?: boolean }) {
   useEffect(() => {
     if (!open) return;
 
-    function handleClick(e) {
-      if (panelRef.current && !panelRef.current.contains(e.target) &&
-        btnRef.current && !btnRef.current.contains(e.target)) {
+    function handleClick(e: MouseEvent) {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        btnRef.current && !btnRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
 
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
     }
 
@@ -63,7 +64,7 @@ export default function Notifications({ sidebar }: { sidebar?: boolean }) {
     };
   }, [open]);
 
-  function handleRemove(id) {
+  function handleRemove(id: string) {
     removeNotification(id);
     load();
   }
