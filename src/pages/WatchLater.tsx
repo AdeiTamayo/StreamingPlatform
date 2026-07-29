@@ -60,6 +60,8 @@ export default function WatchLater() {
   const [view, setView] = useState<'list' | 'calendar'>('list');
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(0);
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
 
@@ -393,7 +395,7 @@ export default function WatchLater() {
                       { value: 'tv', label: 'TV Shows' },
                     ]}
                     placeholder="All types"
-                    onSelect={setFilterType}
+                    onSelect={(v) => { setFilterType(v); setPage(1); }}
                   />
                   <FilterDropdown
                     value={sortBy}
@@ -403,14 +405,14 @@ export default function WatchLater() {
                       { value: 'year', label: 'Year' },
                     ]}
                     placeholder="Sort by"
-                    onSelect={setSortBy}
+                    onSelect={(v) => { setSortBy(v); setPage(1); }}
                   />
                   {(filterType !== 'all' || sortBy !== 'recent') && (
-                    <button className={styles.wlClearBtn} onClick={() => { setFilterType('all'); setSortBy('recent'); }}>Clear filters</button>
+                    <button className={styles.wlClearBtn} onClick={() => { setFilterType('all'); setSortBy('recent'); setPage(1); }}>Clear filters</button>
                   )}
                 </div>
                 <div className="media-grid">
-                  {sortedItems.map((item) => (
+                  {sortedItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE).map((item) => (
                     <div key={`${item.type}-${item.id}`} className="media-card">
                       <Link to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}`}>
                         <div className="media-card-poster">
@@ -426,6 +428,13 @@ export default function WatchLater() {
                     </div>
                   ))}
                 </div>
+                {Math.ceil(sortedItems.length / ITEMS_PER_PAGE) > 1 && (
+                  <div className="pagination">
+                    <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
+                    <span>Page {page} of {Math.ceil(sortedItems.length / ITEMS_PER_PAGE)}</span>
+                    <button disabled={page >= Math.ceil(sortedItems.length / ITEMS_PER_PAGE)} onClick={() => setPage((p) => p + 1)}>Next</button>
+                  </div>
+                )}
               </>
             )}
             {epItems.length > 0 && (
