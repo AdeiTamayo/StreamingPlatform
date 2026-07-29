@@ -22,7 +22,7 @@ function formatRelativeTime(timestamp) {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
-export default function Notifications() {
+export default function Notifications({ sidebar }: { sidebar?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -87,7 +87,7 @@ export default function Notifications() {
   }
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container}${sidebar ? ` ${styles.sidebar}` : ''}`}>
       <button
         ref={btnRef}
         className={styles.bellBtn}

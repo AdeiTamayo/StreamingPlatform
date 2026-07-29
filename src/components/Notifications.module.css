@@ -434,6 +434,28 @@
   }
 }
 
+/* Sidebar mode — smaller icon matching sidebar nav links */
+
+.sidebar {
+  flex-shrink: 0;
+}
+
+.sidebar .bellBtn {
+  width: auto;
+  height: auto;
+  border-radius: 0;
+}
+
+.sidebar .bellIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar .badge {
+  top: -4px;
+  right: -6px;
+}
+
 @media (max-width: 768px) {
   .panel {
     position: fixed;
