@@ -107,6 +107,19 @@ export function markUnwatched(type: MediaType, id: string | number, season?: num
   removeFromWatchedIndex(key);
 }
 
+export function getWatchedEpisodeSet(type: string, id: string | number, season: number, episodeCount?: number): Set<number> {
+  const set = new Set<number>();
+  const prefix = `watched:tv-${id}-S${season}E`;
+  const index = getWatchedIndex();
+  for (const key of index) {
+    if (key.startsWith(prefix)) {
+      const ep = parseInt(key.slice(prefix.length), 10);
+      if (!isNaN(ep) && (!episodeCount || ep <= episodeCount)) set.add(ep);
+    }
+  }
+  return set;
+}
+
 export function clearShowHistory(showId: string | number): void {
   const showIdStr = String(showId);
   const watchedIndex = getWatchedIndex();

@@ -1,4 +1,11 @@
-export default function CollectionSkeleton({ variant = 'grid', count = 4 }) {
+import { memo } from 'react';
+
+interface CollectionSkeletonProps {
+  variant?: string;
+  count?: number;
+}
+
+const CollectionSkeleton = memo(function CollectionSkeleton({ variant = 'grid', count = 4 }: CollectionSkeletonProps) {
     if (variant === 'history') {
         return (
             <div className="last-seen-groups">
@@ -42,4 +49,6 @@ export default function CollectionSkeleton({ variant = 'grid', count = 4 }) {
             ))}
         </div>
     );
-}
+});
+
+export default CollectionSkeleton;

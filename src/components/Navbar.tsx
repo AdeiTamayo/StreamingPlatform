@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useClickOutside from '../hooks/useClickOutside';
 import Notifications from './Notifications';
@@ -32,7 +32,7 @@ const NAV_ITEMS = [
   },
 ];
 
-export default function Navbar() {
+const Navbar = memo(function Navbar() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -452,4 +452,6 @@ export default function Navbar() {
       </aside>
     </>
   );
-}
+});
+
+export default Navbar;

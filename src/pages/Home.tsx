@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
@@ -7,6 +7,38 @@ import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import type { TMDBMovie, TMDBSeries, ContinueWatchingItem, TMDBGenre, TMDBCountry, FilterOption } from '../types';
 import styles from './Home.module.css';
+
+function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void }) {
+  const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
+  const poster = item.meta?.poster as string | undefined;
+  const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
+  return (
+    <div className={styles.cwCard}>
+      <Link
+        to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
+        className={styles.cwCardLink}
+      >
+        <div className={styles.cwCardPoster}>
+          {poster ? (
+            <img src={imageUrl(poster ?? null)} alt={label} loading="lazy" />
+          ) : (
+            <div className={styles.cwCardPlaceholder} />
+          )}
+          {pct !== null && (
+            <div className={styles.cwCardBar}>
+              <div className={styles.cwCardBarFill} style={{ width: `${pct}%` }} />
+            </div>
+          )}
+        </div>
+        <div className={styles.cwCardInfo}>
+          <span className={styles.cwCardLabel}>{label}</span>
+          {item.season && <span className={styles.cwCardMeta}>S{item.season}E{item.episode}</span>}
+        </div>
+      </Link>
+      <button className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove">&times;</button>
+    </div>
+  );
+}
 
 export default function Home() {
   const [trending, setTrending] = useState<(TMDBMovie | TMDBSeries)[]>([]);
@@ -44,17 +76,6 @@ export default function Home() {
   const heroItems = trending.slice(0, 8);
   const hero = heroItems[heroIdx];
 
-  useEffect(() => {
-    if (!hero?.backdrop_path && !hero?.poster_path) return;
-    const url = imageUrl(hero.backdrop_path || hero.poster_path, 'original');
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = url;
-    document.head.appendChild(link);
-    return () => link.remove();
-  }, [hero?.id, hero?.backdrop_path, hero?.poster_path]);
-
   function handleRemoveCW(item: ContinueWatchingItem) {
     clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
@@ -66,11 +87,11 @@ export default function Home() {
     return item.type === cwFilter;
   });
 
-  const cwCounts = {
+  const cwCounts = useMemo(() => ({
     all: continueWatching.length,
     movie: continueWatching.filter((i: ContinueWatchingItem) => i.type === 'movie').length,
     tv: continueWatching.filter((i: ContinueWatchingItem) => i.type === 'tv').length,
-  };
+  }), [continueWatching]);
 
   const CW_TABS: { key: string; label: string }[] = [
     { key: 'all', label: `All (${cwCounts.all})` },
@@ -156,37 +177,9 @@ export default function Home() {
           </div>
           {filteredCW.length > 0 ? (
             <div className={styles.cwGrid}>
-              {filteredCW.map((item, i) => {
-              const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
-              const poster = item.meta?.poster as string | undefined;
-              const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
-              return (
-                <div key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} className={styles.cwCard}>
-                  <Link
-                    to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
-                    className={styles.cwCardLink}
-                  >
-                    <div className={styles.cwCardPoster}>
-                      {poster ? (
-                        <img src={imageUrl(poster ?? null)} alt={label} loading="lazy" />
-                      ) : (
-                        <div className={styles.cwCardPlaceholder} />
-                      )}
-                      {pct !== null && (
-                        <div className={styles.cwCardBar}>
-                          <div className={styles.cwCardBarFill} style={{ width: `${pct}%` }} />
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.cwCardInfo}>
-                      <span className={styles.cwCardLabel}>{label}</span>
-                      {item.season && <span className={styles.cwCardMeta}>S{item.season}E{item.episode}</span>}
-                    </div>
-                  </Link>
-                  <button className={styles.cwRemove} onClick={() => handleRemoveCW(item)} title="Remove">&times;</button>
-                </div>
-              );
-            })}
+              {filteredCW.map((item, i) => (
+                <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} />
+              ))}
             </div>
           ) : (
             <div className="loading" role="status">Nothing in this category</div>

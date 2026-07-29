@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -15,6 +15,17 @@ import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, Episode
 import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
+
+const EpisodeDot = memo(function EpisodeDot({ ep, current, done, onClick }: { ep: number; current: boolean; done: boolean; onClick: (ep: number) => void }) {
+  return (
+    <button
+      role="listitem"
+      className={`${styles.spDot} ${current ? styles.current : ''} ${done ? styles.done : ''}`}
+      onClick={() => onClick(ep)}
+      title={`Episode ${ep}`}
+    />
+  );
+});
 
 export default function TVDetail() {
   const { id } = useParams<{ id: string }>();
@@ -48,11 +59,12 @@ export default function TVDetail() {
   const hasPrev = episode > 1 || seasonIdx > 0;
   const episodeNums = useMemo(() => Array.from({ length: episodeCount }, (_, i) => i + 1), [episodeCount]);
   const watchedStates = useMemo(() => {
+    const set = getWatchedEpisodeSet('tv', id!, season, episodeCount);
     const map: Record<number, boolean> = {};
-    episodeNums.forEach((ep) => { map[ep] = isWatched('tv', id!, season, ep); });
+    episodeNums.forEach((ep) => { map[ep] = set.has(ep); });
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeNums, id, season, watchedCount]);
+  }, [episodeNums, id, season, watchedCount, episodeCount]);
 
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
@@ -369,13 +381,7 @@ export default function TVDetail() {
             </div>
             <div className={styles.spBar} role="list" aria-label="Episode progress">
               {episodeNums.map((ep) => (
-                <button
-                  key={ep}
-                  role="listitem"
-                  className={`${styles.spDot} ${ep === episode ? styles.current : ''} ${watchedStates[ep] ? styles.done : ''}`}
-                  onClick={() => setEpisode(ep)}
-                  title={`Episode ${ep}`}
-                />
+                <EpisodeDot key={ep} ep={ep} current={ep === episode} done={watchedStates[ep]} onClick={setEpisode} />
               ))}
             </div>
           </div>
@@ -446,12 +452,7 @@ export default function TVDetail() {
             </div>
             <div className={styles.spBar}>
               {episodeNums.map((ep) => (
-                <button
-                  key={ep}
-                  className={`${styles.spDot} ${watchedStates[ep] ? styles.done : ''}`}
-                  onClick={() => { setEpisode(ep); setPlayerOpen(true); }}
-                  title={`Episode ${ep}`}
-                />
+                <EpisodeDot key={ep} ep={ep} current={false} done={watchedStates[ep]} onClick={(e: number) => { setEpisode(e); setPlayerOpen(true); }} />
               ))}
             </div>
           </div>

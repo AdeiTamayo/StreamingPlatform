@@ -81,7 +81,7 @@ export async function getTVGenres(signal?: AbortSignal) {
 
 export async function getCountries(signal?: AbortSignal) {
   const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/countries?api_key=${CONFIG.TMDB_API_KEY}`, signal);
-  return (data as { english_name: string }[]).sort((a, b) => a.english_name.localeCompare(b.english_name));
+  return [...(data as { english_name: string }[])].sort((a, b) => a.english_name.localeCompare(b.english_name));
 }
 
 export async function discover(type: string, filters: Record<string, string | undefined>, page = 1, signal?: AbortSignal) {

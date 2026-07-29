@@ -250,14 +250,9 @@ export default function WatchLater() {
   const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
 
   const groupedUpcomingList = useMemo(() => {
-    const groups: { date: string; items: CalendarItem[] }[] = [];
-    for (const item of calendarItems) {
-      const last = groups[groups.length - 1];
-      if (last && last.date === item.date) last.items.push(item);
-      else groups.push({ date: item.date, items: [item] });
-    }
-    return groups;
-  }, [calendarItems]);
+    const sorted = Object.keys(itemsByDate).sort();
+    return sorted.map((date) => ({ date, items: itemsByDate[date] }));
+  }, [itemsByDate]);
 
   const totalPages = Math.max(1, Math.ceil(groupedUpcomingList.length / DAYS_PER_PAGE));
   const paginatedGroups = useMemo(() => {

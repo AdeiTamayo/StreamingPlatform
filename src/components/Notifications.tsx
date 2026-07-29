@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
 import type { NotificationItem } from '../types';
@@ -23,7 +23,7 @@ function formatRelativeTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
-export default function Notifications({ sidebar }: { sidebar?: boolean }) {
+const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -188,4 +188,6 @@ export default function Notifications({ sidebar }: { sidebar?: boolean }) {
       )}
     </div>
   );
-}
+});
+
+export default Notifications;

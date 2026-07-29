@@ -29,7 +29,8 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
 
   useEffect(() => {
     if (fetchRef.current) clearTimeout(fetchRef.current);
-    setLoading(true);
+    const immediate = !query?.trim();
+    if (immediate) setLoading(true);
     fetchRef.current = setTimeout(() => {
       setError(false);
       fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil }, getSignal())

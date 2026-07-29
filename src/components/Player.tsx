@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, memo } from 'react';
 import { logDebug } from '../utils/logger';
 import styles from './Player.module.css';
 
@@ -27,7 +27,7 @@ interface PlayerState {
   ended: boolean;
 }
 
-export default function Player({ src, title, onProgress, onEnded, runtimeMinutes }: PlayerProps) {
+const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMinutes }: PlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const savedOnProgress = useRef(onProgress);
   const savedOnEnded = useRef(onEnded);
@@ -167,4 +167,6 @@ export default function Player({ src, title, onProgress, onEnded, runtimeMinutes
       />
     </div>
   );
-}
+});
+
+export default Player;
