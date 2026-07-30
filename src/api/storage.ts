@@ -180,7 +180,9 @@ export function saveProgress(type: MediaType, id: string | number, currentTime: 
 
 export function getProgress(type: string, id: string | number, season?: number | null, episode?: number | null): ProgressData | null {
   try {
-    return JSON.parse(localStorage.getItem(progressKey(type, id, season, episode)) || '{}') as ProgressData || null;
+    const raw = localStorage.getItem(progressKey(type, id, season, episode));
+    if (!raw) return null;
+    return JSON.parse(raw) as ProgressData || null;
   } catch {
     return null;
   }
