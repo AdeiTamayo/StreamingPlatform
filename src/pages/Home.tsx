@@ -11,7 +11,10 @@ import styles from './Home.module.css';
 function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void }) {
   const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
   const poster = item.meta?.poster as string | undefined;
-  const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / (item.type === 'movie' ? 7200 : 2700)) * 100)) : null;
+  const metaRuntime = (item.meta?.runtime as number) || null;
+  const defaultRuntime = item.type === 'movie' ? 7200 : 2700;
+  const runtimeSeconds = metaRuntime ? metaRuntime * 60 : defaultRuntime;
+  const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / runtimeSeconds) * 100)) : null;
   return (
     <div className={styles.cwCard}>
       <Link
@@ -47,6 +50,7 @@ export default function Home() {
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState<string>('all');
+  const [heroPaused, setHeroPaused] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
@@ -66,12 +70,12 @@ export default function Home() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (trending.length < 2) return;
+    if (trending.length < 2 || heroPaused) return;
     const timer = setInterval(() => {
       setHeroIdx((i) => (i + 1) % Math.min(trending.length, 8));
     }, 6000);
     return () => clearInterval(timer);
-  }, [trending.length]);
+  }, [trending.length, heroPaused]);
 
   const heroItems = trending.slice(0, 8);
   const hero = heroItems[heroIdx];
@@ -104,6 +108,10 @@ export default function Home() {
       <section
         className={styles.hero}
         ref={heroRef}
+        onMouseEnter={() => setHeroPaused(true)}
+        onMouseLeave={() => setHeroPaused(false)}
+        onFocus={() => setHeroPaused(true)}
+        onBlur={() => setHeroPaused(false)}
       >
         <div className={styles.heroBackdrop}>
           {hero ? (

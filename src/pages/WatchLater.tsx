@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { getWatchLater, removeWatchLater, getEpisodeWatchLater, removeEpisodeWatchLater } from '../api/storage';
 import { imageUrl, getMovieDetail, getTVDetail, getSeasonDetails } from '../api/tmdb';
 import CollectionSkeleton from '../components/CollectionSkeleton';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
+import { useAbortController } from '../hooks/useAbortController';
 import type { WatchLaterItem, EpisodeWatchLaterItem, CalendarItem, TMDBSeason, TMDBEpisode, MediaType } from '../types';
 import styles from './WatchLater.module.css';
 
@@ -51,14 +52,16 @@ export default function WatchLater() {
   const [showUpcoming, setShowUpcoming] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
+  const calendarInitedRef = useRef(false);
   const ITEMS_PER_PAGE = 12;
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
+  const { getSignal } = useAbortController();
 
-  const fetchTVFutureEpisodes = useCallback(async (showId: string | number): Promise<CalendarItem[]> => {
+  const fetchTVFutureEpisodes = useCallback(async (showId: string | number, signal?: AbortSignal): Promise<CalendarItem[]> => {
     const results: CalendarItem[] = [];
     try {
-      const detail = await getTVDetail(showId);
+      const detail = await getTVDetail(showId, signal);
       if (!detail) return results;
       const now = new Date();
       const seasons = ((detail as Record<string, unknown>).seasons as TMDBSeason[] || []).filter((s: TMDBSeason) => s.season_number > 0);
@@ -72,7 +75,7 @@ export default function WatchLater() {
         }
 
         try {
-          const seasonDetail = await getSeasonDetails(showId, season.season_number);
+          const seasonDetail = await getSeasonDetails(showId, season.season_number, signal);
           const episodes = (seasonDetail as Record<string, unknown>)?.episodes as TMDBEpisode[] || [];
           for (const ep of episodes) {
             if (ep.air_date && isFuture(ep.air_date)) {
@@ -110,9 +113,9 @@ export default function WatchLater() {
     return results;
   }, []);
 
-  const fetchMovieRelease = useCallback(async (item: WatchLaterItem): Promise<CalendarItem | null> => {
+  const fetchMovieRelease = useCallback(async (item: WatchLaterItem, signal?: AbortSignal): Promise<CalendarItem | null> => {
     try {
-      const detail = await getMovieDetail(item.id) as { release_date?: string; title?: string; poster_path?: string | null };
+      const detail = await getMovieDetail(item.id, signal) as { release_date?: string; title?: string; poster_path?: string | null };
       if (detail?.release_date && isFuture(detail.release_date)) {
         return {
           date: detail.release_date,
@@ -128,6 +131,7 @@ export default function WatchLater() {
 
   const loadCalendarItems = useCallback(async () => {
     setLoadingCalendar(true);
+    const signal = getSignal();
     const wlItems = getWatchLater();
     const epwlItems = getEpisodeWatchLater();
     const results: CalendarItem[] = [];
@@ -136,8 +140,8 @@ export default function WatchLater() {
     for (let i = 0; i < wlItems.length; i += CONCURRENCY) {
       const batch = wlItems.slice(i, i + CONCURRENCY);
       const batchResults = await Promise.allSettled(batch.map(async (item: WatchLaterItem) => {
-        if (item.type === 'movie') return fetchMovieRelease(item);
-        return fetchTVFutureEpisodes(item.id);
+        if (item.type === 'movie') return fetchMovieRelease(item, signal);
+        return fetchTVFutureEpisodes(item.id, signal);
       }));
       for (const r of batchResults) {
         if (r.status === 'fulfilled') {
@@ -152,7 +156,7 @@ export default function WatchLater() {
       const batch = epwlItems.slice(i, i + CONCURRENCY);
       const batchResults = await Promise.allSettled(batch.map(async (epwl: EpisodeWatchLaterItem) => {
         try {
-          const seasonDetail = await getSeasonDetails(epwl.showId, epwl.season) as { episodes?: { episode_number: number; air_date?: string; name?: string }[] };
+          const seasonDetail = await getSeasonDetails(epwl.showId, epwl.season, signal) as { episodes?: { episode_number: number; air_date?: string; name?: string }[] };
           const ep = seasonDetail?.episodes?.find((e) => e.episode_number === epwl.episode);
           if (ep?.air_date && isFuture(ep.air_date)) {
             return {
@@ -176,7 +180,7 @@ export default function WatchLater() {
     results.sort((a, b) => a.date.localeCompare(b.date));
     setCalendarItems(results);
     setLoadingCalendar(false);
-  }, [fetchTVFutureEpisodes, fetchMovieRelease]);
+  }, [fetchTVFutureEpisodes, fetchMovieRelease, getSignal]);
 
   useEffect(() => {
     document.title = 'Watch Later - StreamFlow';
@@ -187,26 +191,31 @@ export default function WatchLater() {
   }, [loadCalendarItems]);
 
   useEffect(() => {
-    if (calendarItems.length > 0 && view === 'calendar' && calendarItems[0]?.date) {
-      const firstDate = calendarItems[0].date;
-      const d = new Date(firstDate);
-      setCalYear(d.getFullYear());
-      setCalMonth(d.getMonth());
-      setSelectedDate(firstDate);
+    if (view === 'calendar') {
+      if (!calendarInitedRef.current && calendarItems.length > 0 && calendarItems[0]?.date) {
+        const firstDate = calendarItems[0].date;
+        const d = new Date(firstDate);
+        setCalYear(d.getFullYear());
+        setCalMonth(d.getMonth());
+        setSelectedDate(firstDate);
+        calendarInitedRef.current = true;
+      }
+    } else {
+      calendarInitedRef.current = false;
     }
-  }, [calendarItems, view]);
+  }, [view, calendarItems]);
 
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
     setItems(getWatchLater());
-    loadCalendarItems();
+    setCalendarItems((prev) => prev.filter((c) => !(String(c.id) === String(id) && c.type === type)));
     toast?.('Removed from Watch Later');
   }
 
   function handleRemoveEp(showId: string | number, season: number, episode: number) {
     removeEpisodeWatchLater(showId, season, episode);
     setEpItems(getEpisodeWatchLater());
-    loadCalendarItems();
+    setCalendarItems((prev) => prev.filter((c) => !(String(c.id) === String(showId) && c.season === season && c.episode === episode)));
     toast?.('Removed from Watch Later');
   }
 

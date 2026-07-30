@@ -127,11 +127,11 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                     {view === 'month' && (
                         <>
                             <div className={styles.datePickerHeader}>
-                                <button className={styles.datePickerNav} onClick={() => setView('year')}>&#10094;</button>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 1, c.getMonth(), 1))}>&#10094;</button>
                                 <button className={styles.datePickerMonth} onClick={() => setView('year')}>
                                     {viewDate.getFullYear()}
                                 </button>
-                                <span className={styles.datePickerNav} />
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 1, c.getMonth(), 1))}>&#10095;</button>
                             </div>
                             <div className={`${styles.datePickerGrid} ${styles.months}`}>
                                 {MONTHS.map((name, i) => {

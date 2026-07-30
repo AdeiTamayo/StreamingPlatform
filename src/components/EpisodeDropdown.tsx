@@ -1,5 +1,5 @@
 import { useState, useMemo, useId } from 'react';
-import { isWatched } from '../api/storage';
+import { getWatchedEpisodeSet } from '../api/storage';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
 import type { TMDBEpisode } from '../types';
@@ -29,6 +29,7 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
 
   const highlightNum: number | null = search && filtered.length > 0 ? filtered[0].episode_number : null;
 
+  const watchedSet = useMemo(() => getWatchedEpisodeSet('tv', showId, season), [showId, season]);
   const current = episodes.find((e) => e.episode_number === episode);
   const triggerLabel = current ? `${current.episode_number}. ${current.name}` : `Episode ${episode}`;
 
@@ -42,14 +43,14 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
         aria-controls={menuId}
         aria-label={triggerLabel}
       >
-        {(() => { return triggerLabel; })()}
+        {triggerLabel}
         <span className={`cs-arrow ${open ? 'open' : ''}`} aria-hidden="true">&#9662;</span>
       </button>
       {open && (
         <div id={menuId} className="custom-select-menu" role="listbox" aria-label="Select episode">
           {filtered.length === 0 && <div className="custom-select-empty" role="status">No matches</div>}
           {filtered.map((ep) => {
-            const watched = isWatched('tv', showId, season, ep.episode_number);
+            const watched = watchedSet.has(ep.episode_number);
             return (
               <button
                 key={ep.episode_number}

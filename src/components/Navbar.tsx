@@ -334,19 +334,17 @@ const Navbar = memo(function Navbar() {
         </div>
       </nav>
 
-      {!menuOpen && (
-        <button
-          className={styles.sidebarHamburger}
-          onClick={() =>
-            setMenuOpen((previous) => !previous)
-          }
-          aria-label="Toggle menu"
-        >
-          <span className={styles.hamburgerLine} />
-          <span className={styles.hamburgerLine} />
-          <span className={styles.hamburgerLine} />
-        </button>
-      )}
+      <button
+        className={styles.sidebarHamburger}
+        onClick={() =>
+          setMenuOpen((previous) => !previous)
+        }
+        aria-label="Toggle menu"
+      >
+        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
+        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
+        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
+      </button>
 
       {menuOpen && (
         <div

@@ -65,6 +65,7 @@ export default function Search() {
   const filtered = tab === 'all'
     ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
     : results;
+  const safePage = Math.min(page, totalPages);
 
   return (
     <div className="page">
@@ -101,7 +102,7 @@ export default function Search() {
             {totalPages > 1 && (
               <div className="pagination">
                 <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-                <span>Page {page} of {totalPages}</span>
+                <span>Page {safePage} of {totalPages}{filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
               </div>
             )}

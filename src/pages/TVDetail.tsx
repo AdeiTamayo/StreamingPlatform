@@ -144,49 +144,58 @@ export default function TVDetail() {
   // Check for new episodes of watch-later shows
   useEffect(() => {
     if (!show || !id) return;
-    const now = new Date();
-    let added = 0;
+    let cancelled = false;
 
-    // For full-series watch later: check latest season
-    if (inWL) {
-      const latestSeason = seasons[seasons.length - 1];
-      if (latestSeason) {
-        getSeasonDetails(id, latestSeason.season_number, getSignal()).then((data) => {
-          const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
-          for (const ep of eps) {
-            if (!ep.air_date) continue;
-            if (new Date(ep.air_date) > now) continue;
-            if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
-            if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
-            if (added >= 5) break;
-            addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
-            added++;
-          }
-        }).catch(() => {});
+    (async () => {
+      const now = new Date();
+      let added = 0;
+
+      if (inWL) {
+        const latestSeason = seasons[seasons.length - 1];
+        if (latestSeason) {
+          try {
+            const data = await getSeasonDetails(id, latestSeason.season_number, getSignal());
+            if (cancelled) return;
+            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
+            for (const ep of eps) {
+              if (added >= 5) break;
+              if (!ep.air_date) continue;
+              if (new Date(ep.air_date) > now) continue;
+              if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
+              if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
+              addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
+              added++;
+            }
+          } catch {}
+        }
       }
-    }
 
-    // For episode watch later items: check saved episodes of this show
-    const epwlItems: EpisodeWatchLaterItem[] = getEpisodeWatchLater().filter((item: EpisodeWatchLaterItem) => String(item.showId) === String(id));
-    if (epwlItems.length > 0) {
-      const seasonsToCheck = [...new Set(epwlItems.map((item: EpisodeWatchLaterItem) => item.season))];
-      seasonsToCheck.forEach((seasonNum) => {
-        getSeasonDetails(id, seasonNum, getSignal()).then((data) => {
-          const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
-          for (const epwl of epwlItems) {
-            if (epwl.season !== seasonNum) continue;
-            const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
-            if (!ep || !ep.air_date) continue;
-            if (new Date(ep.air_date) > now) continue;
-            if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
-            if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
-            if (added >= 5) break;
-            addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
-            added++;
-          }
-        }).catch(() => {});
-      });
-    }
+      const epwlItems: EpisodeWatchLaterItem[] = getEpisodeWatchLater().filter((item: EpisodeWatchLaterItem) => String(item.showId) === String(id));
+      if (epwlItems.length > 0) {
+        const seasonsToCheck = [...new Set(epwlItems.map((item: EpisodeWatchLaterItem) => item.season))];
+        for (const seasonNum of seasonsToCheck) {
+          if (added >= 5) break;
+          try {
+            const data = await getSeasonDetails(id, seasonNum, getSignal());
+            if (cancelled) return;
+            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
+            for (const epwl of epwlItems) {
+              if (added >= 5) break;
+              if (epwl.season !== seasonNum) continue;
+              const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
+              if (!ep || !ep.air_date) continue;
+              if (new Date(ep.air_date) > now) continue;
+              if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
+              if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
+              addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
+              added++;
+            }
+          } catch {}
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, [show, inWL]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function autoMarkWatched() {
@@ -286,7 +295,6 @@ export default function TVDetail() {
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
   const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
-  const safeIdTV = id!;
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const cast = show.credits?.cast?.slice(0, 8) || [];
@@ -372,9 +380,9 @@ export default function TVDetail() {
               <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
               {watchedCount < episodeCount && (
                 <button className={styles.markSeasonBtn} onClick={() => {
-                  markSeasonWatched(safeIdTV, season, episodeCount, show.name, show?.poster_path ?? '');
-                  setWatchedCount(getWatchedCount(safeIdTV, season, episodeCount));
-                  setWatched(isWatched('tv', safeIdTV, season, episode));
+                  markSeasonWatched(safeId, season, episodeCount, show.name, show?.poster_path ?? '');
+                  setWatchedCount(getWatchedCount(safeId, season, episodeCount));
+                  setWatched(isWatched('tv', safeId, season, episode));
                   toast?.('Season marked as watched');
                 }}>Mark season watched</button>
               )}
@@ -443,9 +451,9 @@ export default function TVDetail() {
               <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
               {watchedCount < episodeCount && !!id && (
                 <button className={styles.markSeasonBtn} onClick={() => {
-                  markSeasonWatched(safeIdTV, season, episodeCount, show.name, show?.poster_path ?? '');
-                  setWatchedCount(getWatchedCount(safeIdTV, season, episodeCount));
-                  setWatched(isWatched('tv', safeIdTV, season, episode));
+                  markSeasonWatched(safeId, season, episodeCount, show.name, show?.poster_path ?? '');
+                  setWatchedCount(getWatchedCount(safeId, season, episodeCount));
+                  setWatched(isWatched('tv', safeId, season, episode));
                   toast?.('Season marked as watched');
                 }}>Mark season watched</button>
               )}
