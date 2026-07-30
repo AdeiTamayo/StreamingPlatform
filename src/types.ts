@@ -170,7 +170,7 @@ export interface TMDBDiscoverFilters {
 
 export type MediaType = 'movie' | 'tv';
 
-export type VideoSourceKey = 'vidsrc' | '2embed' | 'vsembed_ru' | 'vsembed_su' | 'embos';
+export type VideoSourceKey = 'vidsrc' | '2embed' | 'embos';
 
 export interface WatchLaterItem {
   type: MediaType;

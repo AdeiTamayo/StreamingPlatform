@@ -30,8 +30,6 @@ describe('vidsrc', () => {
   it('returns source label for each source', () => {
     expect(getSourceLabel('vidsrc')).toBe('VidSrc');
     expect(getSourceLabel('2embed')).toBe('2Embed');
-    expect(getSourceLabel('vsembed_ru')).toBe('VSEmbed.ru');
-    expect(getSourceLabel('vsembed_su')).toBe('VSEmbed.su');
     expect(getSourceLabel('embos')).toBe('Embos');
   });
 
@@ -40,6 +38,6 @@ describe('vidsrc', () => {
   });
 
   it('exports all source keys', () => {
-    expect(SOURCE_KEYS).toEqual(['vidsrc', '2embed', 'vsembed_ru', 'vsembed_su', 'embos']);
+    expect(SOURCE_KEYS).toEqual(['vidsrc', '2embed', 'embos']);
   });
 });
