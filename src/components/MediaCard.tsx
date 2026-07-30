@@ -2,6 +2,7 @@ import { useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
+import { useTVStatus } from '../hooks/useTVStatus';
 import type { TMDBMovie, TMDBSeries, MediaType } from '../types';
 
 interface MediaCardProps {
@@ -17,7 +18,12 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const type = inferredType;
   const id = item.id;
   const title = (item as TMDBMovie).title || (item as TMDBSeries).name || '';
-  const year = ((item as TMDBMovie).release_date || (item as TMDBSeries).first_air_date || '').slice(0, 4);
+  const series = item as TMDBSeries;
+  const isMovie = !!(item as TMDBMovie).title;
+  const year = isMovie
+    ? ((item as TMDBMovie).release_date || '').slice(0, 4)
+    : series.first_air_date?.slice(0, 4) || '';
+  const tvStatus = useTVStatus(isMovie ? 0 : id);
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '?';
   const poster = imageUrl(item.poster_path);
 
@@ -78,7 +84,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
         ) : (
           <>
             <h3>{title}</h3>
-            {year && <span className="media-card-year">{year}</span>}
+            {year && <span className="media-card-year">{tvStatus?.ended && tvStatus.endYear ? `${year}-${tvStatus.endYear}` : year}</span>}
           </>
         )}
       </div>

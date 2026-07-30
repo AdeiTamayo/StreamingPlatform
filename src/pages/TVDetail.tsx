@@ -297,6 +297,8 @@ export default function TVDetail() {
   const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
+  const ended = show.status === 'Ended';
+  const endYear = ended && show.last_air_date ? show.last_air_date.slice(0, 4) : null;
   const cast = show.credits?.cast?.slice(0, 8) || [];
   const created = show.created_by || [];
   const networks = show.networks || [];
@@ -311,7 +313,7 @@ export default function TVDetail() {
             <img src={imageUrl(show.poster_path)} alt={show.name} />
           </div>
           <div className="detail-meta">
-            <h1>{show.name} <span className="year">({year})</span></h1>
+            <h1>{show.name} <span className="year">({endYear ? `${year}-${endYear}` : year})</span></h1>
             <div className="detail-badges">
               <span className="badge rating">{show.vote_average?.toFixed(1)}</span>
               {genres && <span className="badge">{genres}</span>}
