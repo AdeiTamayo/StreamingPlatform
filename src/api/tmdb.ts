@@ -18,11 +18,18 @@ async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = 
       clearTimeout(timeoutId);
       signal?.removeEventListener('abort', onAbort);
 
-      if (!res.ok) throw new Error(`TMDB error: ${res.status}`);
+      if (!res.ok) {
+        if (res.status >= 400 && res.status < 500) {
+          throw Object.assign(new Error(`TMDB error: ${res.status}`), { _skipRetry: true });
+        }
+        throw new Error(`TMDB error: ${res.status}`);
+      }
       const data = await res.json();
       setCache(url, data);
       return data;
     } catch (err) {
+      if (signal?.aborted) throw err;
+      if ((err as any)?._skipRetry) throw err;
       if (i === retries) throw err;
       await new Promise((r) => setTimeout(r, 1000));
     }

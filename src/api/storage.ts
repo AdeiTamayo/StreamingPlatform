@@ -36,9 +36,12 @@ function parseProgressKey(k: string): { type: string; showId?: string; id: strin
 function getIndex(key: string, prefix: string): string[] {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) || [];
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
   } catch {
-    return [];
+    // Corrupted JSON — fall through to rebuild from full scan
   }
   const index: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -317,12 +320,15 @@ export function isInEpisodeWatchLater(showId: string | number, season: number, e
   return localStorage.getItem(`${EP_WL_PREFIX}${showId}-S${season}E${episode}`) !== null;
 }
 
-export function getWatchedCount(showId: string | number, seasonNumber: number, _episodeCount: number): number {
+export function getWatchedCount(showId: string | number, seasonNumber: number, episodeCount: number): number {
   let count = 0;
   const index = getWatchedIndex();
   const prefix = `watched:tv-${showId}-S${seasonNumber}E`;
   for (const k of index) {
-    if (k.startsWith(prefix)) count++;
+    if (k.startsWith(prefix)) {
+      const ep = parseInt(k.slice(prefix.length), 10);
+      if (!isNaN(ep) && ep <= episodeCount) count++;
+    }
   }
   return count;
 }
@@ -335,6 +341,7 @@ export function markSeasonWatched(showId: string | number, seasonNumber: number,
   }
 }
 
+const NOTIFICATIONS_MAX = 50;
 const SEARCH_HISTORY_KEY = 'search_history';
 const SEARCH_HISTORY_MAX = 15;
 
@@ -421,6 +428,26 @@ export function getStats(): Stats {
   return { moviesWatched, episodesWatched, watchLaterCount: wl.length + epWl.length };
 }
 
+export function clearAllData(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (
+      k.startsWith('watched:') ||
+      k.startsWith('progress:') ||
+      k === 'watchlater' ||
+      k.startsWith('epwl:') ||
+      k === 'search_history' ||
+      k === NOTIFICATIONS_KEY ||
+      k === PROGRESS_INDEX_KEY ||
+      k === WATCHED_INDEX_KEY
+    )) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+}
+
 export function getVideoSource(): string {
   return localStorage.getItem(VIDEO_SOURCE_KEY) || 'vidsrc';
 }
@@ -454,6 +481,7 @@ export function addNotification(showId: string | number, showTitle: string, seas
     createdAt: Date.now(),
     read: false,
   });
+  if (list.length > NOTIFICATIONS_MAX) list.length = NOTIFICATIONS_MAX;
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
   return id;
 }

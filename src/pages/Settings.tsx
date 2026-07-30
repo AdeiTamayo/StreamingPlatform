@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource } from '../api/storage';
+import { exportData, importData, getStorageUsage, getStats, getVideoSource, setVideoSource, clearAllData } from '../api/storage';
 import { clearTMDBCache } from '../api/tmdbCache';
 import { getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { useToast } from '../components/useToast';
@@ -34,14 +34,7 @@ export default function Settings() {
   }
 
   async function clearAll() {
-    const keys: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith('watched:') || k.startsWith('progress:') || k === 'watchlater' || k.startsWith('epwl:') || k === 'search_history')) {
-        keys.push(k);
-      }
-    }
-    keys.forEach((k: string) => localStorage.removeItem(k));
+    clearAllData();
     await clearTMDBCache();
     setConfirm(false);
     setUsage(await getStorageUsage());
