@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -48,6 +48,7 @@ export default function TVDetail() {
   const [showTrailer, setShowTrailer] = useState(false);
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
   const { getSignal } = useAbortController();
@@ -65,6 +66,11 @@ export default function TVDetail() {
     return map;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episodeNums, id, season, watchedCount, episodeCount]);
+
+  function allWatched(): boolean {
+    if (!id) return false;
+    return seasons.length > 0 && seasons.every(s => getWatchedCount(id, s.season_number, s.episode_count) >= s.episode_count);
+  }
 
   const hasNext = episode < episodeCount || seasonIdx < seasons.length - 1;
 
@@ -446,6 +452,20 @@ export default function TVDetail() {
               value={season}
               onSelect={(s: number) => { setSeason(s); setEpisode(1); }}
             />
+            {!!id && (
+              <button className={styles.markSeasonBtn} onClick={() => {
+                if (allWatched()) {
+                  unmarkAllSeasonsWatched(safeId, seasons);
+                  toast?.('All episodes unmarked');
+                } else {
+                  markAllSeasonsWatched(safeId, seasons, show.name, show?.poster_path ?? '');
+                  toast?.('All episodes marked as watched');
+                }
+                setWatchedCount(getWatchedCount(safeId, season, episodeCount));
+                setWatched(isWatched('tv', safeId, season, episode));
+                setRefreshKey(n => n + 1);
+              }}>{allWatched() ? 'Unmark all watched' : 'Mark all watched'}</button>
+            )}
           </div>
           <div className={styles.seasonProgress}>
             <div className={styles.spHeader}>

@@ -341,6 +341,20 @@ export function markSeasonWatched(showId: string | number, seasonNumber: number,
   }
 }
 
+export function markAllSeasonsWatched(showId: string | number, seasons: { season_number: number; episode_count: number }[], showName: string, poster: string): void {
+  for (const s of seasons) {
+    markSeasonWatched(showId, s.season_number, s.episode_count, showName, poster);
+  }
+}
+
+export function unmarkAllSeasonsWatched(showId: string | number, seasons: { season_number: number; episode_count: number }[]): void {
+  for (const s of seasons) {
+    for (let i = 1; i <= s.episode_count; i++) {
+      markUnwatched('tv', showId, s.season_number, i);
+    }
+  }
+}
+
 const NOTIFICATIONS_MAX = 50;
 const SEARCH_HISTORY_KEY = 'search_history';
 const SEARCH_HISTORY_MAX = 15;

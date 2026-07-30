@@ -12,14 +12,14 @@ interface MediaCardProps {
 
 const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const [loaded, setLoaded] = useState(false);
-  const inferredType: MediaType = mediaType || ((item as unknown as Record<string, string>).media_type as MediaType) || 'movie';
+  const isMovie = !!(item as TMDBMovie).title;
+  const inferredType: MediaType = mediaType || ((item as unknown as Record<string, string>).media_type as MediaType) || (isMovie ? 'movie' : 'tv');
   const [inWL, setInWL] = useState(() => isInWatchLater(inferredType, item.id));
   const [isWatchedState, setIsWatchedState] = useState(() => isWatched(inferredType, item.id));
   const type = inferredType;
   const id = item.id;
   const title = (item as TMDBMovie).title || (item as TMDBSeries).name || '';
   const series = item as TMDBSeries;
-  const isMovie = !!(item as TMDBMovie).title;
   const year = isMovie
     ? ((item as TMDBMovie).release_date || '').slice(0, 4)
     : series.first_air_date?.slice(0, 4) || '';
@@ -69,9 +69,11 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>
               {inWL ? '\u2605' : '\u2606'}
             </button>
-            <button className={`media-card-watched-btn ${isWatchedState ? 'active' : ''}`} onClick={toggleWatched} title={isWatchedState ? 'Unmark watched' : 'Mark as watched'}>
-              {isWatchedState ? '\u2713' : '+'}
-            </button>
+            {isMovie && (
+              <button className={`media-card-watched-btn ${isWatchedState ? 'active' : ''}`} onClick={toggleWatched} title={isWatchedState ? 'Unmark watched' : 'Mark as seen'}>
+                {isWatchedState ? '\u2713' : '+'}
+              </button>
+            )}
           </div>
         )}
       </div>
