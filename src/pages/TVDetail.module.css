@@ -1,6 +1,5 @@
 /* Episode nav */
 .ep-nav {
-  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -15,10 +14,7 @@
 }
 
 .ep-nav :global(.source-dropdown) {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  margin-left: auto;
 }
 
 .ep-nav-btn {
