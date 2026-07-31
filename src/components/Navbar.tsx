@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useClickOutside from '../hooks/useClickOutside';
+import { useAuth } from '../hooks/useAuth';
 import Notifications from './Notifications';
+import AccountButton from './AccountButton/AccountButton';
 import styles from './Navbar.module.css';
 
-const NAV_ITEMS = [
+const PUBLIC_NAV_ITEMS = [
   {
     to: '/',
     label: 'Home',
@@ -20,6 +22,9 @@ const NAV_ITEMS = [
     label: 'TV Shows',
     icon: <><rect x="2" y="7" width="20" height="15" rx="2" ry="2" /><polyline points="17 2 12 7 7 2" /></>,
   },
+];
+
+const PERSONAL_NAV_ITEMS = [
   {
     to: '/watch-later',
     label: 'Watch Later',
@@ -32,6 +37,8 @@ const NAV_ITEMS = [
   },
 ];
 
+type NavItem = typeof PUBLIC_NAV_ITEMS[number];
+
 const Navbar = memo(function Navbar() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,6 +48,7 @@ const Navbar = memo(function Navbar() {
 
   const navigate = useNavigate();
   const location = useLocation();
+  const { isAuthenticated } = useAuth();
 
   const sidebarRef = useClickOutside(() => {
     if (menuOpen) {
@@ -206,7 +214,7 @@ const Navbar = memo(function Navbar() {
     };
   }, [searchOpen]);
 
-  function renderNavIcon(item: typeof NAV_ITEMS[number]) {
+  function renderNavIcon(item: NavItem) {
     return (
       <Link
         key={item.to}
@@ -244,7 +252,8 @@ const Navbar = memo(function Navbar() {
       >
         <div className={styles.navbarInner}>
           <div className={styles.navLinks}>
-            {NAV_ITEMS.map(renderNavIcon)}
+            {PUBLIC_NAV_ITEMS.map(renderNavIcon)}
+            {isAuthenticated && PERSONAL_NAV_ITEMS.map(renderNavIcon)}
           </div>
 
           <form
@@ -305,32 +314,36 @@ const Navbar = memo(function Navbar() {
               </button>
             )}
           </form>
-          <Link
-            to="/settings"
-            className={[
-              styles.iconBtn,
-              isActive('/settings')
-                ? styles.active
-                : '',
-            ].join(' ')}
-            aria-label="Settings"
-          >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </Link>
+          <AccountButton />
 
-          <Notifications />
+          {isAuthenticated && (
+            <Link
+              to="/settings"
+              className={[
+                styles.iconBtn,
+                isActive('/settings')
+                  ? styles.active
+                  : '',
+              ].join(' ')}
+              aria-label="Settings"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </Link>
+          )}
+
+          {isAuthenticated && <Notifications />}
         </div>
       </nav>
 
@@ -363,7 +376,7 @@ const Navbar = memo(function Navbar() {
         ref={sidebarRef}
       >
         <nav className={styles.sidebarNav}>
-          {NAV_ITEMS.map((item, index) => (
+          {PUBLIC_NAV_ITEMS.map((item, index) => (
             <Link
               key={item.to}
               to={item.to}
@@ -395,40 +408,78 @@ const Navbar = memo(function Navbar() {
             </Link>
           ))}
 
-          <Link
-            to="/settings"
-            className={[
-              styles.sidebarLink,
-              isActive('/settings')
-                ? styles.active
-                : '',
-            ].join(' ')}
-          >
-            <span className={styles.sidebarIconWrap}>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </span>
-            <span>Settings</span>
-          </Link>
+          {isAuthenticated && PERSONAL_NAV_ITEMS.map((item, index) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={[
+                styles.sidebarLink,
+                isActive(item.to)
+                  ? styles.active
+                  : '',
+              ].join(' ')}
+              style={{
+                animationDelay: `${(PUBLIC_NAV_ITEMS.length + index) * 50}ms`,
+              }}
+            >
+              <span className={styles.sidebarIconWrap}>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {item.icon}
+                </svg>
+              </span>
+              <span>{item.label}</span>
+            </Link>
+          ))}
+
+          {isAuthenticated && (
+            <Link
+              to="/settings"
+              className={[
+                styles.sidebarLink,
+                isActive('/settings')
+                  ? styles.active
+                  : '',
+              ].join(' ')}
+            >
+              <span className={styles.sidebarIconWrap}>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </span>
+              <span>Settings</span>
+            </Link>
+          )}
+
+          <AccountButton sidebar />
         </nav>
 
-        <div className={styles.sidebarNotif}>
-          <div className={styles.sidebarNotifRow}>
-            <Notifications sidebar />
-            <span className={styles.sidebarNotifText}>Notifications</span>
+        {isAuthenticated && (
+          <div className={styles.sidebarNotif}>
+            <div className={styles.sidebarNotifRow}>
+              <Notifications sidebar />
+              <span className={styles.sidebarNotifText}>Notifications</span>
+            </div>
           </div>
-        </div>
+        )}
 
         <form
           className={styles.sidebarSearch}
