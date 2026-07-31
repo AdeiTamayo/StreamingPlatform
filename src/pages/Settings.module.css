@@ -1,55 +1,295 @@
-.settings-group {
+.grid {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ------------------------- */
+/* Cards */
+/* ------------------------- */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.4rem;
+  backdrop-filter: blur(10px);
+}
+
+.cardTitle {
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+}
+
+/* ------------------------- */
+/* Account */
+/* ------------------------- */
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
-.settings-group h3 {
-  font-size: 0.95rem;
-  margin-bottom: 0.6rem;
-}
+.avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid var(--border);
 
-.settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
-.settings-row:last-child { border-bottom: none; }
-
-.settings-label {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.settings-value {
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.settings-section {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.settings-section h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 0.75rem;
-}
-
-.confirm-bar {
+.accountInfo {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-start;
+  gap: .2rem;
 }
 
-.confirm-text {
-  font-size: 0.8rem;
+.accountInfo h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.accountInfo span {
   color: var(--text-muted);
+  font-size: .85rem;
+}
+
+/* ------------------------- */
+/* Rows */
+/* ------------------------- */
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+
+  padding: .9rem 0;
+
+  border-top: 1px solid var(--border);
+}
+
+.row:first-of-type {
+  border-top: none;
+}
+
+.rowInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  color: var(--text-muted);
+  font-size: .9rem;
+}
+
+.value {
+  font-weight: 600;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+}
+
+/* ------------------------- */
+/* Buttons container */
+/* ------------------------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-top: 1.2rem;
+}
+
+/* ------------------------- */
+/* Storage */
+/* ------------------------- */
+
+.storageHeader {
+  margin-bottom: 1.5rem;
+}
+
+.storageTotal {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.storageSubtitle {
+  color: var(--text-muted);
+  margin-top: .2rem;
+  margin-bottom: 1rem;
+}
+
+.storageBar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, .06);
+  overflow: hidden;
+}
+
+.storageFill {
+  height: 100%;
+  border-radius: 999px;
+
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, .8),
+      rgba(255, 255, 255, .35));
+
+  transition: width .35s ease;
+}
+
+/* ------------------------- */
+/* Statistics */
+/* ------------------------- */
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.statCard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+
+  padding: 1.25rem;
+
+  background: rgba(255, 255, 255, .02);
+
+  text-align: center;
+
+  transition: .2s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+
+  background: rgba(255, 255, 255, .035);
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.statLabel {
+  margin-top: .35rem;
+  color: var(--text-muted);
+  font-size: .85rem;
+}
+
+/* ------------------------- */
+/* Backup */
+/* ------------------------- */
+
+.backupGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+.backupTitle {
+  margin: 0 0 .9rem;
+
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+/* ------------------------- */
+/* Danger */
+/* ------------------------- */
+
+.dangerText {
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.confirmBox {
+  display: flex;
+  flex-direction: column;
+  gap: .8rem;
+}
+
+.confirmBox h4 {
+  margin: 0;
+}
+
+.confirmBox p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+/* ------------------------- */
+/* Responsive */
+/* ------------------------- */
+
+@media (max-width: 960px) {
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .backupGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+}
+
+@media (max-width:640px) {
+
+  .card {
+    padding: 1rem;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rowActions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+
 }

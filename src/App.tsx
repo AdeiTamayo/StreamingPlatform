@@ -3,6 +3,8 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
+import AuthModal from './components/AuthModal/AuthModal';
+import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import './styles/shared.css';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -42,6 +44,7 @@ export default function App() {
         <div className="app-shell">
           <a href="#main-content" className="skip-link">Skip to content</a>
           <Navbar />
+          <AuthModal />
           <main id="main-content" className="app-content">
             <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
               <Routes>
@@ -51,9 +54,9 @@ export default function App() {
                 <Route path="/movie/:id" element={<MovieDetail />} />
                 <Route path="/tv/:id" element={<TVDetail />} />
                 <Route path="/search" element={<Search />} />
-                <Route path="/watch-later" element={<WatchLater />} />
-                <Route path="/last-seen" element={<LastSeen />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route path="/watch-later" element={<ProtectedRoute><WatchLater /></ProtectedRoute>} />
+                <Route path="/last-seen" element={<ProtectedRoute><LastSeen /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
