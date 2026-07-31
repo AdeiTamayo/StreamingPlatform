@@ -1,8 +1,9 @@
-import { useState, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater } from '../api/storage';
 import { useTVStatus } from '../hooks/useTVStatus';
+import { useAuth } from '../hooks/useAuth';
 import type { TMDBMovie, TMDBSeries, MediaType } from '../types';
 
 interface MediaCardProps {
@@ -16,8 +17,14 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const inferredType: MediaType = mediaType || ((item as unknown as Record<string, string>).media_type as MediaType) || (isMovie ? 'movie' : 'tv');
   const [inWL, setInWL] = useState(() => isInWatchLater(inferredType, item.id));
   const [isWatchedState, setIsWatchedState] = useState(() => isWatched(inferredType, item.id));
+  const { isAuthenticated, syncVersion } = useAuth();
   const type = inferredType;
   const id = item.id;
+
+  useEffect(() => {
+    setInWL(isInWatchLater(type, id));
+    setIsWatchedState(isWatched(type, id));
+  }, [isAuthenticated, syncVersion, type, id]);
   const title = (item as TMDBMovie).title || (item as TMDBSeries).name || '';
   const series = item as TMDBSeries;
   const year = isMovie

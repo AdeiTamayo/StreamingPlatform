@@ -23,6 +23,11 @@
   backdrop-filter: blur(10px);
 }
 
+.card:has(.custom-select) {
+  position: relative;
+  z-index: 2;
+}
+
 .cardTitle {
   font-size: .82rem;
   font-weight: 700;

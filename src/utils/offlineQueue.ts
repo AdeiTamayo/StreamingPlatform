@@ -53,10 +53,23 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
         return true;
       }
       case 'delete': {
-        const { error } = await requireSupabase()
-          .from(op.table as never)
-          .delete()
-          .eq('id', op.data.id as string);
+        const d = op.data as Record<string, unknown>;
+        let query: any = requireSupabase().from(op.table as never).delete();
+        if (d.id != null) {
+          query = query.eq('id', d.id as string);
+        } else if (d.userId != null) {
+          query = query
+            .eq('user_id', d.userId as string)
+            .eq('media_type', d.mediaType as string)
+            .eq('tmdb_id', d.tmdbId as number);
+          if (d.mediaType === 'tv') {
+            if (d.season != null) query = query.eq('season', d.season as number);
+            if (d.episode != null) query = query.eq('episode', d.episode as number);
+          }
+        } else {
+          return false;
+        }
+        const { error } = await query;
         if (error) throw error;
         return true;
       }

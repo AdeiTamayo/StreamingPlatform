@@ -12,7 +12,8 @@ export const watchedRepository = {
       );
       if (error) throw error;
       return result as WatchedRow | null;
-    } catch {
+    } catch (err: any) {
+      if (err?.code === '23505') return null;
       enqueueWrite('watched', 'insert', data as any);
       return null;
     }
@@ -24,7 +25,8 @@ export const watchedRepository = {
         requireSupabase().from('watched').insert(items as any),
       );
       if (error) throw error;
-    } catch {
+    } catch (err: any) {
+      if (err?.code === '23505') return;
       for (const item of items) {
         enqueueWrite('watched', 'insert', item as any);
       }
