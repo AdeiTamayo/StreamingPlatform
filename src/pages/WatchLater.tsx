@@ -102,15 +102,34 @@ export default function WatchLater() {
         const detail = await getTVDetail(showId, signal);
         if (!detail) return results;
         const now = new Date();
+        const nextEp = (detail as Record<string, unknown>)
+          .next_episode_to_air as
+          | {
+              air_date: string;
+              season_number: number;
+              episode_number: number;
+              name: string;
+            }
+          | undefined;
+        const nextSeasonNumber = nextEp?.season_number;
         const seasons = (
           ((detail as Record<string, unknown>).seasons as TMDBSeason[]) || []
         ).filter((s: TMDBSeason) => s.season_number > 0);
 
         for (const season of seasons) {
-          if (!season.air_date) continue;
-          const seasonStart = new Date(season.air_date);
-
-          if (seasonStart > now) {
+          if (nextSeasonNumber && season.season_number !== nextSeasonNumber) {
+            continue;
+          }
+          if (
+            !season.air_date &&
+            !(nextEp && season.season_number === nextSeasonNumber)
+          ) {
+            continue;
+          }
+          const seasonStart = season.air_date
+            ? new Date(season.air_date)
+            : null;
+          if (seasonStart && seasonStart > now) {
             continue;
           }
 
@@ -125,31 +144,30 @@ export default function WatchLater() {
                 ?.episodes as TMDBEpisode[]) || [];
             for (const ep of episodes) {
               if (ep.air_date && isFuture(ep.air_date)) {
-                results.push({
-                  date: ep.air_date,
-                  title: (detail as Record<string, unknown>).name as string,
-                  type: "episode",
-                  id: showId,
-                  poster: (detail as Record<string, unknown>)
-                    .poster_path as string | undefined,
-                  season: season.season_number,
-                  episode: ep.episode_number,
-                  episodeTitle: ep.name,
-                });
+                const dup = results.some(
+                  (r) =>
+                    r.season === season.season_number &&
+                    r.episode === ep.episode_number &&
+                    r.date === ep.air_date,
+                );
+                if (!dup) {
+                  results.push({
+                    date: ep.air_date,
+                    title: (detail as Record<string, unknown>).name as string,
+                    type: "episode",
+                    id: showId,
+                    poster: (detail as Record<string, unknown>)
+                      .poster_path as string | undefined,
+                    season: season.season_number,
+                    episode: ep.episode_number,
+                    episodeTitle: ep.name,
+                  });
+                }
               }
             }
           } catch {}
         }
 
-        const nextEp = (detail as Record<string, unknown>)
-          .next_episode_to_air as
-          | {
-              air_date: string;
-              season_number: number;
-              episode_number: number;
-              name: string;
-            }
-          | undefined;
         if (nextEp?.air_date && isFuture(nextEp.air_date)) {
           const n = nextEp;
           const dup = results.some(

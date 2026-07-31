@@ -1,4 +1,5 @@
 import { createContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
 import { authService } from '../services/auth/authService';
 import { dataMigration } from '../utils/dataMigration';
@@ -19,6 +20,7 @@ export interface AuthContextValue extends AuthState {
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  syncVersion: number;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -31,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [syncVersion, setSyncVersion] = useState(0);
+  const navigate = useNavigate();
 
   const openAuthModal = useCallback(() => {
     setIsAuthModalOpen(true);
@@ -49,6 +53,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const runMigration = useCallback((userId: string) => {
+    dataMigration
+      .migrateFromLocalStorage(userId)
+      .finally(() => setSyncVersion((v) => v + 1));
+  }, []);
+
   useEffect(() => {
     const { data: listener } = authService.onAuthStateChange((event, session) => {
       const supabaseSession = session as Session | null;
@@ -56,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUserId(supabaseSession.user.id);
         setAuth(supabaseSession.user, supabaseSession);
         setIsAuthModalOpen(false);
-        dataMigration.migrateFromLocalStorage(supabaseSession.user.id);
+        runMigration(supabaseSession.user.id);
       } else if (event === 'SIGNED_OUT') {
         setCurrentUserId(null);
         setAuth(null, null);
@@ -70,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         setCurrentUserId(session.user.id);
         setAuth(session.user, session);
+        runMigration(session.user.id);
       } else {
         setCurrentUserId(null);
         setState((prev) => ({ ...prev, loading: false }));
@@ -79,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       listener?.subscription.unsubscribe();
     };
-  }, [setAuth]);
+  }, [setAuth, runMigration]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await authService.signIn(email, password);
@@ -100,7 +111,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await authService.signOut();
     setAuth(null, null);
-  }, [setAuth]);
+    navigate('/');
+  }, [setAuth, navigate]);
 
   const resetPassword = useCallback(async (email: string) => {
     await authService.resetPassword(email);
@@ -117,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthModalOpen,
         openAuthModal,
         closeAuthModal,
+        syncVersion,
       }}
     >
       {children}

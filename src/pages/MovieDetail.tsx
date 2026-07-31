@@ -8,6 +8,7 @@ import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
+import { useAuth } from '../hooks/useAuth';
 import { logDebug } from '../utils/logger';
 import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
@@ -29,6 +30,16 @@ export default function MovieDetail() {
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
   const { getSignal } = useAbortController();
+  const { isAuthenticated, syncVersion } = useAuth();
+
+  useEffect(() => {
+    if (!id) return;
+    setWatched(isWatched('movie', id));
+    setInWL(isInWatchLater('movie', id));
+    const prog = getProgress('movie', id);
+    setStartAt(prog?.currentTime || null);
+    watchedRef.current = isWatched('movie', id);
+  }, [isAuthenticated, syncVersion, id]);
 
   useEffect(() => {
     if (!id) return;

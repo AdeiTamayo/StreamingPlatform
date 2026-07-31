@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import type { TMDBMovie, TMDBSeries, ContinueWatchingItem, TMDBGenre, TMDBCountry, FilterOption } from '../types';
@@ -54,6 +55,7 @@ export default function Home() {
   const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
+  const { isAuthenticated, syncVersion } = useAuth();
 
   useEffect(() => {
     document.title = 'StreamFlow';
@@ -68,6 +70,10 @@ export default function Home() {
       })
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setContinueWatching(getContinueWatching());
+  }, [isAuthenticated, syncVersion]);
 
   useEffect(() => {
     if (trending.length < 2 || heroPaused) return;
