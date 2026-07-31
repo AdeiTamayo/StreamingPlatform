@@ -9,9 +9,11 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "transfer:supabase": "tsx scripts/transfer-localstorage-to-supabase.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.111.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"
@@ -26,6 +28,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "oxlint": "^1.71.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.9.3",
     "vite": "^8.1.1",
     "vite-tsconfig-paths": "^6.1.1",
