@@ -1,11 +1,36 @@
 import { logDebug } from '../utils/logger';
-import { getTMDBCacheSize } from './tmdbCache';
+import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
+import { watchedRepository } from '../repositories/watchedRepository';
+import { progressRepository } from '../repositories/progressRepository';
+import { watchLaterRepository } from '../repositories/watchLaterRepository';
+import { notificationRepository } from '../repositories/notificationRepository';
+import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
+import { settingsRepository } from '../repositories/settingsRepository';
+import { syncOfflineQueue } from '../utils/offlineQueue';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
 
 const WL_KEY = 'watchlater';
 const PROGRESS_INDEX_KEY = 'progress_index';
 const WATCHED_INDEX_KEY = 'watched_index';
 const VIDEO_SOURCE_KEY = 'video_source';
+const NOTIFICATIONS_KEY = 'notifications';
+const SEARCH_HISTORY_KEY = 'search_history';
+const EP_WL_PREFIX = 'epwl:';
+const NOTIFICATIONS_MAX = 50;
+const SEARCH_HISTORY_MAX = 15;
+
+let currentUserId: string | null = null;
+
+export function setCurrentUserId(userId: string | null): void {
+  currentUserId = userId;
+  if (userId) {
+    syncOfflineQueue();
+  }
+}
+
+export function getCurrentUserId(): string | null {
+  return currentUserId;
+}
 
 function watchedKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
   if (type === 'movie') return `watched:movie-${id}`;
@@ -41,7 +66,7 @@ function getIndex(key: string, prefix: string): string[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch {
-    // Corrupted JSON — fall through to rebuild from full scan
+    // Corrupted JSON
   }
   const index: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -102,12 +127,29 @@ export function markWatched(type: MediaType, id: string | number, title: string,
   const key = watchedKey(type, id, season, episode);
   localStorage.setItem(key, JSON.stringify(data));
   addToWatchedIndex(key);
+
+  if (currentUserId) {
+    watchedRepository.mark({
+      user_id: currentUserId,
+      media_type: type,
+      tmdb_id: Number(id),
+      title,
+      season: season ?? null,
+      episode: episode ?? null,
+      watched_at: new Date().toISOString(),
+      meta: (meta ?? null) as never,
+    });
+  }
 }
 
 export function markUnwatched(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
   const key = watchedKey(type, id, season, episode);
   localStorage.removeItem(key);
   removeFromWatchedIndex(key);
+
+  if (currentUserId) {
+    watchedRepository.unmark(currentUserId, type, Number(id), season, episode);
+  }
 }
 
 export function getWatchedEpisodeSet(type: string, id: string | number, season: number, episodeCount?: number): Set<number> {
@@ -123,7 +165,7 @@ export function getWatchedEpisodeSet(type: string, id: string | number, season: 
   return set;
 }
 
-export function clearShowHistory(showId: string | number): void {
+export async function clearShowHistory(showId: string | number): Promise<void> {
   const showIdStr = String(showId);
   const watchedIndex = getWatchedIndex();
   const remainingWatched: string[] = [];
@@ -148,6 +190,11 @@ export function clearShowHistory(showId: string | number): void {
     }
   }
   saveIndex(PROGRESS_INDEX_KEY, remainingProgress);
+
+  if (currentUserId) {
+    await watchedRepository.clearShowHistory(currentUserId, Number(showId));
+    await progressRepository.clearByShowId(currentUserId, Number(showId));
+  }
 }
 
 export function getLastWatchedEpisode(showId: string | number): { type: string; showId: string; id: string; season: number; episode: number; watchedAt: number } | null {
@@ -176,6 +223,19 @@ export function saveProgress(type: MediaType, id: string | number, currentTime: 
   } catch (err) {
     logDebug(`saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${String(err)}`);
   }
+
+  if (currentUserId) {
+    progressRepository.save({
+      user_id: currentUserId,
+      media_type: type,
+      tmdb_id: Number(id),
+      season: season ?? null,
+      episode: episode ?? null,
+      current_time: currentTime,
+      duration: null,
+      meta: (meta ?? null) as never,
+    });
+  }
 }
 
 export function getProgress(type: string, id: string | number, season?: number | null, episode?: number | null): ProgressData | null {
@@ -191,6 +251,10 @@ export function getProgress(type: string, id: string | number, season?: number |
 export function clearProgress(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
   localStorage.removeItem(progressKey(type, id, season, episode));
   removeFromProgressIndex(progressKey(type, id, season, episode));
+
+  if (currentUserId) {
+    progressRepository.clear(currentUserId, type, Number(id), season, episode);
+  }
 }
 
 export function getWatchLater(): WatchLaterItem[] {
@@ -205,11 +269,28 @@ export function addWatchLater(type: MediaType, id: string | number, title: strin
   const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && item.id === id));
   list.push({ type, id, title, year, poster, addedAt: Date.now() });
   localStorage.setItem(WL_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    watchLaterRepository.add({
+      user_id: currentUserId,
+      media_type: type,
+      tmdb_id: Number(id),
+      title,
+      year: year || null,
+      poster: poster || null,
+      season: null,
+      episode: null,
+    });
+  }
 }
 
 export function removeWatchLater(type: MediaType, id: string | number): void {
   const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && String(item.id) === String(id)));
   localStorage.setItem(WL_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    watchLaterRepository.remove(currentUserId, type, Number(id));
+  }
 }
 
 export function isInWatchLater(type: MediaType, id: string | number): boolean {
@@ -295,8 +376,6 @@ export function getContinueWatching(): ContinueWatchingItem[] {
   return progressItems.sort((a, b) => b.savedAt - a.savedAt);
 }
 
-const EP_WL_PREFIX = 'epwl:';
-
 export function getEpisodeWatchLater(): EpisodeWatchLaterItem[] {
   const items: EpisodeWatchLaterItem[] = [];
   for (let i = 0; i < localStorage.length; i++) {
@@ -312,10 +391,27 @@ export function getEpisodeWatchLater(): EpisodeWatchLaterItem[] {
 export function addEpisodeWatchLater(showId: string | number, season: number, episode: number, showTitle: string): void {
   const key = `${EP_WL_PREFIX}${showId}-S${season}E${episode}`;
   localStorage.setItem(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }));
+
+  if (currentUserId) {
+    watchLaterRepository.add({
+      user_id: currentUserId,
+      media_type: 'tv',
+      tmdb_id: Number(showId),
+      title: showTitle,
+      year: null,
+      poster: null,
+      season,
+      episode,
+    });
+  }
 }
 
 export function removeEpisodeWatchLater(showId: string | number, season: number, episode: number): void {
   localStorage.removeItem(`${EP_WL_PREFIX}${showId}-S${season}E${episode}`);
+
+  if (currentUserId) {
+    watchLaterRepository.removeEpisode(currentUserId, Number(showId), season, episode);
+  }
 }
 
 export function isInEpisodeWatchLater(showId: string | number, season: number, episode: number): boolean {
@@ -357,10 +453,6 @@ export function unmarkAllSeasonsWatched(showId: string | number, seasons: { seas
   }
 }
 
-const NOTIFICATIONS_MAX = 50;
-const SEARCH_HISTORY_KEY = 'search_history';
-const SEARCH_HISTORY_MAX = 15;
-
 export function getSearchHistory(): string[] {
   try {
     return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]') as string[] || [];
@@ -376,6 +468,10 @@ export function addSearchHistory(query: string): void {
   list.unshift(trimmed);
   if (list.length > SEARCH_HISTORY_MAX) list.length = SEARCH_HISTORY_MAX;
   localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    searchHistoryRepository.add({ user_id: currentUserId, query: trimmed });
+  }
 }
 
 const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history', 'watched_index', 'progress_index', 'notifications'];
@@ -470,9 +566,11 @@ export function getVideoSource(): string {
 
 export function setVideoSource(source: string): void {
   localStorage.setItem(VIDEO_SOURCE_KEY, source);
-}
 
-const NOTIFICATIONS_KEY = 'notifications';
+  if (currentUserId) {
+    settingsRepository.upsert({ user_id: currentUserId, preferred_video_source: source });
+  }
+}
 
 export function getNotifications(): NotificationItem[] {
   try {
@@ -499,24 +597,52 @@ export function addNotification(showId: string | number, showTitle: string, seas
   });
   if (list.length > NOTIFICATIONS_MAX) list.length = NOTIFICATIONS_MAX;
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    notificationRepository.add({
+      user_id: currentUserId,
+      title: showTitle,
+      message: episodeTitle || null,
+      media_type: 'tv',
+      tmdb_id: Number(showId),
+      season,
+      episode,
+      read: false,
+    });
+  }
+
   return id;
 }
 
 export function removeNotification(id: string): void {
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(getNotifications().filter((n: NotificationItem) => n.id !== id)));
+
+  if (currentUserId) {
+    notificationRepository.remove(currentUserId, id);
+  }
 }
 
 export function markAllNotificationsRead(): void {
   const list = getNotifications();
   list.forEach((n: NotificationItem) => { n.read = true; });
   localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    notificationRepository.markAllRead(currentUserId);
+  }
 }
 
 export function clearAllNotifications(): void {
   localStorage.removeItem(NOTIFICATIONS_KEY);
+
+  if (currentUserId) {
+    notificationRepository.clearAll(currentUserId);
+  }
 }
 
 export function isAlreadyNotified(showId: string | number, season: number, episode: number): boolean {
   const sid = String(showId);
   return getNotifications().some((n: NotificationItem) => n.showId === sid && n.season === season && n.episode === episode);
 }
+
+
