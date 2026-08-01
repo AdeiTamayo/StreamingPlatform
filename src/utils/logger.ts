@@ -26,11 +26,3 @@ export function logError(context: string, error: unknown) {
   } catch {}
   console.error(`[${context}]`, error);
 }
-
-export function getErrorLog() {
-  try {
-    return JSON.parse(localStorage.getItem(ERROR_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}

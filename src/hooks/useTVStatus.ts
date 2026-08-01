@@ -7,5 +7,9 @@ export function useTVStatus(id: number) {
     fetchTVStatus(id);
   }, [id]);
 
-  return useSyncExternalStore(subscribe, () => (id > 0 ? getStatus(id) : undefined));
+  // Only re-render when this id's status actually changes.
+  return useSyncExternalStore(
+    (onStoreChange) => subscribe(id, onStoreChange),
+    () => (id > 0 ? getStatus(id) : undefined),
+  );
 }

@@ -53,8 +53,30 @@ export async function setCache(url: string, data: any): Promise<void> {
       tx.oncomplete = () => { db.close(); resolve(); };
       tx.onerror = () => { db.close(); reject(tx.error); };
     });
-    await pruneCache();
+    schedulePrune();
   } catch {}
+}
+
+// Pruning runs in the background at most every PRUNE_MIN_INTERVAL (or once
+// enough writes have accumulated), instead of blocking every cache write.
+const PRUNE_THRESHOLD = 40;
+const PRUNE_MIN_INTERVAL = 60_000;
+let writesSincePrune = 0;
+let lastPruneAt = 0;
+let pruneScheduled = false;
+
+function schedulePrune(): void {
+  writesSincePrune += 1;
+  const now = Date.now();
+  if (writesSincePrune < PRUNE_THRESHOLD && now - lastPruneAt < PRUNE_MIN_INTERVAL) return;
+  if (pruneScheduled) return;
+  pruneScheduled = true;
+  setTimeout(() => {
+    pruneScheduled = false;
+    writesSincePrune = 0;
+    lastPruneAt = Date.now();
+    void pruneCache();
+  }, 0);
 }
 
 async function removeCache(url: string): Promise<void> {
