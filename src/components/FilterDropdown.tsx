@@ -1,6 +1,7 @@
-import { useMemo, useState, useId } from 'react';
+import { useMemo, useState, useId, useCallback } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
+import useDropdownKeys from '../hooks/useDropdownKeys';
 import type { FilterOption } from '../types';
 
 interface FilterDropdownProps {
@@ -13,8 +14,9 @@ interface FilterDropdownProps {
 
 export default function FilterDropdown({ value, options, placeholder, onSelect, className = '' }: FilterDropdownProps) {
     const [open, setOpen] = useState(false);
-    const ref = useClickOutside(() => setOpen(false));
-    const search = useDropdownSearch(open, () => setOpen(false));
+    const close = useCallback(() => setOpen(false), []);
+    const ref = useClickOutside(close);
+    const search = useDropdownSearch(open, close);
     const id = useId();
     const menuId = `fd-menu-${id}`;
 
@@ -26,6 +28,13 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
     }, [options, search]);
 
     const highlightKey: string | null = search && filtered.length > 0 ? filtered[0].value || filtered[0].label : null;
+    const activeIndex = useDropdownKeys(open, filtered.length, (i) => {
+        const option = filtered[i];
+        if (option) {
+            onSelect(option.value);
+            setOpen(false);
+        }
+    }, close);
 
     return (
         <div className={`custom-select ${className}`.trim()} ref={ref}>
@@ -43,9 +52,9 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
             {open && (
                 <div id={menuId} className="custom-select-menu filter-select-menu" role="listbox" aria-label={placeholder}>
                     {filtered.length === 0 && <div className="custom-select-empty" role="status">No matches</div>}
-                    {filtered.map((option) => {
+                    {filtered.map((option, index) => {
                         const key = option.value || option.label;
-                        const isHighlighted = key === highlightKey;
+                        const isHighlighted = search ? key === highlightKey : index === activeIndex;
                         return (
                             <button
                                 key={key}
