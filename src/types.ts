@@ -196,6 +196,7 @@ export interface ProgressData {
   savedAt: number;
   season?: number;
   episode?: number;
+  duration?: number;
   meta?: Record<string, unknown>;
 }
 

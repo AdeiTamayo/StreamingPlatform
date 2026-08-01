@@ -149,7 +149,7 @@
   min-width: 0;
 }
 
-.episode-card-info h4 {
+.episode-card-info .ep-title {
   font-size: 0.85rem;
   font-weight: 600;
   margin-bottom: 0.15rem;
@@ -199,6 +199,12 @@
 .sp-bar {
   display: flex;
   gap: 3px;
+}
+
+.sp-dot-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
 }
 
 .sp-dot {

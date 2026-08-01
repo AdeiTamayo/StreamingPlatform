@@ -13,12 +13,17 @@ const POSTMESSAGE_STALE_MS = 20_000;
 const FALLBACK_POLL_MS = 10_000;
 const COMPLETION_RATIO = 0.9;
 
+// Absolute ceiling for the wall-clock estimate when no duration info exists:
+// a dead embed must still eventually end instead of counting forever.
+const FALLBACK_MAX_SECONDS = 3 * 60 * 60;
+
 interface PlayerProps {
   src: string;
   title: string;
   onProgress: (currentTime: number, duration: number) => void;
   onEnded: () => void;
   runtimeMinutes: number | null;
+  startAt?: number;
 }
 
 interface PlayerState {
@@ -27,16 +32,22 @@ interface PlayerState {
   ended: boolean;
 }
 
-const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMinutes }: PlayerProps) {
+const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMinutes, startAt = 0 }: PlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const savedOnProgress = useRef(onProgress);
   const savedOnEnded = useRef(onEnded);
-  savedOnProgress.current = onProgress;
-  savedOnEnded.current = onEnded;
+
+  // Keep latest callbacks without re-subscribing listeners on every render.
+  useEffect(() => {
+    savedOnProgress.current = onProgress;
+  }, [onProgress]);
+  useEffect(() => {
+    savedOnEnded.current = onEnded;
+  }, [onEnded]);
 
   // Mutable playback state - kept out of React state so ticks/messages
-  // don't cause re-renders.
-  const state = useRef<PlayerState>({ currentTime: 0, duration: 0, ended: false });
+  // don't cause re-renders. Starts at the resume point when provided.
+  const state = useRef<PlayerState>({ currentTime: startAt || 0, duration: 0, ended: false });
 
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval>>(null);
   const graceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -71,6 +82,8 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
       if (runtimeMinutes) {
         const runtimeSeconds = runtimeMinutes * 60;
         if (state.current.currentTime >= runtimeSeconds) markEnded();
+      } else if (state.current.currentTime >= FALLBACK_MAX_SECONDS) {
+        markEnded();
       }
     }, FALLBACK_POLL_MS);
   }, [runtimeMinutes, markEnded]);
@@ -145,7 +158,7 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
 
   // --- reset state + arm grace period whenever the video changes ---
   useEffect(() => {
-    state.current = { currentTime: 0, duration: 0, ended: false };
+    state.current = { currentTime: startAt || 0, duration: 0, ended: false };
     clearFallbackTimers();
 
     // Give the embed a window to start sending real events before
@@ -153,7 +166,7 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
     graceTimerRef.current = setTimeout(startWallClockFallback, POSTMESSAGE_GRACE_MS);
 
     return clearFallbackTimers;
-  }, [src, clearFallbackTimers, startWallClockFallback]);
+  }, [src, startAt, clearFallbackTimers, startWallClockFallback]);
 
   return (
     <div className={styles.playerWrapper}>
