@@ -1,12 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
-import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
-import type { TMDBMovie, TMDBSeries, ContinueWatchingItem, TMDBGenre, TMDBCountry, FilterOption } from '../types';
+import { useAuth } from '../hooks/useAuth';
+import type { TMDBMovie, TMDBSeries, ContinueWatchingItem } from '../types';
 import styles from './Home.module.css';
 
 function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void }) {
@@ -52,7 +52,6 @@ export default function Home() {
   const [heroIdx, setHeroIdx] = useState(0);
   const [cwFilter, setCwFilter] = useState<string>('all');
   const [heroPaused, setHeroPaused] = useState(false);
-  const heroRef = useRef<HTMLElement>(null);
   const toast = useToast();
   const { getSignal } = useAbortController();
   const { isAuthenticated, syncVersion } = useAuth();
@@ -113,11 +112,12 @@ export default function Home() {
     <div className="page">
       <section
         className={styles.hero}
-        ref={heroRef}
         onMouseEnter={() => setHeroPaused(true)}
         onMouseLeave={() => setHeroPaused(false)}
         onFocus={() => setHeroPaused(true)}
         onBlur={() => setHeroPaused(false)}
+        onTouchStart={() => setHeroPaused(true)}
+        onTouchEnd={() => setHeroPaused(false)}
       >
         <div className={styles.heroBackdrop}>
           {hero ? (
@@ -155,12 +155,11 @@ export default function Home() {
                 &#9654; Play
               </Link>
             </div>
-            <div className={styles.heroDots} role="tablist" aria-label="Featured items">
+            <div className={styles.heroDots} aria-label="Featured items">
               {heroItems.map((_, i) => (
                 <button
                   key={i}
-                  role="tab"
-                  aria-selected={i === heroIdx}
+                  aria-pressed={i === heroIdx}
                   className={`${styles.heroDot} ${i === heroIdx ? styles.active : ''}`}
                   onClick={() => setHeroIdx(i)}
                   aria-label={`Show item ${i + 1}`}
@@ -175,12 +174,11 @@ export default function Home() {
         <section className="section">
           <div className="section-header">
             <h2 className="section-title">Continue Watching</h2>
-            <div className={styles.cwToggles} role="tablist" aria-label="Filter by type">
+            <div className={styles.cwToggles} aria-label="Filter by type">
               {CW_TABS.map((t) => (
                 <button
                   key={t.key}
-                  role="tab"
-                  aria-selected={cwFilter === t.key}
+                  aria-pressed={cwFilter === t.key}
                   className={`${styles.cwToggle} ${cwFilter === t.key ? styles.active : ''}`}
                   onClick={() => setCwFilter(t.key)}
                 >
@@ -196,7 +194,7 @@ export default function Home() {
               ))}
             </div>
           ) : (
-            <div className="loading" role="status">Nothing in this category</div>
+            <div className={styles.cwEmpty}>Nothing in this category</div>
           )}
         </section>
       )}

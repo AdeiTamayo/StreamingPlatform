@@ -3,7 +3,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 100;
+  z-index: var(--z-nav);
   display: flex;
   justify-content: center;
   background: transparent;
@@ -90,8 +90,9 @@
   }
 }
 
-.active {
-  color: var(--accent) !important;
+.navIconBtn.active,
+.iconBtn.active {
+  color: var(--accent);
 }
 
 /* -----------------------------
@@ -278,7 +279,7 @@
     top: .75rem;
     left: .75rem;
 
-    z-index: 400;
+    z-index: var(--z-popover);
 
     width: 2.4rem;
     height: 2.4rem;
@@ -360,7 +361,7 @@
 
     inset: 0;
 
-    z-index: 300;
+    z-index: var(--z-overlay);
 
     background: rgba(0, 0, 0, .55);
 
@@ -399,7 +400,7 @@
     top: 0;
     left: 0;
 
-    z-index: 350;
+    z-index: var(--z-sidebar);
 
     width: min(85vw, 320px);
 

@@ -84,8 +84,8 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             onGenreChange={(value) => { setGenre(value); setPage(1); }}
             countryOptions={countryOptions}
             genreOptions={genreOptions}
-            hasActiveFilters={!!country || !!genre || !!year || !!sortBy || !!releaseDateFrom || !!releaseDateUntil}
-            onClearFilters={() => { setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setPage(1); }}
+            hasActiveFilters={!!query || !!country || !!genre || !!year || !!sortBy || !!releaseDateFrom || !!releaseDateUntil}
+            onClearFilters={() => { setQuery(''); setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setPage(1); }}
           />
         </div>
         {showMore && (
@@ -121,7 +121,7 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             {totalPages > 1 && (
               <div className="pagination">
                 <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-                <span>Page {page}</span>
+                <span>Page {page} of {totalPages}</span>
                 <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
               </div>
             )}

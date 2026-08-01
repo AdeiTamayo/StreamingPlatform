@@ -57,7 +57,7 @@
   position: absolute;
   top: calc(100% + 0.45rem);
   left: 0;
-  z-index: 70;
+  z-index: var(--z-popover);
   width: 292px;
   padding: 0.85rem;
   border: 1px solid var(--border-strong);

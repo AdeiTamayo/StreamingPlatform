@@ -74,7 +74,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: 199;
+  z-index: var(--z-notif-overlay);
   background: rgba(0, 0, 0, 0.15);
   animation: overlayIn 0.18s ease both;
 }
@@ -83,7 +83,7 @@
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  z-index: 200;
+  z-index: var(--z-notif);
   width: 300px;
   max-height: min(72vh, 560px);
   background: linear-gradient(180deg, rgba(18, 26, 42, 0.98), rgba(12, 18, 30, 0.98));

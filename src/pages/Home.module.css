@@ -297,6 +297,15 @@
   margin-top: 0.15rem;
 }
 
+.cw-empty {
+  padding: 1.5rem 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
 @media (max-width: 768px) {
   .hero-content {
     padding: 1.25rem 1.25rem 1rem;

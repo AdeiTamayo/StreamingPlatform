@@ -11,6 +11,7 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const fetchRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const requestIdRef = useRef(0);
   const fetchFnRef = useRef<FetchFn>(fetchFn);
   fetchFnRef.current = fetchFn;
   const { getSignal } = useAbortController();
@@ -23,29 +24,35 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
     if (filterKey !== prevFilterKey.current) {
       prevFilterKey.current = filterKey;
       setPage(1);
-      return;
     }
   }, [filterKey]);
 
   useEffect(() => {
     if (fetchRef.current) clearTimeout(fetchRef.current);
-    const immediate = !query?.trim();
-    if (immediate) setLoading(true);
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setError(false);
+    // Abort any still-in-flight request immediately so a slow old-filter
+    // response can never overwrite the newer results.
+    getSignal();
     fetchRef.current = setTimeout(() => {
-      setError(false);
       fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil }, getSignal())
         .then((data) => {
+          if (requestId !== requestIdRef.current) return;
           setResults(data.results || []);
           setTotalPages(data.total_pages || 1);
         })
         .catch((err: Error) => {
           if (err?.name === 'AbortError') return;
+          if (requestId !== requestIdRef.current) return;
           setError(true);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (requestId === requestIdRef.current) setLoading(false);
+        });
     }, query?.trim() ? 400 : 0);
     return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
-  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, getSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { results, page, setPage, totalPages, loading, error };
 }
