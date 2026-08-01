@@ -35,6 +35,29 @@
   pointer-events: none;
 }
 
+.hero-search-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(10, 16, 28, 0.9);
+  color: #fff;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s, transform 0.2s;
+}
+
+.hero-search-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
+}
+
 .hero-content {
   position: absolute;
   bottom: 20%;
@@ -310,6 +333,10 @@
   .hero-content {
     padding: 1.25rem 1.25rem 1rem;
     max-width: 100%;
+  }
+
+  .hero-search-btn {
+    display: flex;
   }
 
   .hero-overview {

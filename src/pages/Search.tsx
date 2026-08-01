@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
@@ -16,6 +16,8 @@ const TABS: { key: string; label: string }[] = [
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const [input, setInput] = useState(query);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState('all');
   const [results, setResults] = useState<(TMDBMovie | TMDBSeries)[]>([]);
   const [page, setPage] = useState(1);
@@ -58,6 +60,20 @@ export default function Search() {
     }
   }, [query]);
 
+  useEffect(() => { setInput(query); }, [query]);
+
+  useEffect(() => {
+    if (!query.trim()) {
+      inputRef.current?.focus();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const q = input.trim();
+    setSearchParams(q ? { q } : {});
+  }
+
   function handleHistoryClick(q: string) {
     setSearchParams({ q });
   }
@@ -71,6 +87,18 @@ export default function Search() {
     <div className="page">
       <section className="section">
         <h2 className="section-title">{query ? `Search Results for "${query}"` : 'Search'}</h2>
+        <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
+          <input
+            ref={inputRef}
+            type="search"
+            className={styles.searchInput}
+            placeholder="Search movies, TV shows..."
+            aria-label="Search"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+          />
+          <button type="submit" className={styles.searchSubmitBtn}>Search</button>
+        </form>
         <div className={styles.searchTabs} aria-label="Search categories">
           {TABS.map((t) => (
             <button key={t.key} aria-pressed={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>

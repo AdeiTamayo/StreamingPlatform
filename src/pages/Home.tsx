@@ -136,6 +136,12 @@ export default function Home() {
             <div className={styles.heroPlaceholder} />
           )}
         </div>
+        <Link to="/search" className={styles.heroSearchBtn} aria-label="Search">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </Link>
         {hero && (
           <div className={styles.heroContent}>
             <span className={styles.heroBadge}>{(hero as unknown as { media_type?: string }).media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
