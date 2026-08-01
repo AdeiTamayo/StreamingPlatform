@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
@@ -15,6 +15,14 @@ import styles from './MovieDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
+function formatResume(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
@@ -29,31 +37,32 @@ export default function MovieDetail() {
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
+  const lastTimeRef = useRef<number | null>(null);
   const { getSignal } = useAbortController();
   const { isAuthenticated, syncVersion } = useAuth();
 
-  useEffect(() => {
+  const refreshFromStorage = useCallback(() => {
     if (!id) return;
     setWatched(isWatched('movie', id));
     setInWL(isInWatchLater('movie', id));
     const prog = getProgress('movie', id);
     setStartAt(prog?.currentTime || null);
     watchedRef.current = isWatched('movie', id);
-  }, [isAuthenticated, syncVersion, id]);
+  }, [id]);
+
+  useEffect(() => {
+    refreshFromStorage();
+  }, [isAuthenticated, syncVersion, refreshFromStorage]);
 
   useEffect(() => {
     if (!id) return;
     setLoading(true);
     setError(false);
-    setWatched(isWatched('movie', id));
-    setInWL(isInWatchLater('movie', id));
-    const prog = getProgress('movie', id);
-    setStartAt(prog?.currentTime || null);
-    watchedRef.current = isWatched('movie', id);
+    refreshFromStorage();
     autoWatchedRef.current = false;
     setTrailerKey(null);
     setShowTrailer(false);
-    getMovieDetail(id!, getSignal())
+    getMovieDetail(id, getSignal())
       .then((data) => {
         setMovie(data as TMDBMovie);
         document.title = `${(data as TMDBMovie).title} - StreamFlow`;
@@ -66,9 +75,11 @@ export default function MovieDetail() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, refreshFromStorage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const safeId = id!;
+  if (!id) return <div className="page"><div className="loading">Movie not found</div></div>;
+
+  const safeId = id;
 
   function autoMarkWatched() {
     if (!movie || watchedRef.current || autoWatchedRef.current) return;
@@ -81,8 +92,9 @@ export default function MovieDetail() {
   }
 
   function handleProgress(currentTime: number, duration: number) {
+    lastTimeRef.current = currentTime;
     if (watchedRef.current || !movie) return;
-    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path });
+    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path }, duration || undefined);
     const tmdbRuntime = movie.runtime || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
@@ -114,6 +126,18 @@ export default function MovieDetail() {
     }
   }
 
+  function toggleWatchLater() {
+    if (inWL) {
+      removeWatchLater('movie', safeId);
+      setInWL(false);
+      toast?.('Removed from Watch Later');
+    } else if (movie) {
+      addWatchLater('movie', safeId, movie.title, (movie.release_date || '').slice(0, 4), imageUrl(movie.poster_path));
+      setInWL(true);
+      toast?.('Added to Watch Later');
+    }
+  }
+
   function retry() {
     if (!id) return;
     setLoading(true);
@@ -131,7 +155,7 @@ export default function MovieDetail() {
   );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
-  const embedUrl = getMovieEmbedUrl(safeId, videoSource);
+  const embedUrl = getMovieEmbedUrl(safeId, videoSource, startAt ?? undefined);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
   const cast: TMDBCastMember[] = movie.credits?.cast?.slice(0, 8) || [];
@@ -154,7 +178,7 @@ export default function MovieDetail() {
               <span className="badge rating">{movie.vote_average?.toFixed(1)}</span>
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{movie.runtime} min</span>
-              {startAt && <span className="badge resume-badge">Resume at {Math.floor(startAt / 60)}:{String(Math.floor(startAt % 60)).padStart(2, '0')}</span>}
+              {startAt && <span className="badge resume-badge">Resume at {formatResume(startAt)}</span>}
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (
@@ -178,10 +202,7 @@ export default function MovieDetail() {
           <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
             {watched ? 'Watched' : 'Mark as watched'}
           </button>
-          <button className={`watch-toggle ${inWL ? 'in-wl' : ''}`} onClick={() => {
-            if (inWL) { removeWatchLater('movie', safeId); setInWL(false); }
-            else { addWatchLater('movie', safeId, movie.title, year, imageUrl(movie.poster_path)); setInWL(true); }
-          }}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
+          <button className={`watch-toggle ${inWL ? 'in-wl' : ''}`} onClick={toggleWatchLater}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
           {trailerKey && (
             <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
               {showTrailer ? 'Hide Trailer' : 'Trailer'}
@@ -193,7 +214,7 @@ export default function MovieDetail() {
             </button>
           )}
         </div>
-        {showTrailer && trailerKey && (
+        {showTrailer && trailerKey ? (
           <div className="trailer-wrapper">
             <iframe
               src={`https://www.youtube.com/embed/${trailerKey}`}
@@ -203,9 +224,18 @@ export default function MovieDetail() {
               className="player-iframe"
             />
           </div>
-        )}
-        {!showTrailer && (
-          <Player key={startAt !== null ? 'resume' : 'fresh'} src={embedUrl} title={movie.title} onProgress={handleProgress} onEnded={handleEnded} runtimeMinutes={movie.runtime ?? null} />
+        ) : (
+          // startAt restores the last known position when returning from the
+          // trailer, instead of restarting the film at 0:00 mid-watch.
+          <Player
+            key={startAt !== null ? 'resume' : 'fresh'}
+            src={embedUrl}
+            title={movie.title}
+            onProgress={handleProgress}
+            onEnded={handleEnded}
+            runtimeMinutes={movie.runtime ?? null}
+            startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
+          />
         )}
         <div className={styles.sourceSelector}>
           <FilterDropdown

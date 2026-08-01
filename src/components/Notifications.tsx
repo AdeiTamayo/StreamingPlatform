@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, useId, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
 import type { NotificationItem } from '../types';
@@ -29,6 +29,9 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   const [unreadCount, setUnreadCount] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
+  const panelTitleId = useId();
+  const panelId = useId();
 
   function load() {
     const list: NotificationItem[] = getNotifications();
@@ -48,12 +51,12 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     function handleClick(e: MouseEvent) {
       if (panelRef.current && !panelRef.current.contains(e.target as Node) &&
         btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        closePanel();
       }
     }
 
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') closePanel();
     }
 
     document.addEventListener('mousedown', handleClick);
@@ -62,6 +65,19 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('keydown', handleKeyDown);
     };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Move focus into the panel on open; restore it to the bell on close.
+  useEffect(() => {
+    if (open) {
+      wasOpenRef.current = true;
+      const t = setTimeout(() => panelRef.current?.focus(), 0);
+      return () => clearTimeout(t);
+    }
+    if (wasOpenRef.current) {
+      wasOpenRef.current = false;
+      btnRef.current?.focus();
+    }
   }, [open]);
 
   function handleRemove(id: string) {
@@ -80,11 +96,15 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   }
 
   function handleToggle() {
-    const next = !open;
-    setOpen(next);
-    if (next) {
-      handleMarkAllRead();
-    }
+    setOpen((previous) => !previous);
+  }
+
+  // Unread items are marked as read when the panel closes, so the unread
+  // highlight survives long enough to actually be seen.
+  function closePanel() {
+    if (!open) return;
+    handleMarkAllRead();
+    setOpen(false);
   }
 
   return (
@@ -96,7 +116,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-controls="notifications-panel"
+        aria-controls={panelId}
       >
         <span className={styles.bellIcon}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -108,11 +128,11 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
       </button>
       {open && (
         <>
-          <div className={styles.overlay} onClick={() => setOpen(false)} />
-          <div ref={panelRef} id="notifications-panel" className={styles.panel} role="dialog" aria-label="Notifications panel">
+          <div className={styles.overlay} onClick={closePanel} aria-hidden="true" />
+          <div ref={panelRef} id={panelId} className={styles.panel} role="dialog" aria-labelledby={panelTitleId} tabIndex={-1}>
             <div className={styles.header}>
               <div className={styles.headerCopy}>
-                <h3 className={styles.headerTitle}>Notifications</h3>
+                <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
                 <p className={styles.headerSubtitle}>
                   {notifications.length === 0
                     ? 'You will see episode alerts here.'
@@ -157,7 +177,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
                       <Link
                         to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
                         className={styles.openBtn}
-                        onClick={() => setOpen(false)}
+                        onClick={closePanel}
                       >
                         Open
                       </Link>

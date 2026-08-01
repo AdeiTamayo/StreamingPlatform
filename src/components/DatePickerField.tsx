@@ -85,24 +85,30 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
 
     return (
         <div className={styles.datePicker} ref={ref}>
-            <button className={styles.datePickerTrigger} onClick={openPicker}>
+            <button
+                className={styles.datePickerTrigger}
+                onClick={openPicker}
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                aria-label={`${label}: ${value || placeholder}`}
+            >
                 <span className={styles.datePickerInlineLabel}>{label}</span>
                 <span className={`${styles.datePickerValue} ${value ? '' : styles.empty}`}>{value || placeholder}</span>
-                <span className={styles.datePickerIcon}>&#128197;</span>
+                <span className={styles.datePickerIcon} aria-hidden="true">&#128197;</span>
             </button>
             {open && (
-                <div className={styles.datePickerPopover}>
+                <div className={styles.datePickerPopover} role="dialog" aria-label={`${label} picker`}>
                     {view === 'day' && (
                         <>
                             <div className={styles.datePickerHeader}>
-                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))}>&#10094;</button>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))} aria-label="Previous month">&#10094;</button>
                                 <button className={styles.datePickerMonth} onClick={() => setView('month')}>
                                     {viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
                                 </button>
-                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))}>&#10095;</button>
+                                <button className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))} aria-label="Next month">&#10095;</button>
                             </div>
-                            <div className={styles.datePickerWeekdays}>
-                                {WEEKDAYS.map((weekday) => <span key={weekday}>{weekday}</span>)}
+                            <div className={styles.datePickerWeekdays} aria-hidden="true">
+                                {WEEKDAYS.map((weekday, i) => <span key={`${weekday}-${i}`}>{weekday}</span>)}
                             </div>
                             <div className={styles.datePickerGrid}>
                                 {monthCells.map((day, index) => {
@@ -115,6 +121,8 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                                             key={dayString}
                                             className={`${styles.datePickerCell} ${isSelected ? styles.selected : ''} ${isToday ? styles.today : ''}`}
                                             onClick={() => selectDate(day)}
+                                            aria-pressed={!!isSelected}
+                                            aria-label={`${MONTHS[day.getMonth()]} ${day.getDate()}, ${day.getFullYear()}`}
                                         >
                                             {day.getDate()}
                                         </button>

@@ -27,14 +27,19 @@ function sleep(ms: number): Promise<void> {
 
 function calculateDelay(attempt: number, baseDelayMs: number, maxDelayMs: number): number {
   const delay = baseDelayMs * Math.pow(2, attempt - 1);
-  return Math.min(delay, maxDelayMs);
+  const capped = Math.min(delay, maxDelayMs);
+  // Add +/-25% jitter so retrying clients don't all fire in lockstep.
+  const jitter = 0.75 + Math.random() * 0.5;
+  return Math.round(capped * jitter);
 }
 
 export async function withRetry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {},
 ): Promise<T> {
-  const { maxAttempts, baseDelayMs, maxDelayMs } = { ...DEFAULT_OPTIONS, ...options };
+  const maxAttempts = Math.min(Math.max(1, Math.floor(options.maxAttempts ?? DEFAULT_OPTIONS.maxAttempts)), 10);
+  const baseDelayMs = options.baseDelayMs ?? DEFAULT_OPTIONS.baseDelayMs;
+  const maxDelayMs = options.maxDelayMs ?? DEFAULT_OPTIONS.maxDelayMs;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {

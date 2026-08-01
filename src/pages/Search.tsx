@@ -70,10 +70,10 @@ export default function Search() {
   return (
     <div className="page">
       <section className="section">
-        <h2 className="section-title">Search Results for "{query}"</h2>
-        <div className={styles.searchTabs} role="tablist" aria-label="Search categories">
+        <h2 className="section-title">{query ? `Search Results for "${query}"` : 'Search'}</h2>
+        <div className={styles.searchTabs} aria-label="Search categories">
           {TABS.map((t) => (
-            <button key={t.key} role="tab" aria-selected={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
+            <button key={t.key} aria-pressed={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
         {!query && history.length > 0 && (

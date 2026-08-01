@@ -180,13 +180,6 @@
   border-color: rgba(239, 68, 68, 0.3);
 }
 
-.last-seen-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
-}
-
 .last-seen-view-btn {
   flex-shrink: 0;
   padding: 0.2rem 0.5rem;
@@ -199,6 +192,23 @@
   cursor: pointer;
   transition: background 0.2s;
   line-height: 1.2;
+}
+
+.last-seen-card {
+  position: relative;
+}
+
+.last-seen-card-link {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.last-seen-card .last-seen-view-btn {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  min-height: 28px;
 }
 
 .last-seen-view-btn:hover {

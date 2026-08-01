@@ -59,7 +59,10 @@ const Navbar = memo(function Navbar() {
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searchBtnRef = useRef<HTMLButtonElement | null>(null);
   const goBtnRef = useRef<HTMLButtonElement | null>(null);
+  const hamburgerRef = useRef<HTMLButtonElement | null>(null);
+  const firstSidebarLinkRef = useRef<HTMLAnchorElement | null>(null);
   const lastScrollRef = useRef(0);
+  const wasMenuOpenRef = useRef(false);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,6 +76,10 @@ const Navbar = memo(function Navbar() {
   function isActive(path: string) {
     if (path === '/') {
       return location.pathname === '/';
+    }
+
+    if (path === '/movies' && location.pathname.startsWith('/movie/')) {
+      return true;
     }
 
     return location.pathname.startsWith(path);
@@ -136,6 +143,27 @@ const Navbar = memo(function Navbar() {
     return () => {
       document.body.classList.remove('sidebar-open');
     };
+  }, [menuOpen]);
+
+  // Focus the first sidebar link on open, restore focus to the hamburger
+  // on close (skipped on first render so the button isn't focused on load).
+  useEffect(() => {
+    if (menuOpen) {
+      wasMenuOpenRef.current = true;
+      firstSidebarLinkRef.current?.focus();
+    } else if (wasMenuOpenRef.current) {
+      wasMenuOpenRef.current = false;
+      hamburgerRef.current?.focus();
+    }
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMenuOpen(false);
+    }
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, [menuOpen]);
 
   useEffect(() => {
@@ -264,6 +292,7 @@ const Navbar = memo(function Navbar() {
               ref={searchRef}
               type="text"
               placeholder="Search... (/)"
+              aria-label="Search"
               value={query}
               onChange={(e) =>
                 setQuery(e.target.value)
@@ -348,11 +377,14 @@ const Navbar = memo(function Navbar() {
       </nav>
 
       <button
+        ref={hamburgerRef}
         className={styles.sidebarHamburger}
         onClick={() =>
           setMenuOpen((previous) => !previous)
         }
         aria-label="Toggle menu"
+        aria-expanded={menuOpen}
+        aria-controls="sidebar-menu"
       >
         <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
         <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
@@ -363,10 +395,12 @@ const Navbar = memo(function Navbar() {
         <div
           className={styles.sidebarOverlay}
           onClick={() => setMenuOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       <aside
+        id="sidebar-menu"
         className={[
           styles.sidebar,
           menuOpen
@@ -374,12 +408,15 @@ const Navbar = memo(function Navbar() {
             : '',
         ].join(' ')}
         ref={sidebarRef}
+        inert={!menuOpen}
+        aria-label="Sidebar navigation"
       >
         <nav className={styles.sidebarNav}>
           {PUBLIC_NAV_ITEMS.map((item, index) => (
             <Link
               key={item.to}
               to={item.to}
+              ref={index === 0 ? firstSidebarLinkRef : undefined}
               className={[
                 styles.sidebarLink,
                 isActive(item.to)
@@ -488,6 +525,7 @@ const Navbar = memo(function Navbar() {
           <input
             type="text"
             placeholder="Search..."
+            aria-label="Search"
             value={query}
             onChange={(e) =>
               setQuery(e.target.value)

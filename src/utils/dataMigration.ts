@@ -5,6 +5,21 @@ import { progressRepository } from '../repositories/progressRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { notificationRepository } from '../repositories/notificationRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
+import { logError } from './logger';
+import {
+  watchedKey,
+  progressKey,
+  WL_KEY,
+  EP_WL_PREFIX,
+  EP_WL_INDEX_KEY,
+  SEARCH_HISTORY_KEY,
+  NOTIFICATIONS_KEY,
+  WATCHED_INDEX_KEY,
+  PROGRESS_INDEX_KEY,
+  NOTIFICATIONS_MAX,
+  SEARCH_HISTORY_MAX,
+  LOCAL_DATA_KEYS,
+} from '../api/storage';
 
 const MIGRATION_FLAG_KEY = 'supabase_data_migrated';
 
@@ -126,7 +141,7 @@ function getLegacyWatchLater(): Array<{
   }> = [];
 
   try {
-    const raw = localStorage.getItem('watchlater');
+    const raw = localStorage.getItem(WL_KEY);
     if (raw) {
       const list = JSON.parse(raw);
       if (Array.isArray(list)) {
@@ -150,7 +165,7 @@ function getLegacyWatchLater(): Array<{
 
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (!k || !k.startsWith('epwl:')) continue;
+    if (!k || !k.startsWith(EP_WL_PREFIX)) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}');
       items.push({
@@ -193,7 +208,7 @@ function getLegacyNotifications(): Array<{
   }> = [];
 
   try {
-    const raw = localStorage.getItem('notifications');
+    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
     if (raw) {
       const list = JSON.parse(raw);
       if (Array.isArray(list)) {
@@ -220,7 +235,7 @@ function getLegacyNotifications(): Array<{
 
 function getLegacySearchHistory(): string[] {
   try {
-    const raw = localStorage.getItem('search_history');
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
     if (raw) {
       const list = JSON.parse(raw);
       if (Array.isArray(list)) return list;
@@ -235,16 +250,7 @@ function clearLegacyData(): void {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && (
-      k.startsWith('watched:') ||
-      k.startsWith('progress:') ||
-      k === 'watchlater' ||
-      k.startsWith('epwl:') ||
-      k === 'search_history' ||
-      k === 'notifications' ||
-      k === 'watched_index' ||
-      k === 'progress_index'
-    )) {
+    if (k && LOCAL_DATA_KEYS.some((prefix) => k === prefix || k.startsWith(prefix))) {
       keysToRemove.push(k);
     }
   }
@@ -254,6 +260,19 @@ function clearLegacyData(): void {
 function setLocalWatchedKey(key: string, data: Record<string, unknown>): void {
   localStorage.setItem(key, JSON.stringify(data));
 }
+
+function mergeIntoIndex(indexKey: string, prefix: string, newKeys: string[]): void {
+  const existing: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(prefix)) existing.push(k);
+  }
+  localStorage.setItem(indexKey, JSON.stringify([...new Set([...existing, ...newKeys])]));
+}
+
+// Merge semantics for downloadSupabaseData: the server snapshot must never
+// overwrite entries created locally while signed out. Each section writes
+// only what is missing locally, then merges the indices.
 
 async function downloadSupabaseData(userId: string): Promise<void> {
   const [watchedRows, progressRows, wlRows, notifRows, searchRows] = await Promise.all([
@@ -267,43 +286,45 @@ async function downloadSupabaseData(userId: string): Promise<void> {
   if (watchedRows.length > 0) {
     const watchedIndex: string[] = [];
     for (const row of watchedRows) {
-      const key = row.media_type === 'movie'
-        ? `watched:movie-${row.tmdb_id}`
-        : `watched:tv-${row.tmdb_id}-S${row.season}E${row.episode}`;
-      watchedIndex.push(key);
-      setLocalWatchedKey(key, {
-        type: row.media_type,
-        id: row.tmdb_id,
-        title: row.title,
-        season: row.season ?? undefined,
-        episode: row.episode ?? undefined,
-        watchedAt: new Date(row.watched_at).getTime(),
-        meta: row.meta ?? undefined,
-      });
+      const key = watchedKey(row.media_type, row.tmdb_id, row.season, row.episode);
+      if (!localStorage.getItem(key)) {
+        setLocalWatchedKey(key, {
+          type: row.media_type,
+          id: row.tmdb_id,
+          title: row.title,
+          season: row.season ?? undefined,
+          episode: row.episode ?? undefined,
+          watchedAt: new Date(row.watched_at).getTime(),
+          meta: row.meta ?? undefined,
+        });
+        watchedIndex.push(key);
+      }
     }
-    localStorage.setItem('watched_index', JSON.stringify(watchedIndex));
+    if (watchedIndex.length > 0) mergeIntoIndex(WATCHED_INDEX_KEY, 'watched:', watchedIndex);
   }
 
   if (progressRows.length > 0) {
     const progressIndex: string[] = [];
     for (const row of progressRows) {
-      const key = row.media_type === 'movie'
-        ? `progress:movie-${row.tmdb_id}`
-        : `progress:tv-${row.tmdb_id}-S${row.season}E${row.episode}`;
-      progressIndex.push(key);
-      localStorage.setItem(key, JSON.stringify({
-        type: row.media_type,
-        id: row.tmdb_id,
-        currentTime: row.current_time,
-        savedAt: new Date(row.updated_at).getTime(),
-        season: row.season ?? undefined,
-        episode: row.episode ?? undefined,
-      }));
+      const key = progressKey(row.media_type, row.tmdb_id, row.season, row.episode);
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, JSON.stringify({
+          type: row.media_type,
+          id: row.tmdb_id,
+          currentTime: row.current_time,
+          savedAt: new Date(row.updated_at).getTime(),
+          season: row.season ?? undefined,
+          episode: row.episode ?? undefined,
+          duration: row.duration ?? undefined,
+        }));
+        progressIndex.push(key);
+      }
     }
-    localStorage.setItem('progress_index', JSON.stringify(progressIndex));
+    if (progressIndex.length > 0) mergeIntoIndex(PROGRESS_INDEX_KEY, 'progress:', progressIndex);
   }
 
   if (wlRows.length > 0) {
+    const existingItems = getLegacyWatchLaterRaw();
     const items = wlRows
       .filter((r) => r.season == null && r.episode == null)
       .map((r) => ({
@@ -314,42 +335,104 @@ async function downloadSupabaseData(userId: string): Promise<void> {
         poster: r.poster || '',
         addedAt: new Date(r.created_at).getTime(),
       }));
-    localStorage.setItem('watchlater', JSON.stringify(items));
+
+    const merged = [...existingItems];
+    for (const item of items) {
+      const exists = merged.some((m) => m.type === item.type && String(m.id) === String(item.id));
+      if (!exists) merged.push(item);
+    }
+    localStorage.setItem(WL_KEY, JSON.stringify(merged));
 
     for (const row of wlRows) {
       if (row.season != null && row.episode != null) {
-        const key = `epwl:${row.tmdb_id}-S${row.season}E${row.episode}`;
-        localStorage.setItem(key, JSON.stringify({
-          showId: row.tmdb_id,
-          season: row.season,
-          episode: row.episode,
-          showTitle: row.title,
-          addedAt: new Date(row.created_at).getTime(),
-        }));
+        const key = `${EP_WL_PREFIX}${row.tmdb_id}-S${row.season}E${row.episode}`;
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, JSON.stringify({
+            showId: row.tmdb_id,
+            season: row.season,
+            episode: row.episode,
+            showTitle: row.title,
+            addedAt: new Date(row.created_at).getTime(),
+          }));
+          addToEpwlIndex(key);
+        }
       }
     }
   }
 
   if (notifRows.length > 0) {
-    const items = notifRows.map((r) => ({
-      id: `n-${new Date(r.created_at).getTime()}-${Math.random().toString(36).slice(2, 8)}`,
-      showId: String(r.tmdb_id ?? ''),
-      showTitle: r.title,
-      season: r.season ?? 0,
-      episode: r.episode ?? 0,
-      episodeTitle: r.message || null,
-      type: 'new_episode',
-      airDate: null,
-      createdAt: new Date(r.created_at).getTime(),
-      read: r.read,
-    }));
-    localStorage.setItem('notifications', JSON.stringify(items));
+    const existing = getLegacyNotificationsRaw();
+    const existingKeys = new Set(existing.map((n) => `${n.showId}-${n.season}-${n.episode}`));
+    for (const r of notifRows) {
+      const key = `${r.tmdb_id}-${r.season}-${r.episode}`;
+      if (existingKeys.has(key)) continue;
+      existing.push({
+        id: `n-${new Date(r.created_at).getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+        showId: String(r.tmdb_id ?? ''),
+        showTitle: r.title,
+        season: r.season ?? 0,
+        episode: r.episode ?? 0,
+        episodeTitle: r.message || null,
+        type: 'new_episode',
+        airDate: null,
+        createdAt: new Date(r.created_at).getTime(),
+        read: r.read,
+      });
+    }
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(existing.slice(0, NOTIFICATIONS_MAX)));
   }
 
   if (searchRows.length > 0) {
-    const queries = searchRows.map((r) => r.query);
-    localStorage.setItem('search_history', JSON.stringify(queries));
+    const merged = [...getLegacySearchHistory()];
+    for (const r of searchRows) {
+      if (!merged.some((q) => q.toLowerCase() === r.query.toLowerCase())) {
+        merged.push(r.query);
+      }
+    }
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(merged.slice(0, SEARCH_HISTORY_MAX)));
   }
+}
+
+function getLegacyWatchLaterRaw(): Array<{ type: MediaType; id: number | string; title: string; year: string; poster: string; addedAt: number }> {
+  try {
+    const raw = localStorage.getItem(WL_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list;
+    }
+  } catch {}
+  return [];
+}
+
+function getLegacyNotificationsRaw(): Array<{
+  id: string;
+  showId: string;
+  showTitle: string;
+  season: number;
+  episode: number;
+  episodeTitle: string | null;
+  type: string;
+  airDate: string | null;
+  createdAt: number;
+  read: boolean;
+}> {
+  try {
+    const raw = localStorage.getItem(NOTIFICATIONS_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list;
+    }
+  } catch {}
+  return [];
+}
+
+function addToEpwlIndex(key: string): void {
+  const index: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith(EP_WL_PREFIX)) index.push(k);
+  }
+  localStorage.setItem(EP_WL_INDEX_KEY, JSON.stringify([...new Set([...index, key])]));
 }
 
 export const dataMigration = {
@@ -360,73 +443,101 @@ export const dataMigration = {
     }
 
     let hasData = false;
+    let failed = false;
 
     const watchedItems = getLegacyWatched();
     if (watchedItems.length > 0) {
       hasData = true;
-      const batch = watchedItems.map((item) => ({ ...item, user_id: userId }));
-      await watchedRepository.markBatch(batch);
+      try {
+        const batch = watchedItems.map((item) => ({ ...item, user_id: userId }));
+        await watchedRepository.markBatch(batch);
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.watched', err);
+      }
     }
 
     const progressItems = getLegacyProgress();
     if (progressItems.length > 0) {
       hasData = true;
-      for (const item of progressItems) {
-        await progressRepository.save({
-          user_id: userId,
-          media_type: item.media_type,
-          tmdb_id: item.tmdb_id,
-          season: item.season,
-          episode: item.episode,
-          current_time: item.current_time,
-          meta: item.meta as any,
-        });
+      try {
+        for (const item of progressItems) {
+          await progressRepository.save({
+            user_id: userId,
+            media_type: item.media_type,
+            tmdb_id: item.tmdb_id,
+            season: item.season,
+            episode: item.episode,
+            current_time: item.current_time,
+            meta: item.meta as any,
+          });
+        }
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.progress', err);
       }
     }
 
     const wlItems = getLegacyWatchLater();
     if (wlItems.length > 0) {
       hasData = true;
-      for (const item of wlItems) {
-        await watchLaterRepository.add({
-          user_id: userId,
-          media_type: item.media_type,
-          tmdb_id: item.tmdb_id,
-          title: item.title,
-          year: item.year,
-          poster: item.poster,
-          season: item.season,
-          episode: item.episode,
-        });
+      try {
+        for (const item of wlItems) {
+          await watchLaterRepository.add({
+            user_id: userId,
+            media_type: item.media_type,
+            tmdb_id: item.tmdb_id,
+            title: item.title,
+            year: item.year,
+            poster: item.poster,
+            season: item.season,
+            episode: item.episode,
+          });
+        }
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.watchLater', err);
       }
     }
 
     const notifItems = getLegacyNotifications();
     if (notifItems.length > 0) {
       hasData = true;
-      for (const item of notifItems) {
-        await notificationRepository.add({
-          user_id: userId,
-          title: item.title,
-          message: item.message,
-          media_type: item.media_type,
-          tmdb_id: item.tmdb_id,
-          season: item.season,
-          episode: item.episode,
-          read: item.read,
-        });
+      try {
+        for (const item of notifItems) {
+          await notificationRepository.add({
+            user_id: userId,
+            title: item.title,
+            message: item.message,
+            media_type: item.media_type,
+            tmdb_id: item.tmdb_id,
+            season: item.season,
+            episode: item.episode,
+            read: item.read,
+          });
+        }
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.notifications', err);
       }
     }
 
     const searchItems = getLegacySearchHistory();
     if (searchItems.length > 0) {
       hasData = true;
-      for (const query of searchItems) {
-        await searchHistoryRepository.add({ user_id: userId, query });
+      try {
+        for (const query of searchItems) {
+          await searchHistoryRepository.add({ user_id: userId, query });
+        }
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.searchHistory', err);
       }
     }
 
-    if (hasData) {
+    // Only clear local data and mark the flag when every section succeeded -
+    // otherwise the next login retries the incomplete sections.
+    if (hasData && !failed) {
       clearLegacyData();
     }
 
@@ -440,13 +551,5 @@ export const dataMigration = {
     } catch {
       // Silently fail - localStorage data will still be available
     }
-  },
-
-  hasMigrated(): boolean {
-    return localStorage.getItem(MIGRATION_FLAG_KEY) === 'true';
-  },
-
-  resetMigrationFlag(): void {
-    localStorage.removeItem(MIGRATION_FLAG_KEY);
   },
 };

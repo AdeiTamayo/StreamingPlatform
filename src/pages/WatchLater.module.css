@@ -511,41 +511,31 @@
 .posterRow {
   display: flex;
 
+  flex: 1;
+
+  min-height: 0;
+
   gap: 4px;
 
   flex-wrap: wrap;
+
+  align-items: center;
 
   justify-content: center;
 
   width: 100%;
 }
 
-/* Single release → bigger thumb centered in the cell */
-.pcount-1 .posterThumb,
-.pcount-1 .posterMore {
-  width: 52px;
-
-  height: 78px;
-}
-
-.pcount-2 .posterThumb,
-.pcount-2 .posterMore {
-  width: 40px;
-
-  height: 60px;
-}
-
-.pcount-3 .posterThumb,
-.pcount-3 .posterMore {
-  width: 32px;
-
-  height: 48px;
-}
-
+/* Thumbs scale with the day card: the poster row fills the cell below
+   the day number, and thumbs keep the 2:3 poster ratio. */
 .posterThumb {
-  width: 28px;
+  height: 100%;
 
-  height: 42px;
+  aspect-ratio: 2 / 3;
+
+  width: auto;
+
+  max-width: 46%;
 
   object-fit: cover;
 
@@ -572,9 +562,13 @@
 }
 
 .posterMore {
-  width: 28px;
+  height: 100%;
 
-  height: 42px;
+  aspect-ratio: 2 / 3;
+
+  width: auto;
+
+  max-width: 46%;
 
   display: flex;
 
@@ -591,6 +585,12 @@
   background: rgba(255, 255, 255, 0.06);
 
   color: var(--text-dim);
+}
+
+/* Three releases share the row width so they stay on one line */
+.pcount-3 .posterThumb,
+.pcount-3 .posterMore {
+  max-width: 32%;
 }
 
 .dayPanel {
@@ -1021,30 +1021,44 @@
   }
 
   .posterRow {
+    flex: none;
+
     gap: 3px;
   }
 
   .posterThumb {
     width: 26px;
+
     height: 39px;
+
+    max-width: none;
   }
 
   .pcount-1 .posterThumb,
   .pcount-1 .posterMore {
     width: 40px;
+
     height: 60px;
+
+    max-width: none;
   }
 
   .pcount-2 .posterThumb,
   .pcount-2 .posterMore {
     width: 30px;
+
     height: 45px;
+
+    max-width: none;
   }
 
   .pcount-3 .posterThumb,
   .pcount-3 .posterMore {
     width: 26px;
+
     height: 39px;
+
+    max-width: none;
   }
 
   .calendarCard,

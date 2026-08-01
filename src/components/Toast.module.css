@@ -3,7 +3,7 @@
   bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 999;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -21,7 +21,8 @@
   text-align: center;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   animation: toast-in 0.25s ease;
-  white-space: nowrap;
+  max-width: min(90vw, 420px);
+  overflow-wrap: break-word;
 }
 
 @keyframes toast-in {

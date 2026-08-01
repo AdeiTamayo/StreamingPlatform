@@ -22,6 +22,33 @@
   --green: #4ade80;
   --radius: 16px;
   --radius-sm: 12px;
+
+  /* z-index scale */
+  --z-nav: 100;
+  --z-notif-overlay: 199;
+  --z-notif: 200;
+  --z-overlay: 300;
+  --z-sidebar: 350;
+  --z-popover: 400;
+  --z-toast: 999;
+  --z-modal: 1000;
+}
+
+/* Light theme - opt in with <html data-theme="light"> */
+[data-theme='light'] {
+  --bg: #f2f5fa;
+  --bg-elevated: rgba(255, 255, 255, 0.94);
+  --bg-card: rgba(255, 255, 255, 0.95);
+  --bg-card-strong: #ffffff;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #64748b;
+  --border: rgba(15, 23, 42, 0.14);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --accent: #0284c7;
+  --accent-strong: #0369a1;
+  --accent-warm: #b45309;
+  --green: #16a34a;
 }
 
 html {

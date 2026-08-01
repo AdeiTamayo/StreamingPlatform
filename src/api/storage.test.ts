@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   isWatched, markWatched, markUnwatched,
   getWatchLater, addWatchLater, removeWatchLater, isInWatchLater,
@@ -48,14 +48,14 @@ describe('watched marks', () => {
 
 describe('getWatchedEpisodeSet', () => {
   it('returns empty set when nothing watched', () => {
-    expect(getWatchedEpisodeSet('tv', '1', 1)).toEqual(new Set());
+    expect(getWatchedEpisodeSet(1, 1)).toEqual(new Set());
   });
 
   it('returns set of watched episode numbers', () => {
     markWatched('tv', '1', 'Show', 1, 1);
     markWatched('tv', '1', 'Show', 1, 3);
     markWatched('tv', '1', 'Show', 1, 5);
-    const set = getWatchedEpisodeSet('tv', '1', 1);
+    const set = getWatchedEpisodeSet(1, 1);
     expect(set).toEqual(new Set([1, 3, 5]));
   });
 
@@ -63,21 +63,21 @@ describe('getWatchedEpisodeSet', () => {
     markWatched('tv', '1', 'Show', 1, 1);
     markWatched('tv', '1', 'Show', 2, 1);
     markWatched('tv', '1', 'Show', 2, 2);
-    const set = getWatchedEpisodeSet('tv', '1', 1);
+    const set = getWatchedEpisodeSet(1, 1);
     expect(set).toEqual(new Set([1]));
   });
 
   it('caps by episodeCount when provided', () => {
     markWatched('tv', '1', 'Show', 1, 5);
     markWatched('tv', '1', 'Show', 1, 10);
-    const set = getWatchedEpisodeSet('tv', '1', 1, 8);
+    const set = getWatchedEpisodeSet(1, 1, 8);
     expect(set).toEqual(new Set([5]));
   });
 
   it('does not include movie entries', () => {
     markWatched('movie', '1', 'Movie');
     markWatched('tv', '1', 'Show', 1, 1);
-    const set = getWatchedEpisodeSet('tv', '1', 1);
+    const set = getWatchedEpisodeSet(1, 1);
     expect(set).toEqual(new Set([1]));
   });
 });

@@ -26,23 +26,29 @@ import type {
 } from "../types";
 import styles from "./WatchLater.module.css";
 
+function parseLocalDate(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function isFuture(dateStr: string) {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   d.setHours(23, 59, 59, 999);
   return d >= new Date();
 }
 
+function todayLocal() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
   });
-}
-
-function shortTitle(title: string, max = 12) {
-  return title.length > max ? title.slice(0, max) + "\u2026" : title;
 }
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -101,7 +107,6 @@ export default function WatchLater() {
       try {
         const detail = await getTVDetail(showId, signal);
         if (!detail) return results;
-        const now = new Date();
         const nextEp = (detail as Record<string, unknown>)
           .next_episode_to_air as
           | {
@@ -124,12 +129,6 @@ export default function WatchLater() {
             !season.air_date &&
             !(nextEp && season.season_number === nextSeasonNumber)
           ) {
-            continue;
-          }
-          const seasonStart = season.air_date
-            ? new Date(season.air_date)
-            : null;
-          if (seasonStart && seasonStart > now) {
             continue;
           }
 
@@ -156,8 +155,9 @@ export default function WatchLater() {
                     title: (detail as Record<string, unknown>).name as string,
                     type: "episode",
                     id: showId,
-                    poster: (detail as Record<string, unknown>)
-                      .poster_path as string | undefined,
+                    poster: (detail as Record<string, unknown>).poster_path as
+                      | string
+                      | undefined,
                     season: season.season_number,
                     episode: ep.episode_number,
                     episodeTitle: ep.name,
@@ -182,8 +182,9 @@ export default function WatchLater() {
               title: detail.name,
               type: "episode",
               id: showId,
-              poster: (detail as Record<string, unknown>)
-                .poster_path as string | undefined,
+              poster: (detail as Record<string, unknown>).poster_path as
+                | string
+                | undefined,
               season: n.season_number,
               episode: n.episode_number,
               episodeTitle: n.name,
@@ -302,6 +303,10 @@ export default function WatchLater() {
     }
 
     deduped.sort((a, b) => a.date.localeCompare(b.date));
+    if (signal.aborted) {
+      setLoadingCalendar(false);
+      return;
+    }
     setCalendarItems(deduped);
     setLoadingCalendar(false);
   }, [fetchTVFutureEpisodes, fetchMovieRelease, getSignal]);
@@ -322,7 +327,7 @@ export default function WatchLater() {
         calendarItems[0]?.date
       ) {
         const firstDate = calendarItems[0].date;
-        const d = new Date(firstDate);
+        const d = parseLocalDate(firstDate);
         setCalYear(d.getFullYear());
         setCalMonth(d.getMonth());
         setSelectedDate(firstDate);
@@ -389,7 +394,7 @@ export default function WatchLater() {
     () => getMonthDays(calYear, calMonth),
     [calYear, calMonth],
   );
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayLocal();
 
   function dateStr(y: number, m: number, d: number | null) {
     if (d === null) return "";
@@ -430,6 +435,14 @@ export default function WatchLater() {
     if (upcomingPage >= totalPages)
       setUpcomingPage(Math.max(0, totalPages - 1));
   }, [totalPages, upcomingPage]);
+
+  useEffect(() => {
+    const listPages = Math.max(
+      1,
+      Math.ceil(sortedItems.length / ITEMS_PER_PAGE),
+    );
+    if (page > listPages) setPage(listPages);
+  }, [sortedItems.length, page]);
 
   if (view === "calendar") {
     const maxPosters = 3;
@@ -504,7 +517,7 @@ export default function WatchLater() {
                   setCalYear(now.getFullYear());
                   setCalMonth(now.getMonth());
 
-                  setSelectedDate(now.toISOString().slice(0, 10));
+                  setSelectedDate(todayLocal());
                 }}
               >
                 Today
@@ -521,7 +534,11 @@ export default function WatchLater() {
 
           <div className={styles.calendarCard}>
             <div className={styles.calendarTop}>
-              <button className={styles.calNav} onClick={prevMonth} aria-label="Previous month">
+              <button
+                className={styles.calNav}
+                onClick={prevMonth}
+                aria-label="Previous month"
+              >
                 ←
               </button>
 
@@ -529,7 +546,11 @@ export default function WatchLater() {
                 {MONTHS[calMonth]} {calYear}
               </div>
 
-              <button className={styles.calNav} onClick={nextMonth} aria-label="Next month">
+              <button
+                className={styles.calNav}
+                onClick={nextMonth}
+                aria-label="Next month"
+              >
                 →
               </button>
             </div>
@@ -860,34 +881,40 @@ export default function WatchLater() {
           </>
         )}
 
-        {!loadingCalendar && calendarItems.length > 0 && (
+        {!loadingCalendar && (items.length > 0 || epItems.length > 0) && (
           <div className={styles.upcomingBanner}>
-            <button
-              className={styles.upcomingToggle}
-              onClick={() => setShowUpcoming((v) => !v)}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            {calendarItems.length > 0 ? (
+              <button
+                className={styles.upcomingToggle}
+                onClick={() => setShowUpcoming((v) => !v)}
               >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span className={styles.upcomingToggleLabel}>
+                  {calendarItems.length} upcoming
+                </span>
+                <span className={styles.upcomingToggleArrow}>
+                  {showUpcoming ? "\u25B2" : "\u25BC"}
+                </span>
+              </button>
+            ) : (
               <span className={styles.upcomingToggleLabel}>
-                {calendarItems.length} upcoming
+                No upcoming releases
               </span>
-              <span className={styles.upcomingToggleArrow}>
-                {showUpcoming ? "\u25B2" : "\u25BC"}
-              </span>
-            </button>
+            )}
             <button
               className={styles.calIconBtn}
               onClick={() => setView("calendar")}

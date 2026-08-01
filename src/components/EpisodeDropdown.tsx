@@ -1,7 +1,8 @@
-import { useState, useMemo, useId } from 'react';
+import { useState, useMemo, useId, useCallback } from 'react';
 import { getWatchedEpisodeSet } from '../api/storage';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
+import useDropdownKeys from '../hooks/useDropdownKeys';
 import type { TMDBEpisode } from '../types';
 
 interface EpisodeDropdownProps {
@@ -14,8 +15,9 @@ interface EpisodeDropdownProps {
 
 export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }: EpisodeDropdownProps) {
   const [open, setOpen] = useState(false);
-  const ref = useClickOutside(() => setOpen(false));
-  const search = useDropdownSearch(open, () => setOpen(false));
+  const close = useCallback(() => setOpen(false), []);
+  const ref = useClickOutside(close);
+  const search = useDropdownSearch(open, close);
   const id = useId();
   const menuId = `ed-menu-${id}`;
 
@@ -28,8 +30,15 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
   }, [episodes, search]);
 
   const highlightNum: number | null = search && filtered.length > 0 ? filtered[0].episode_number : null;
+  const activeIndex = useDropdownKeys(open, filtered.length, (i) => {
+    const ep = filtered[i];
+    if (ep) {
+      onSelect(ep.episode_number);
+      setOpen(false);
+    }
+  }, close);
 
-  const watchedSet = useMemo(() => getWatchedEpisodeSet('tv', showId, season), [showId, season]);
+  const watchedSet = useMemo(() => getWatchedEpisodeSet(showId, season), [showId, season]);
   const current = episodes.find((e) => e.episode_number === episode);
   const triggerLabel = current ? `${current.episode_number}. ${current.name}` : `Episode ${episode}`;
 
@@ -49,21 +58,22 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
       {open && (
         <div id={menuId} className="custom-select-menu" role="listbox" aria-label="Select episode">
           {filtered.length === 0 && <div className="custom-select-empty" role="status">No matches</div>}
-          {filtered.map((ep) => {
+          {filtered.map((ep, index) => {
             const watched = watchedSet.has(ep.episode_number);
+            const isHighlighted = search ? ep.episode_number === highlightNum : index === activeIndex;
             return (
               <button
                 key={ep.episode_number}
                 role="option"
                 aria-selected={ep.episode_number === episode}
-                className={`custom-select-item ${ep.episode_number === episode ? 'active' : ''} ${ep.episode_number === highlightNum ? 'highlighted' : ''} ${watched ? 'watched' : ''}`}
+                className={`custom-select-item ${ep.episode_number === episode ? 'active' : ''} ${isHighlighted ? 'highlighted' : ''} ${watched ? 'watched' : ''}`}
                 onClick={() => { onSelect(ep.episode_number); setOpen(false); }}
               >
                 <span className="cs-item-label">
                   <span className="cs-item-num">{ep.episode_number}.</span>
                   {ep.name}
                 </span>
-                {watched && <span className="cs-check" aria-label="Watched">&#10003;</span>}
+                {watched && <span className="cs-check" aria-hidden="true" title="Watched">&#10003;</span>}
               </button>
             );
           })}
