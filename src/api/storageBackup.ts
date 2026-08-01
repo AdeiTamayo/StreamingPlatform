@@ -74,9 +74,21 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
   };
 }
 
-export async function importSupabaseData(data: SupabaseBackupData): Promise<void> {
+// True when the object has no user data at all - used to reject empty or
+// malformed files before any import work happens.
+export function isSupabaseBackupEmpty(data: SupabaseBackupData): boolean {
+  return (
+    data.watched?.length === 0 &&
+    data.progress?.length === 0 &&
+    data.watchLater?.length === 0 &&
+    data.notifications?.length === 0 &&
+    data.searchHistory?.length === 0
+  );
+}
+
+export async function importSupabaseData(data: SupabaseBackupData): Promise<boolean> {
   const userId = getCurrentUserId();
-  if (!userId) return;
+  if (!userId) return false;
 
   const operations: Promise<unknown>[] = [];
 
@@ -109,5 +121,6 @@ export async function importSupabaseData(data: SupabaseBackupData): Promise<void
     }
   }
 
-  await Promise.allSettled(operations);
+  const results = await Promise.allSettled(operations);
+  return results.some((r) => r.status === 'fulfilled');
 }

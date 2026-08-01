@@ -1,4 +1,4 @@
-import { logDebug } from '../utils/logger';
+import { logDebug, logError } from '../utils/logger';
 import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { progressRepository } from '../repositories/progressRepository';
@@ -6,25 +6,46 @@ import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { notificationRepository } from '../repositories/notificationRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
 import { settingsRepository } from '../repositories/settingsRepository';
-import { syncOfflineQueue } from '../utils/offlineQueue';
+import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
+import type { WatchedInsert } from '../types/database';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
 
-const WL_KEY = 'watchlater';
-const PROGRESS_INDEX_KEY = 'progress_index';
-const WATCHED_INDEX_KEY = 'watched_index';
-const VIDEO_SOURCE_KEY = 'video_source';
-const NOTIFICATIONS_KEY = 'notifications';
-const SEARCH_HISTORY_KEY = 'search_history';
-const EP_WL_PREFIX = 'epwl:';
-const NOTIFICATIONS_MAX = 50;
-const SEARCH_HISTORY_MAX = 15;
+export const WL_KEY = 'watchlater';
+export const PROGRESS_INDEX_KEY = 'progress_index';
+export const WATCHED_INDEX_KEY = 'watched_index';
+export const EP_WL_INDEX_KEY = 'epwl_index';
+export const VIDEO_SOURCE_KEY = 'video_source';
+export const NOTIFICATIONS_KEY = 'notifications';
+export const SEARCH_HISTORY_KEY = 'search_history';
+export const EP_WL_PREFIX = 'epwl:';
+export const NOTIFICATIONS_MAX = 50;
+export const SEARCH_HISTORY_MAX = 15;
+export const EP_WL_MAX = 200;
+
+// Keys/prefixes owned by this app's data layer. Kept in one place so
+// clearAllData and clearLegacyData can't drift apart.
+export const LOCAL_DATA_KEYS: string[] = [
+  'watched:',
+  'progress:',
+  WL_KEY,
+  EP_WL_PREFIX,
+  EP_WL_INDEX_KEY,
+  SEARCH_HISTORY_KEY,
+  NOTIFICATIONS_KEY,
+  PROGRESS_INDEX_KEY,
+  WATCHED_INDEX_KEY,
+  OFFLINE_QUEUE_KEY,
+  'app_errors',
+  'player_debug',
+];
 
 let currentUserId: string | null = null;
 
 export function setCurrentUserId(userId: string | null): void {
   currentUserId = userId;
   if (userId) {
-    syncOfflineQueue();
+    initOfflineQueueSync();
+    syncOfflineQueue().catch(() => {});
   }
 }
 
@@ -32,12 +53,12 @@ export function getCurrentUserId(): string | null {
   return currentUserId;
 }
 
-function watchedKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
+export function watchedKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
   if (type === 'movie') return `watched:movie-${id}`;
   return `watched:tv-${id}-S${season}E${episode}`;
 }
 
-function progressKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
+export function progressKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
   if (type === 'movie') return `progress:movie-${id}`;
   return `progress:tv-${id}-S${season}E${episode}`;
 }
@@ -78,7 +99,11 @@ function getIndex(key: string, prefix: string): string[] {
 }
 
 function saveIndex(key: string, index: string[]): void {
-  localStorage.setItem(key, JSON.stringify(index));
+  try {
+    localStorage.setItem(key, JSON.stringify(index));
+  } catch (err) {
+    logError('storage.saveIndex', err);
+  }
 }
 
 function addToIndex(key: string, indexStorageKey: string, prefix: string): void {
@@ -118,6 +143,14 @@ function removeFromWatchedIndex(key: string): void {
   removeFromIndex(key, WATCHED_INDEX_KEY, 'watched:');
 }
 
+function safeWrite(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (err) {
+    logError('storage.setItem', err);
+  }
+}
+
 export function isWatched(type: MediaType, id: string | number, season?: number | null, episode?: number | null): boolean {
   return localStorage.getItem(watchedKey(type, id, season, episode)) !== null;
 }
@@ -125,7 +158,7 @@ export function isWatched(type: MediaType, id: string | number, season?: number 
 export function markWatched(type: MediaType, id: string | number, title: string, season?: number | null, episode?: number | null, meta?: Record<string, unknown>): void {
   const data: WatchedData = { type, id, title, season: season ?? undefined, episode: episode ?? undefined, watchedAt: Date.now(), ...(meta ? { meta } : {}) };
   const key = watchedKey(type, id, season, episode);
-  localStorage.setItem(key, JSON.stringify(data));
+  safeWrite(key, JSON.stringify(data));
   addToWatchedIndex(key);
 
   if (currentUserId) {
@@ -152,7 +185,7 @@ export function markUnwatched(type: MediaType, id: string | number, season?: num
   }
 }
 
-export function getWatchedEpisodeSet(type: string, id: string | number, season: number, episodeCount?: number): Set<number> {
+export function getWatchedEpisodeSet(id: string | number, season: number, episodeCount?: number): Set<number> {
   const set = new Set<number>();
   const prefix = `watched:tv-${id}-S${season}E`;
   const index = getWatchedIndex();
@@ -167,12 +200,14 @@ export function getWatchedEpisodeSet(type: string, id: string | number, season: 
 
 export async function clearShowHistory(showId: string | number): Promise<void> {
   const showIdStr = String(showId);
+  const removed = new Set<string>();
   const watchedIndex = getWatchedIndex();
   const remainingWatched: string[] = [];
   for (const k of watchedIndex) {
     const p = parseWatchedKey(k);
     if (p && p.showId === showIdStr) {
       localStorage.removeItem(k);
+      removed.add(k);
     } else {
       remainingWatched.push(k);
     }
@@ -185,11 +220,32 @@ export async function clearShowHistory(showId: string | number): Promise<void> {
     const p = parseProgressKey(k);
     if (p && p.showId === showIdStr) {
       localStorage.removeItem(k);
+      removed.add(k);
     } else {
       remainingProgress.push(k);
     }
   }
   saveIndex(PROGRESS_INDEX_KEY, remainingProgress);
+
+  // Orphaned keys written outside the index (e.g. importData before the
+  // index-rebuild fix) would survive the index loop - sweep them up too.
+  let orphansWatched = false;
+  let orphansProgress = false;
+  const sweep: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || removed.has(k)) continue;
+    if (parseWatchedKey(k)?.showId === showIdStr) {
+      sweep.push(k);
+      orphansWatched = true;
+    } else if (parseProgressKey(k)?.showId === showIdStr) {
+      sweep.push(k);
+      orphansProgress = true;
+    }
+  }
+  sweep.forEach((k) => localStorage.removeItem(k));
+  if (orphansWatched) saveIndex(WATCHED_INDEX_KEY, getWatchedIndex());
+  if (orphansProgress) saveIndex(PROGRESS_INDEX_KEY, getProgressIndex());
 
   if (currentUserId) {
     await watchedRepository.clearShowHistory(currentUserId, Number(showId));
@@ -205,6 +261,7 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
     if (p && p.showId === String(showId) && (p.season ?? 0) > 0) {
       try {
         const data: WatchedData = JSON.parse(localStorage.getItem(k) || '{}');
+        if (!Number.isFinite(data.watchedAt)) continue;
         if (!last || data.watchedAt > last.watchedAt) {
           last = { ...p, showId: p.showId ?? '', season: data.season ?? p.season ?? 0, episode: data.episode ?? p.episode ?? 0, watchedAt: data.watchedAt };
         }
@@ -214,8 +271,8 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
   return last;
 }
 
-export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>): void {
-  const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(meta ? { meta } : {}) };
+export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>, duration?: number): void {
+  const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(duration ? { duration } : {}), ...(meta ? { meta } : {}) };
   try {
     localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
     addToProgressIndex(progressKey(type, id, season, episode));
@@ -232,7 +289,7 @@ export function saveProgress(type: MediaType, id: string | number, currentTime: 
       season: season ?? null,
       episode: episode ?? null,
       current_time: currentTime,
-      duration: null,
+      duration: duration ?? null,
       meta: (meta ?? null) as never,
     });
   }
@@ -266,9 +323,9 @@ export function getWatchLater(): WatchLaterItem[] {
 }
 
 export function addWatchLater(type: MediaType, id: string | number, title: string, year: string, poster: string): void {
-  const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && item.id === id));
+  const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && String(item.id) === String(id)));
   list.push({ type, id, title, year, poster, addedAt: Date.now() });
-  localStorage.setItem(WL_KEY, JSON.stringify(list));
+  safeWrite(WL_KEY, JSON.stringify(list));
 
   if (currentUserId) {
     watchLaterRepository.add({
@@ -286,7 +343,7 @@ export function addWatchLater(type: MediaType, id: string | number, title: strin
 
 export function removeWatchLater(type: MediaType, id: string | number): void {
   const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && String(item.id) === String(id)));
-  localStorage.setItem(WL_KEY, JSON.stringify(list));
+  safeWrite(WL_KEY, JSON.stringify(list));
 
   if (currentUserId) {
     watchLaterRepository.remove(currentUserId, type, Number(id));
@@ -355,18 +412,18 @@ export function getContinueWatching(): ContinueWatchingItem[] {
   const progressItems: ContinueWatchingItem[] = [];
   const keys = getProgressIndex();
   for (const k of keys) {
+    const p = parseProgressKey(k);
+    if (!p) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
       if (!data || (data.currentTime as number) <= 30) continue;
       const wKey = k.replace('progress:', 'watched:');
       if (localStorage.getItem(wKey)) continue;
-      const isMovie = k.includes('movie');
-      const p = isMovie ? null : parseProgressKey(k);
       progressItems.push({
-        type: (isMovie ? 'movie' : 'tv') as MediaType,
-        id: (isMovie ? k.replace('progress:movie-', '') : (p ? p.showId : '')) as string | number,
-        season: (p?.season ?? null) as number | null,
-        episode: (p?.episode ?? null) as number | null,
+        type: p.type as MediaType,
+        id: (p.showId ?? p.id) as string | number,
+        season: p.season as number | null,
+        episode: p.episode as number | null,
         currentTime: data.currentTime as number,
         savedAt: data.savedAt as number,
         meta: (data.meta || null) as Record<string, unknown> | null,
@@ -378,19 +435,34 @@ export function getContinueWatching(): ContinueWatchingItem[] {
 
 export function getEpisodeWatchLater(): EpisodeWatchLaterItem[] {
   const items: EpisodeWatchLaterItem[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith(EP_WL_PREFIX)) continue;
+  const index = getIndex(EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  for (const k of index) {
     try {
-      items.push(JSON.parse(localStorage.getItem(k) || '{}') as EpisodeWatchLaterItem);
+      const item = JSON.parse(localStorage.getItem(k) || '{}') as EpisodeWatchLaterItem;
+      if (item && item.showId != null) items.push(item);
     } catch {}
   }
   return items.sort((a, b) => b.addedAt - a.addedAt);
 }
 
+function pruneEpisodeWatchLater(): void {
+  const index = getIndex(EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  if (index.length <= EP_WL_MAX) return;
+  const entries = index
+    .map((k) => ({ key: k, addedAt: (JSON.parse(localStorage.getItem(k) || '{}') as EpisodeWatchLaterItem).addedAt || 0 }))
+    .sort((a, b) => a.addedAt - b.addedAt);
+  const toRemove = entries.slice(0, entries.length - EP_WL_MAX);
+  toRemove.forEach(({ key }) => {
+    localStorage.removeItem(key);
+    removeFromIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  });
+}
+
 export function addEpisodeWatchLater(showId: string | number, season: number, episode: number, showTitle: string): void {
   const key = `${EP_WL_PREFIX}${showId}-S${season}E${episode}`;
-  localStorage.setItem(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }));
+  safeWrite(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }));
+  addToIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  pruneEpisodeWatchLater();
 
   if (currentUserId) {
     watchLaterRepository.add({
@@ -407,7 +479,9 @@ export function addEpisodeWatchLater(showId: string | number, season: number, ep
 }
 
 export function removeEpisodeWatchLater(showId: string | number, season: number, episode: number): void {
-  localStorage.removeItem(`${EP_WL_PREFIX}${showId}-S${season}E${episode}`);
+  const key = `${EP_WL_PREFIX}${showId}-S${season}E${episode}`;
+  localStorage.removeItem(key);
+  removeFromIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
 
   if (currentUserId) {
     watchLaterRepository.removeEpisode(currentUserId, Number(showId), season, episode);
@@ -432,10 +506,38 @@ export function getWatchedCount(showId: string | number, seasonNumber: number, e
 }
 
 export function markSeasonWatched(showId: string | number, seasonNumber: number, episodeCount: number, showName: string, poster: string): void {
+  const newKeys: string[] = [];
+  const batch: WatchedInsert[] = [];
+  const watchedAt = new Date().toISOString();
+  const meta = { title: showName, poster };
+
   for (let i = 1; i <= episodeCount; i++) {
-    if (!isWatched('tv', showId, seasonNumber, i)) {
-      markWatched('tv', showId, showName, seasonNumber, i, { title: showName, poster });
+    const key = watchedKey('tv', showId, seasonNumber, i);
+    if (localStorage.getItem(key)) continue;
+    newKeys.push(key);
+    safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, season: seasonNumber, episode: i, watchedAt: Date.now(), meta }));
+    if (currentUserId) {
+      batch.push({
+        user_id: currentUserId,
+        media_type: 'tv',
+        tmdb_id: Number(showId),
+        title: showName,
+        season: seasonNumber,
+        episode: i,
+        watched_at: watchedAt,
+        meta: meta as never,
+      });
     }
+  }
+
+  if (newKeys.length > 0) {
+    const index = getWatchedIndex();
+    const merged = [...new Set([...index, ...newKeys])];
+    saveIndex(WATCHED_INDEX_KEY, merged);
+  }
+
+  if (batch.length > 0) {
+    watchedRepository.markBatch(batch);
   }
 }
 
@@ -467,7 +569,7 @@ export function addSearchHistory(query: string): void {
   const list = getSearchHistory().filter((q: string) => q.toLowerCase() !== trimmed.toLowerCase());
   list.unshift(trimmed);
   if (list.length > SEARCH_HISTORY_MAX) list.length = SEARCH_HISTORY_MAX;
-  localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(list));
+  safeWrite(SEARCH_HISTORY_KEY, JSON.stringify(list));
 
   if (currentUserId) {
     searchHistoryRepository.add({ user_id: currentUserId, query: trimmed });
@@ -491,7 +593,24 @@ export function exportData(): Record<string, string | null> {
   return data;
 }
 
-export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): void {
+function rebuildIndices(): void {
+  const watchedIndex: string[] = [];
+  const progressIndex: string[] = [];
+  const epwlIndex: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (k.startsWith('watched:')) watchedIndex.push(k);
+    else if (k.startsWith('progress:')) progressIndex.push(k);
+    else if (k.startsWith(EP_WL_PREFIX)) epwlIndex.push(k);
+  }
+  saveIndex(WATCHED_INDEX_KEY, watchedIndex);
+  saveIndex(PROGRESS_INDEX_KEY, progressIndex);
+  saveIndex(EP_WL_INDEX_KEY, epwlIndex);
+}
+
+export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): number {
+  let imported = 0;
   if (mode === 'replace') {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -501,8 +620,15 @@ export function importData(data: Record<string, unknown>, mode: 'merge' | 'repla
     keys.forEach((k) => localStorage.removeItem(k));
   }
   Object.entries(data).forEach(([k, v]) => {
-    if (isExportKey(k)) localStorage.setItem(k, String(v));
+    if (isExportKey(k)) {
+      localStorage.setItem(k, String(v));
+      imported++;
+    }
   });
+  // Imported watched/progress/epwl keys must be reflected in the indices or
+  // they stay invisible to LastSeen/Stats/ContinueWatching.
+  rebuildIndices();
+  return imported;
 }
 
 export async function getStorageUsage(): Promise<StorageUsage> {
@@ -544,20 +670,13 @@ export function clearAllData(): void {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && (
-      k.startsWith('watched:') ||
-      k.startsWith('progress:') ||
-      k === 'watchlater' ||
-      k.startsWith('epwl:') ||
-      k === 'search_history' ||
-      k === NOTIFICATIONS_KEY ||
-      k === PROGRESS_INDEX_KEY ||
-      k === WATCHED_INDEX_KEY
-    )) {
+    if (k && LOCAL_DATA_KEYS.some((prefix) => k === prefix || k.startsWith(prefix))) {
       keysToRemove.push(k);
     }
   }
   keysToRemove.forEach((k) => localStorage.removeItem(k));
+  clearOfflineQueue();
+  void clearTMDBCache();
 }
 
 export function getVideoSource(): string {
@@ -565,7 +684,7 @@ export function getVideoSource(): string {
 }
 
 export function setVideoSource(source: string): void {
-  localStorage.setItem(VIDEO_SOURCE_KEY, source);
+  safeWrite(VIDEO_SOURCE_KEY, source);
 
   if (currentUserId) {
     settingsRepository.upsert({ user_id: currentUserId, preferred_video_source: source });
@@ -596,7 +715,7 @@ export function addNotification(showId: string | number, showTitle: string, seas
     read: false,
   });
   if (list.length > NOTIFICATIONS_MAX) list.length = NOTIFICATIONS_MAX;
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+  safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list));
 
   if (currentUserId) {
     notificationRepository.add({
@@ -615,17 +734,19 @@ export function addNotification(showId: string | number, showTitle: string, seas
 }
 
 export function removeNotification(id: string): void {
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(getNotifications().filter((n: NotificationItem) => n.id !== id)));
+  const list = getNotifications();
+  const item = list.find((n: NotificationItem) => n.id === id);
+  safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list.filter((n: NotificationItem) => n.id !== id)));
 
-  if (currentUserId) {
-    notificationRepository.remove(currentUserId, id);
+  if (currentUserId && item) {
+    notificationRepository.remove(currentUserId, Number(item.showId), item.season, item.episode);
   }
 }
 
 export function markAllNotificationsRead(): void {
   const list = getNotifications();
   list.forEach((n: NotificationItem) => { n.read = true; });
-  localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+  safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list));
 
   if (currentUserId) {
     notificationRepository.markAllRead(currentUserId);
@@ -644,5 +765,3 @@ export function isAlreadyNotified(showId: string | number, season: number, episo
   const sid = String(showId);
   return getNotifications().some((n: NotificationItem) => n.showId === sid && n.season === season && n.episode === episode);
 }
-
-

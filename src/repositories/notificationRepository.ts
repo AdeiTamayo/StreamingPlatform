@@ -20,7 +20,7 @@ export const notificationRepository = {
   async getAll(userId: string): Promise<NotificationRow[]> {
     try {
       const { data, error }: any = await withRetry(async () =>
-requireSupabase().from('notifications')
+        requireSupabase().from('notifications')
           .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),
@@ -32,17 +32,23 @@ requireSupabase().from('notifications')
     }
   },
 
-  async remove(userId: string, id: string): Promise<void> {
+  // Local notification ids (n-<ts>-<rand>) never match server UUIDs, so remote
+  // deletion matches the same (user_id, tmdb_id, season, episode) track the
+  // insert used instead of an id.
+  async remove(userId: string, tmdbId: number, season: number, episode: number): Promise<void> {
     try {
       const { error }: any = await withRetry(async () =>
-requireSupabase().from('notifications')
+        requireSupabase().from('notifications')
           .delete()
           .eq('user_id', userId)
-          .eq('id', id),
+          .eq('media_type', 'tv')
+          .eq('tmdb_id', tmdbId)
+          .eq('season', season)
+          .eq('episode', episode),
       );
       if (error) throw error;
     } catch {
-      enqueueWrite('notifications', 'delete', { userId, id });
+      enqueueWrite('notifications', 'delete', { userId, mediaType: 'tv', tmdbId, season, episode });
     }
   },
 
@@ -63,7 +69,7 @@ requireSupabase().from('notifications')
   async clearAll(userId: string): Promise<void> {
     try {
       const { error }: any = await withRetry(async () =>
-requireSupabase().from('notifications')
+        requireSupabase().from('notifications')
           .delete()
           .eq('user_id', userId),
       );
@@ -72,22 +78,4 @@ requireSupabase().from('notifications')
       enqueueWrite('notifications', 'delete', { userId });
     }
   },
-
-  async isAlreadyNotified(userId: string, showId: number, season: number, episode: number): Promise<boolean> {
-    try {
-      const { count, error }: any = await withRetry(async () =>
-requireSupabase().from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('tmdb_id', showId)
-          .eq('season', season)
-          .eq('episode', episode),
-      );
-      if (error) throw error;
-      return (count ?? 0) > 0;
-    } catch {
-      return false;
-    }
-  },
 };
-

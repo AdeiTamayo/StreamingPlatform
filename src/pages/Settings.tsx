@@ -10,7 +10,8 @@ import {
 } from "../api/storage";
 import { clearTMDBCache } from "../api/tmdbCache";
 import { getSourceLabel, SOURCE_KEYS } from "../api/vidsrc";
-import { exportSupabaseData, importSupabaseData } from "../api/storageBackup";
+import { exportSupabaseData, importSupabaseData, isSupabaseBackupEmpty } from "../api/storageBackup";
+import { getQueueSize } from "../utils/offlineQueue";
 import { useToast } from "../components/useToast";
 import { useAuth } from "../hooks/useAuth";
 import FilterDropdown from "../components/FilterDropdown";
@@ -72,7 +73,9 @@ export default function Settings() {
   const { user, signOut } = useAuth();
 
   const [usage, setUsage] = useState<StorageUsage | null>(null);
+  const [usageError, setUsageError] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [queueSize, setQueueSize] = useState(getQueueSize());
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
 
   const [confirm, setConfirm] = useState(false);
@@ -83,13 +86,21 @@ export default function Settings() {
   useEffect(() => {
     document.title = "Settings - StreamFlow";
 
-    getStorageUsage().then(setUsage);
+    getStorageUsage()
+      .then((data) => { setUsage(data); setUsageError(false); })
+      .catch(() => setUsageError(true));
     setStats(getStats());
+    setQueueSize(getQueueSize());
   }, []);
   async function clearCache() {
     await clearTMDBCache();
 
-    setUsage(await getStorageUsage());
+    try {
+      setUsage(await getStorageUsage());
+      setUsageError(false);
+    } catch {
+      setUsageError(true);
+    }
 
     toast?.("TMDB cache cleared");
   }
@@ -101,8 +112,14 @@ export default function Settings() {
 
     setConfirm(false);
 
-    setUsage(await getStorageUsage());
+    try {
+      setUsage(await getStorageUsage());
+      setUsageError(false);
+    } catch {
+      setUsageError(true);
+    }
     setStats(getStats());
+    setQueueSize(getQueueSize());
 
     toast?.("All data cleared");
   }
@@ -140,12 +157,19 @@ export default function Settings() {
       try {
         const data = JSON.parse(reader.result as string);
 
-        importData(data, "merge");
+        const count = importData(data, "merge");
 
-        setUsage(await getStorageUsage());
+        try {
+          setUsage(await getStorageUsage());
+          setUsageError(false);
+        } catch {
+          setUsageError(true);
+        }
         setStats(getStats());
+        setQueueSize(getQueueSize());
 
-        toast?.("Data imported successfully");
+        if (count > 0) toast?.("Data imported successfully");
+        else toast?.("No data found in file");
       } catch {
         toast?.("Invalid backup file");
       }
@@ -194,9 +218,15 @@ export default function Settings() {
       try {
         const data = JSON.parse(reader.result as string);
 
-        await importSupabaseData(data);
+        if (isSupabaseBackupEmpty(data)) {
+          toast?.("No data found in file");
+          return;
+        }
 
-        toast?.("Supabase data imported successfully");
+        const ok = await importSupabaseData(data);
+
+        if (ok) toast?.("Supabase data imported successfully");
+        else toast?.("Import failed");
       } catch {
         toast?.("Invalid backup file");
       }
@@ -315,7 +345,10 @@ export default function Settings() {
 
           <div className={styles.column}>
             <Card title="Storage">
-              {usage && (
+              {usageError ? (
+                <div className={styles.value}>Storage usage unavailable</div>
+              ) : (
+                usage && (
                 <>
                   <div className={styles.storageHeader}>
                     <div className={styles.storageTotal}>
@@ -361,7 +394,13 @@ export default function Settings() {
                       Clear
                     </button>
                   </Row>
+
+                  <Row
+                    label="Offline Queue"
+                    value={queueSize > 0 ? `${queueSize} pending` : "Empty"}
+                  />
                 </>
+                )
               )}
             </Card>
 
