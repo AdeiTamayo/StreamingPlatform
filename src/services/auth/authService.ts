@@ -1,4 +1,4 @@
-import { requireSupabase } from '../../lib/supabase';
+import { requireSupabase, supabase } from '../../lib/supabase';
 import { withRetry } from '../../utils/retry';
 
 export interface AuthError {
@@ -40,7 +40,8 @@ export const authService = {
 
   async signOut() {
     try {
-      const { error } = await requireSupabase().auth.signOut();
+      if (!supabase) return;
+      const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (err) {
       throw toAuthError(err);
@@ -61,8 +62,9 @@ export const authService = {
   },
 
   async getSession() {
+    if (!supabase) return null;
     try {
-      const { data, error } = await requireSupabase().auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
       return data.session;
     } catch {
@@ -70,18 +72,13 @@ export const authService = {
     }
   },
 
-  async getCurrentUser() {
-    try {
-      const { data, error } = await requireSupabase().auth.getUser();
-      if (error) throw error;
-      return data.user;
-    } catch {
-      return null;
-    }
-  },
-
   onAuthStateChange(callback: (event: string, session: unknown) => void) {
-    return requireSupabase().auth.onAuthStateChange((event, session) => {
+    // Local-only mode: nothing to subscribe to, return a no-op listener so
+    // callers never crash on an unconfigured Supabase.
+    if (!supabase) {
+      return { data: { subscription: { unsubscribe: () => {} } } };
+    }
+    return supabase.auth.onAuthStateChange((event, session) => {
       callback(event, session);
     });
   },

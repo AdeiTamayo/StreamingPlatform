@@ -1,17 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { getErrorMessage, isValidEmail } from './errors';
 import styles from './AuthModal.module.css';
 
 interface LoginFormProps {
   onSwitchToRegister: () => void;
   onSwitchToForgot: () => void;
-}
-
-function getErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
 }
 
 export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: LoginFormProps) {
@@ -24,9 +18,24 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email address.');
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setError('Enter your password.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await signIn(email.trim(), password);
+      await signIn(trimmedEmail, password);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

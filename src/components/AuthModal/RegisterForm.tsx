@@ -1,16 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { getErrorMessage, isValidEmail } from './errors';
 import styles from './AuthModal.module.css';
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
-}
-
-function getErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
 }
 
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
@@ -26,6 +20,15 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     e.preventDefault();
     setError('');
 
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email address.');
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
@@ -37,7 +40,7 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
     setSubmitting(true);
     try {
-      const { session } = await signUp(email.trim(), password);
+      const { session } = await signUp(trimmedEmail, password);
       if (!session) {
         setPendingConfirmation(true);
       }

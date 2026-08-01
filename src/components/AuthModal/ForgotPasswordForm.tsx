@@ -1,16 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { getErrorMessage, isValidEmail } from './errors';
 import styles from './AuthModal.module.css';
 
 interface ForgotPasswordFormProps {
   onSwitchToLogin: () => void;
-}
-
-function getErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
 }
 
 export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFormProps) {
@@ -23,9 +17,20 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Enter your email address.');
+      return;
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setError('Enter a valid email address.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await resetPassword(email.trim());
+      await resetPassword(trimmedEmail);
       setSent(true);
     } catch (err) {
       setError(getErrorMessage(err));

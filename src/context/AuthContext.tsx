@@ -1,29 +1,11 @@
-import { createContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
 import { authService } from '../services/auth/authService';
 import { dataMigration } from '../utils/dataMigration';
 import { setCurrentUserId } from '../api/storage';
-
-export interface AuthState {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  isAuthenticated: boolean;
-}
-
-export interface AuthContextValue extends AuthState {
-  signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
-  signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
-  signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
-  isAuthModalOpen: boolean;
-  openAuthModal: () => void;
-  closeAuthModal: () => void;
-  syncVersion: number;
-}
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import { logError } from '../utils/logger';
+import { AuthContext, type AuthState } from './authContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -56,39 +38,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const runMigration = useCallback((userId: string) => {
     dataMigration
       .migrateFromLocalStorage(userId)
+      .catch((err) => logError('dataMigration', err))
       .finally(() => setSyncVersion((v) => v + 1));
   }, []);
 
   useEffect(() => {
-    const { data: listener } = authService.onAuthStateChange((event, session) => {
-      const supabaseSession = session as Session | null;
-      if (event === 'SIGNED_IN' && supabaseSession?.user) {
-        setCurrentUserId(supabaseSession.user.id);
-        setAuth(supabaseSession.user, supabaseSession);
-        setIsAuthModalOpen(false);
-        runMigration(supabaseSession.user.id);
-      } else if (event === 'SIGNED_OUT') {
-        setCurrentUserId(null);
-        setAuth(null, null);
-      } else if (event === 'TOKEN_REFRESHED' && supabaseSession?.user) {
-        setCurrentUserId(supabaseSession.user.id);
-        setAuth(supabaseSession.user, supabaseSession);
-      }
-    });
+    let mounted = true;
+    let subscription: { unsubscribe: () => void } | undefined;
 
-    authService.getSession().then((session) => {
-      if (session?.user) {
-        setCurrentUserId(session.user.id);
-        setAuth(session.user, session);
-        runMigration(session.user.id);
-      } else {
+    try {
+      subscription = authService.onAuthStateChange((event, session) => {
+        if (!mounted) return;
+        const supabaseSession = session as Session | null;
+        if (event === 'SIGNED_IN' && supabaseSession?.user) {
+          setCurrentUserId(supabaseSession.user.id);
+          setAuth(supabaseSession.user, supabaseSession);
+          setIsAuthModalOpen(false);
+          runMigration(supabaseSession.user.id);
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUserId(null);
+          setAuth(null, null);
+        } else if (event === 'TOKEN_REFRESHED' && supabaseSession?.user) {
+          setCurrentUserId(supabaseSession.user.id);
+          setAuth(supabaseSession.user, supabaseSession);
+        }
+      }).data.subscription;
+    } catch (err) {
+      logError('auth.onAuthStateChange', err);
+    }
+
+    authService.getSession()
+      .then((session) => {
+        if (!mounted) return;
+        if (session?.user) {
+          setCurrentUserId(session.user.id);
+          setAuth(session.user, session);
+          runMigration(session.user.id);
+        } else {
+          setCurrentUserId(null);
+          setState((prev) => ({ ...prev, loading: false }));
+        }
+      })
+      .catch((err) => {
+        logError('auth.getSession', err);
+        if (!mounted) return;
         setCurrentUserId(null);
         setState((prev) => ({ ...prev, loading: false }));
-      }
-    });
+      });
 
     return () => {
-      listener?.subscription.unsubscribe();
+      mounted = false;
+      subscription?.unsubscribe();
     };
   }, [setAuth, runMigration]);
 
