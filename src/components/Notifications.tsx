@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useId, memo } from 'react';
+import { useState, useEffect, useRef, useId, memo, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
 import type { NotificationItem } from '../types';
@@ -21,6 +22,130 @@ function formatRelativeTime(timestamp: number): string {
   if (days < 7) return `${days}d ago`;
 
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
+}
+
+type NotificationPanelProps = {
+  panelRef: RefObject<HTMLDivElement | null>;
+  panelId: string;
+  panelTitleId: string;
+  notifications: NotificationItem[];
+  unreadCount: number;
+  onClose: () => void;
+  onRemove: (id: string) => void;
+  onMarkAllRead: () => void;
+  onClearAll: () => void;
+  sidebar?: boolean;
+};
+
+function NotificationPanel({
+  panelRef,
+  panelId,
+  panelTitleId,
+  notifications,
+  unreadCount,
+  onClose,
+  onRemove,
+  onMarkAllRead,
+  onClearAll,
+  sidebar,
+}: NotificationPanelProps) {
+  return (
+    <>
+      <div
+        className={`${styles.overlay}${sidebar ? ` ${styles.sidebarOverlay}` : ''}`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        ref={panelRef}
+        id={panelId}
+        className={`${styles.panel}${sidebar ? ` ${styles.sidebarPanel}` : ''}`}
+        role="dialog"
+        aria-labelledby={panelTitleId}
+        tabIndex={-1}
+      >
+        <div className={styles.header}>
+          <div className={styles.headerCopy}>
+            <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
+            <p className={styles.headerSubtitle}>
+              {notifications.length === 0
+                ? 'You will see episode alerts here.'
+                : unreadCount > 0
+                  ? `${unreadCount} unread ${unreadCount === 1 ? 'alert' : 'alerts'}`
+                  : ''}
+            </p>
+          </div>
+          <div className={styles.headerActions}>
+            {unreadCount > 0 && (
+              <button onClick={onMarkAllRead} className={styles.headerAction}>Mark all read</button>
+            )}
+            <button onClick={onClose} className={styles.closeBtn} aria-label="Close notifications">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 6 6 18" />
+                <path d="M6 6 18 18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        {notifications.length === 0 ? (
+          <div className={styles.empty}>
+            <div className={styles.emptyIcon}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <div className={styles.emptyTitle}>No notifications yet</div>
+            <div className={styles.emptyText}>Episode alerts will appear here when new releases are detected.</div>
+          </div>
+        ) : (
+          <ul className={styles.list}>
+            {notifications.map((n) => (
+              <li key={n.id} className={`${styles.item} ${!n.read ? styles.unread : ''}`}>
+                <div className={styles.itemContent}>
+                  <div className={styles.itemTitle}>{n.showTitle}</div>
+                  <div className={styles.itemSub}>
+                    S{n.season} E{n.episode}
+                    {n.episodeTitle && <span> &middot; {n.episodeTitle}</span>}
+                  </div>
+                  <div className={styles.itemMeta}>
+                    {n.airDate && <span>Airs {n.airDate}</span>}
+                    <span>{formatRelativeTime(n.createdAt)}</span>
+                  </div>
+                </div>
+                <div className={styles.itemActionsButtons}>
+                  <Link
+                    to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
+                    className={styles.openBtn}
+                    onClick={onClose}
+                  >
+                    Open
+                  </Link>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => onRemove(n.id)}
+                    aria-label={`Remove notification for ${n.showTitle}`}
+                    title="Remove"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6 6 18" />
+                      <path d="M6 6 18 18" />
+                    </svg>
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {notifications.length > 0 && (
+          <div className={styles.footer}>
+            <span className={styles.footerHint}>{notifications.length} total</span>
+            <button onClick={onClearAll} className={styles.clearBtn}>Clear all</button>
+          </div>
+        )}
+      </div>
+    </>
+  );
 }
 
 const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boolean }) {
@@ -124,88 +249,38 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
           </svg>
         </span>
+        {sidebar && <span className={styles.bellLabel}>Notifications</span>}
         {unreadCount > 0 && <span className={styles.badge}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
-      {open && (
-        <>
-          <div className={styles.overlay} onClick={closePanel} aria-hidden="true" />
-          <div ref={panelRef} id={panelId} className={styles.panel} role="dialog" aria-labelledby={panelTitleId} tabIndex={-1}>
-            <div className={styles.header}>
-              <div className={styles.headerCopy}>
-                <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
-                <p className={styles.headerSubtitle}>
-                  {notifications.length === 0
-                    ? 'You will see episode alerts here.'
-                    : unreadCount > 0
-                      ? `${unreadCount} unread ${unreadCount === 1 ? 'alert' : 'alerts'}`
-                      : ''}
-                </p>
-              </div>
-              <div className={styles.headerActions}>
-                {unreadCount > 0 && (
-                  <button onClick={handleMarkAllRead} className={styles.headerAction}>Mark all read</button>
-                )}
-              </div>
-            </div>
-            {notifications.length === 0 ? (
-              <div className={styles.empty}>
-                <div className={styles.emptyIcon}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                </div>
-                <div className={styles.emptyTitle}>No notifications yet</div>
-                <div className={styles.emptyText}>Episode alerts will appear here when new releases are detected.</div>
-              </div>
-            ) : (
-              <ul className={styles.list}>
-                {notifications.map((n) => (
-                  <li key={n.id} className={`${styles.item} ${!n.read ? styles.unread : ''}`}>
-                    <div className={styles.itemContent}>
-                      <div className={styles.itemTitle}>{n.showTitle}</div>
-                      <div className={styles.itemSub}>
-                        S{n.season} E{n.episode}
-                        {n.episodeTitle && <span> &middot; {n.episodeTitle}</span>}
-                      </div>
-                      <div className={styles.itemMeta}>
-                        {n.airDate && <span>Airs {n.airDate}</span>}
-                        <span>{formatRelativeTime(n.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div className={styles.itemActionsButtons}>
-                      <Link
-                        to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
-                        className={styles.openBtn}
-                        onClick={closePanel}
-                      >
-                        Open
-                      </Link>
-                      <button
-                        className={styles.removeBtn}
-                        onClick={() => handleRemove(n.id)}
-                        aria-label={`Remove notification for ${n.showTitle}`}
-                        title="Remove"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 6 6 18" />
-                          <path d="M6 6 18 18" />
-                        </svg>
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {notifications.length > 0 && (
-              <div className={styles.footer}>
-                <span className={styles.footerHint}>{notifications.length} total</span>
-                <button onClick={handleClearAll} className={styles.clearBtn}>Clear all</button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {open && (sidebar ? (
+        createPortal(
+          <NotificationPanel
+            panelRef={panelRef}
+            panelId={panelId}
+            panelTitleId={panelTitleId}
+            notifications={notifications}
+            unreadCount={unreadCount}
+            onClose={closePanel}
+            onRemove={handleRemove}
+            onMarkAllRead={handleMarkAllRead}
+            onClearAll={handleClearAll}
+            sidebar
+          />,
+          document.body,
+        )
+      ) : (
+        <NotificationPanel
+          panelRef={panelRef}
+          panelId={panelId}
+          panelTitleId={panelTitleId}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          onClose={closePanel}
+          onRemove={handleRemove}
+          onMarkAllRead={handleMarkAllRead}
+          onClearAll={handleClearAll}
+        />
+      ))}
     </div>
   );
 });

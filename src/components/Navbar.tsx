@@ -386,9 +386,9 @@ const Navbar = memo(function Navbar() {
         aria-expanded={menuOpen}
         aria-controls="sidebar-menu"
       >
-        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
-        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
-        <span className={`${styles.hamburgerLine}${menuOpen ? ` ${styles.open}` : ''}`} />
+        <span className={styles.hamburgerLine} />
+        <span className={styles.hamburgerLine} />
+        <span className={styles.hamburgerLine} />
       </button>
 
       {menuOpen && (
@@ -511,10 +511,7 @@ const Navbar = memo(function Navbar() {
 
         {isAuthenticated && (
           <div className={styles.sidebarNotif}>
-            <div className={styles.sidebarNotifRow}>
-              <Notifications sidebar />
-              <span className={styles.sidebarNotifText}>Notifications</span>
-            </div>
+            <Notifications sidebar />
           </div>
         )}
 

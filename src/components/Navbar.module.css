@@ -331,24 +331,6 @@
   }
 
 
-  .hamburgerLine.open:nth-child(1) {
-    transform:
-      translateY(7px) rotate(45deg);
-  }
-
-
-  .hamburgerLine.open:nth-child(2) {
-    opacity: 0;
-  }
-
-
-  .hamburgerLine.open:nth-child(3) {
-    transform:
-      translateY(-7px) rotate(-45deg);
-  }
-
-
-
   /* -----------------------------
      Overlay
   ------------------------------ */
@@ -587,17 +569,6 @@
     margin-top: .35rem;
   }
 
-  .sidebarNotifRow {
-    display: flex;
-    align-items: center;
-    gap: .65rem;
-    padding: .7rem .75rem;
-    border-radius: 12px;
-    color: #fff;
-    font-size: .9rem;
-    font-weight: 600;
-  }
-
   .sidebarIconWrap {
     display: flex;
     align-items: center;
@@ -751,5 +722,12 @@
 :global(body.sidebar-open) {
 
   overflow: hidden;
+
+}
+
+
+:global(body.sidebar-open) .sidebarHamburger {
+
+  display: none;
 
 }

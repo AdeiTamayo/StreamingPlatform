@@ -152,9 +152,15 @@
 .headerAction:focus-visible,
 .clearBtn:focus-visible,
 .openBtn:focus-visible,
-.removeBtn:focus-visible {
+.removeBtn:focus-visible,
+.closeBtn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.closeBtn {
+  display: none;
+  flex-shrink: 0;
 }
 
 .list {
@@ -162,21 +168,7 @@
   overflow-y: auto;
   flex: 1;
   padding: 0.40rem;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
-}
-
-.list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-}
-
-.list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.24);
+  scrollbar-width: none;
 }
 
 .item {
@@ -449,12 +441,28 @@
 
 .sidebar {
   flex-shrink: 0;
+  width: 100%;
 }
 
 .sidebar .bellBtn {
-  width: auto;
+  width: 100%;
   height: auto;
-  border-radius: 0;
+  justify-content: flex-start;
+  gap: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.sidebar .bellBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar .bellLabel {
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .sidebar .bellIcon svg {
@@ -463,8 +471,16 @@
 }
 
 .sidebar .badge {
-  top: -4px;
-  right: -6px;
+  top: calc(50% - 8px);
+  right: 0.75rem;
+}
+
+.sidebarOverlay {
+  z-index: var(--z-popover);
+}
+
+.sidebarPanel {
+  z-index: calc(var(--z-popover) + 1);
 }
 
 @media (max-width: 768px) {
@@ -500,6 +516,25 @@
   .footer {
     padding-left: 0.9rem;
     padding-right: 0.9rem;
+  }
+
+  .closeBtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .closeBtn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text);
   }
 
   .item {
