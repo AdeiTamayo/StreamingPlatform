@@ -1,11 +1,25 @@
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(167, 189, 219, 0.18);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(167, 189, 219, 0.32);
 }
 
 * {
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 189, 219, 0.25) transparent;
 }
 
 /* App shell */
@@ -217,6 +231,11 @@
   background: linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95));
   border: 1px solid var(--border);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.media-card-link {
+  display: block;
+  color: inherit;
 }
 
 .media-card:hover {
@@ -828,7 +847,7 @@
   z-index: 1000;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
   scrollbar-width: thin;
-  scrollbar-color: #444 transparent;
+  scrollbar-color: rgba(167, 189, 219, 0.25) transparent;
 }
 
 .custom-select-menu::-webkit-scrollbar {
@@ -840,12 +859,12 @@
 }
 
 .custom-select-menu::-webkit-scrollbar-thumb {
-  background: #444;
+  background: rgba(167, 189, 219, 0.25);
   border-radius: 4px;
 }
 
 .custom-select-menu::-webkit-scrollbar-thumb:hover {
-  background: #666;
+  background: rgba(167, 189, 219, 0.4);
 }
 
 .custom-select-empty {
@@ -1198,5 +1217,19 @@
     right: 1rem;
     width: 2.25rem;
     height: 2.25rem;
+  }
+}
+
+/* Touch targets: enlarge small controls on touch devices (>= 44px) */
+@media (hover: none) and (pointer: coarse) {
+  .media-card-wl,
+  .media-card-watched-btn,
+  .wl-remove,
+  .cw-remove,
+  .ls-remove,
+  .filter-clear-btn,
+  .more-filters-toggle {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
