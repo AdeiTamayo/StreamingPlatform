@@ -21,6 +21,7 @@ export const EP_WL_PREFIX = 'epwl:';
 export const NOTIFICATIONS_MAX = 50;
 export const SEARCH_HISTORY_MAX = 15;
 export const EP_WL_MAX = 200;
+export const NEW_EPISODE_SCAN_KEY = 'new_episode_scan_last_run';
 
 // Keys/prefixes owned by this app's data layer. Kept in one place so
 // clearAllData and clearLegacyData can't drift apart.
@@ -35,6 +36,7 @@ export const LOCAL_DATA_KEYS: string[] = [
   PROGRESS_INDEX_KEY,
   WATCHED_INDEX_KEY,
   OFFLINE_QUEUE_KEY,
+  NEW_EPISODE_SCAN_KEY,
   'app_errors',
   'player_debug',
 ];
@@ -196,15 +198,35 @@ export function isSeriesWatched(showId: string | number): boolean {
   return localStorage.getItem(watchedKey('tv', showId, null, null)) !== null;
 }
 
-export function getSeriesWatchedFlag(showId: string | number): { watched: boolean; source?: 'explicit' | 'auto' } {
+export function getSeriesWatchedFlag(showId: string | number): { watched: boolean; source?: 'explicit' | 'auto'; watchedAt?: number } {
   const raw = localStorage.getItem(watchedKey('tv', showId, null, null));
   if (!raw) return { watched: false };
   try {
     const data = JSON.parse(raw) as WatchedData;
-    return { watched: true, source: (data.meta?.source as 'explicit' | 'auto') || 'explicit' };
+    return { watched: true, source: (data.meta?.source as 'explicit' | 'auto') || 'explicit', watchedAt: data.watchedAt };
   } catch {
     return { watched: true };
   }
+}
+
+export function getSeriesWatchedShows(): Array<{ id: string; title: string; poster: string; watchedAt: number; source: 'explicit' | 'auto' }> {
+  const shows: Array<{ id: string; title: string; poster: string; watchedAt: number; source: 'explicit' | 'auto' }> = [];
+  const index = getWatchedIndex();
+  for (const k of index) {
+    const m = k.match(/^watched:tv-(\d+)$/);
+    if (!m) continue;
+    try {
+      const data = JSON.parse(localStorage.getItem(k) || '{}') as WatchedData;
+      shows.push({
+        id: m[1],
+        title: data.title || '',
+        poster: (data.meta?.poster as string) || '',
+        watchedAt: data.watchedAt || 0,
+        source: (data.meta?.source as 'explicit' | 'auto') || 'explicit',
+      });
+    } catch {}
+  }
+  return shows;
 }
 
 export function markSeriesWatched(showId: string | number, showName: string, poster: string, source: 'explicit' | 'auto' = 'explicit'): void {

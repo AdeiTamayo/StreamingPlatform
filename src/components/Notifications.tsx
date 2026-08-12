@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useId, memo, type RefObject } from 'react'
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
+import { scanForNewEpisodes } from '../api/newEpisodeScan';
+import { useAuth } from '../hooks/useAuth';
 import type { NotificationItem } from '../types';
 import styles from './Notifications.module.css';
 
@@ -164,11 +166,29 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     setUnreadCount(list.filter((n) => !n.read).length);
   }
 
+  async function scan() {
+    await scanForNewEpisodes();
+    load();
+  }
+
+  const { syncVersion } = useAuth();
+
+  // Background new-episode detection: scan at startup (throttled to once per
+  // hour) and keep refreshing the list so the bell reflects new releases
+  // without visiting the series page.
   useEffect(() => {
     load();
-    const interval = setInterval(load, 30000);
+    void scan();
+    const interval = setInterval(() => {
+      load();
+      void scan();
+    }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (syncVersion > 0) void scan();
+  }, [syncVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -221,6 +241,10 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   }
 
   function handleToggle() {
+    if (!open) {
+      // Fresh check on open so newly released episodes show immediately.
+      void scanForNewEpisodes(true).then(load);
+    }
     setOpen((previous) => !previous);
   }
 

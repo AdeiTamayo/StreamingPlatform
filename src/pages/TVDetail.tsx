@@ -153,6 +153,93 @@ export default function TVDetail() {
     setWatchedCount(getWatchedCount(id, season, episodeCount));
   }, [id, season, episodeCount, watched]);
 
+  // Check for new episodes of watch-later shows and of series marked as
+  // watched (own controller; the scan must not be aborted by unrelated fetch
+  // effects). When a new episode airs after a series was marked as watched,
+  // the series is moved from watched to Watch Later. Runs before the flag
+  // sync below so the auto flag (set when every episode was watched) is still
+  // readable before it gets cleared for incomplete series.
+  useEffect(() => {
+    if (!show || !id) return;
+    const epwlItems: EpisodeWatchLaterItem[] = getEpisodeWatchLater().filter((item: EpisodeWatchLaterItem) => String(item.showId) === String(id));
+    const seriesFlag = getSeriesWatchedFlag(id);
+    const seriesFlagAt = seriesFlag.watched && seriesFlag.watchedAt ? seriesFlag.watchedAt : null;
+    if (!inWL && epwlItems.length === 0 && seriesFlagAt == null) return;
+    const controller = new AbortController();
+    let cancelled = false;
+
+    (async () => {
+      const now = new Date();
+      let added = 0;
+      let movedToWatchLater = false;
+
+      if (inWL || seriesFlagAt != null) {
+        const latestSeason = seasons[seasons.length - 1];
+        if (latestSeason) {
+          try {
+            const data = await getSeasonDetails(id, latestSeason.season_number, controller.signal);
+            if (cancelled) return;
+            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
+
+            if (seriesFlagAt != null && !movedToWatchLater) {
+              const hasUnwatchedNewEpisodes = eps.some(
+                (ep: TMDBEpisode) =>
+                  !!ep.air_date &&
+                  new Date(ep.air_date).getTime() > seriesFlagAt &&
+                  !isWatched('tv', id, latestSeason.season_number, ep.episode_number),
+              );
+              if (hasUnwatchedNewEpisodes) {
+                unmarkSeriesWatched(id);
+                if (!inWL) addWatchLater('tv', id, show.name, (show.first_air_date || '').slice(0, 4), imageUrl(show.poster_path));
+                setInWL(true);
+                setSeriesWatched(allWatched());
+                toast?.('New episodes released - moved to Watch Later');
+                movedToWatchLater = true;
+              }
+            }
+
+            if (inWL || movedToWatchLater) {
+              for (const ep of eps) {
+                if (added >= 5) break;
+                if (!ep.air_date) continue;
+                if (new Date(ep.air_date) > now) continue;
+                if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
+                if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
+                addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
+                added++;
+              }
+            }
+          } catch {}
+        }
+      }
+
+      if (epwlItems.length > 0) {
+        const seasonsToCheck = [...new Set(epwlItems.map((item: EpisodeWatchLaterItem) => item.season))];
+        for (const seasonNum of seasonsToCheck) {
+          if (added >= 5) break;
+          try {
+            const data = await getSeasonDetails(id, seasonNum, controller.signal);
+            if (cancelled) return;
+            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
+            for (const epwl of epwlItems) {
+              if (added >= 5) break;
+              if (epwl.season !== seasonNum) continue;
+              const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
+              if (!ep || !ep.air_date) continue;
+              if (new Date(ep.air_date) > now) continue;
+              if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
+              if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
+              addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
+              added++;
+            }
+          } catch {}
+        }
+      }
+    })();
+
+    return () => { cancelled = true; controller.abort(); };
+  }, [show, inWL]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep the implicit series flag in sync with per-episode state and expose
   // the derived "series watched" status (flag OR all episodes watched) to the
   // header toggle.
@@ -187,66 +274,6 @@ export default function TVDetail() {
       });
     return () => controller.abort();
   }, [id, season, seasons.length, episodeFetchTick]);
-
-  // Check for new episodes of watch-later shows (own controller; the scan
-  // must not be aborted by unrelated fetch effects).
-  useEffect(() => {
-    if (!show || !id) return;
-    const epwlItems: EpisodeWatchLaterItem[] = getEpisodeWatchLater().filter((item: EpisodeWatchLaterItem) => String(item.showId) === String(id));
-    if (!inWL && epwlItems.length === 0) return;
-    const controller = new AbortController();
-    let cancelled = false;
-
-    (async () => {
-      const now = new Date();
-      let added = 0;
-
-      if (inWL) {
-        const latestSeason = seasons[seasons.length - 1];
-        if (latestSeason) {
-          try {
-            const data = await getSeasonDetails(id, latestSeason.season_number, controller.signal);
-            if (cancelled) return;
-            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
-            for (const ep of eps) {
-              if (added >= 5) break;
-              if (!ep.air_date) continue;
-              if (new Date(ep.air_date) > now) continue;
-              if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
-              if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
-              addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
-              added++;
-            }
-          } catch {}
-        }
-      }
-
-      if (epwlItems.length > 0) {
-        const seasonsToCheck = [...new Set(epwlItems.map((item: EpisodeWatchLaterItem) => item.season))];
-        for (const seasonNum of seasonsToCheck) {
-          if (added >= 5) break;
-          try {
-            const data = await getSeasonDetails(id, seasonNum, controller.signal);
-            if (cancelled) return;
-            const eps = (data as { episodes: TMDBEpisode[] }).episodes || [];
-            for (const epwl of epwlItems) {
-              if (added >= 5) break;
-              if (epwl.season !== seasonNum) continue;
-              const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
-              if (!ep || !ep.air_date) continue;
-              if (new Date(ep.air_date) > now) continue;
-              if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
-              if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
-              addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
-              added++;
-            }
-          } catch {}
-        }
-      }
-    })();
-
-    return () => { cancelled = true; controller.abort(); };
-  }, [show, inWL]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;

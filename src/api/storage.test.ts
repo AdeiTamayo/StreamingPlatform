@@ -11,7 +11,7 @@ import {
   getLastSeen, getContinueWatching,
   getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified,
   clearAllData, exportData, importData,
-  isSeriesWatched, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag,
+  isSeriesWatched, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, getSeriesWatchedShows, syncSeriesWatchedFlag,
 } from './storage';
 
 beforeEach(() => {
@@ -414,11 +414,16 @@ describe('series watched flag', () => {
     expect(isWatched('tv', '1', 2, 1)).toBe(false);
   });
 
-  it('records the source of the mark', () => {
+  it('records the source and time of the mark', () => {
     markSeriesWatched('1', 'Show', 'p.jpg', 'auto');
-    expect(getSeriesWatchedFlag('1')).toEqual({ watched: true, source: 'auto' });
+    const autoFlag = getSeriesWatchedFlag('1');
+    expect(autoFlag.watched).toBe(true);
+    expect(autoFlag.source).toBe('auto');
+    expect(typeof autoFlag.watchedAt).toBe('number');
     markSeriesWatched('2', 'Show 2', 'p.jpg', 'explicit');
-    expect(getSeriesWatchedFlag('2')).toEqual({ watched: true, source: 'explicit' });
+    const explicitFlag = getSeriesWatchedFlag('2');
+    expect(explicitFlag.watched).toBe(true);
+    expect(explicitFlag.source).toBe('explicit');
   });
 
   it('appears in last seen with null season/episode', () => {
@@ -452,7 +457,9 @@ describe('series watched flag', () => {
       { season_number: 1, episode_count: 2 },
       { season_number: 2, episode_count: 1 },
     ], 'Show', 'p.jpg');
-    expect(getSeriesWatchedFlag('1')).toEqual({ watched: true, source: 'auto' });
+    const flag = getSeriesWatchedFlag('1');
+    expect(flag.watched).toBe(true);
+    expect(flag.source).toBe('auto');
   });
 
   it('sync clears an auto flag when episodes are missing', () => {
@@ -479,6 +486,20 @@ describe('series watched flag', () => {
     markSeriesWatched('1', 'Show', 'p.jpg');
     markSeriesWatched('1', 'Show', 'p.jpg');
     expect(getLastSeen()).toHaveLength(1);
+  });
+
+  it('lists all series flags with their metadata', () => {
+    markSeriesWatched('1', 'Show A', 'a.jpg', 'explicit');
+    markSeriesWatched('2', 'Show B', 'b.jpg', 'auto');
+    const shows = getSeriesWatchedShows();
+    expect(shows).toHaveLength(2);
+    const a = shows.find((s) => s.id === '1');
+    expect(a?.title).toBe('Show A');
+    expect(a?.poster).toBe('a.jpg');
+    expect(a?.source).toBe('explicit');
+    expect(typeof a?.watchedAt).toBe('number');
+    const b = shows.find((s) => s.id === '2');
+    expect(b?.source).toBe('auto');
   });
 });
 
