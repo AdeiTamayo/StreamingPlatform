@@ -43,18 +43,32 @@ function getLegacyWatched(): WatchedInsert[] {
           meta: data.meta || null,
         });
       } else {
-        const mm = k.match(/^watched:movie-(.+)$/);
-        if (mm) {
+        const mf = k.match(/^watched:tv-(\d+)$/);
+        if (mf) {
           items.push({
             user_id: '',
-            media_type: 'movie',
-            tmdb_id: Number(mm[1]),
+            media_type: 'tv',
+            tmdb_id: Number(mf[1]),
             title: data.title || '',
             season: null,
             episode: null,
             watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
             meta: data.meta || null,
           });
+        } else {
+          const mm = k.match(/^watched:movie-(.+)$/);
+          if (mm) {
+            items.push({
+              user_id: '',
+              media_type: 'movie',
+              tmdb_id: Number(mm[1]),
+              title: data.title || '',
+              season: null,
+              episode: null,
+              watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
+              meta: data.meta || null,
+            });
+          }
         }
       }
     } catch {

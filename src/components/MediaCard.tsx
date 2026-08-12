@@ -55,7 +55,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
       markUnwatched(type, id);
       setIsWatchedState(false);
     } else {
-      markWatched(type, id, title, null, null, { title, poster: item.poster_path });
+      markWatched(type, id, title, null, null, { title, poster: item.poster_path, source: 'explicit' });
       clearProgress(type, id);
       setIsWatchedState(true);
     }
@@ -96,11 +96,9 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
           <button className={`media-card-wl ${inWL ? 'active' : ''}`} onClick={toggleWL} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>
             {inWL ? '\u2605' : '\u2606'}
           </button>
-          {isMovie && (
-            <button className={`media-card-watched-btn ${isWatchedState ? 'active' : ''}`} onClick={toggleWatched} title={isWatchedState ? 'Unmark watched' : 'Mark as seen'}>
-              {isWatchedState ? '\u2713' : '+'}
-            </button>
-          )}
+          <button className={`media-card-watched-btn ${isWatchedState ? 'active' : ''}`} onClick={toggleWatched} title={isWatchedState ? 'Unmark watched' : (isMovie ? 'Mark as seen' : 'Mark series as seen')}>
+            {isWatchedState ? '\u2713' : '+'}
+          </button>
         </div>
       )}
     </div>

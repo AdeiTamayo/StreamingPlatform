@@ -412,6 +412,8 @@ export default function Settings() {
 
                     <Stat title="Episodes" value={stats.episodesWatched} />
 
+                    <Stat title="Series" value={stats.seriesWatched} />
+
                     <Stat title="Watch Later" value={stats.watchLaterCount} />
                   </div>
                 </>

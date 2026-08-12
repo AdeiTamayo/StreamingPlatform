@@ -88,11 +88,19 @@ async function main() {
     try {
       const data = JSON.parse(localStorage.getItem(key) || '{}');
       const m_tv = key.match(/^watched:tv-(\\d+)-S(\\d+)E(\\d+)$/);
+      const m_series = key.match(/^watched:tv-(\\d+)$/);
       const m_movie = key.match(/^watched:movie-(.+)$/);
       if (m_tv) {
         await supabase.from('watched').upsert({
           user_id: userId, media_type: 'tv', tmdb_id: Number(m_tv[1]),
           title: data.title || '', season: Number(m_tv[2]), episode: Number(m_tv[3]),
+          watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
+          meta: data.meta || null,
+        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+      } else if (m_series) {
+        await supabase.from('watched').upsert({
+          user_id: userId, media_type: 'tv', tmdb_id: Number(m_series[1]),
+          title: data.title || '', season: null, episode: null,
           watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
           meta: data.meta || null,
         }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });

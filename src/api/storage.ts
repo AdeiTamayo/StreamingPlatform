@@ -55,6 +55,7 @@ export function getCurrentUserId(): string | null {
 
 export function watchedKey(type: string, id: string | number, season?: number | null, episode?: number | null): string {
   if (type === 'movie') return `watched:movie-${id}`;
+  if (season == null || episode == null) return `watched:tv-${id}`;
   return `watched:tv-${id}-S${season}E${episode}`;
 }
 
@@ -66,6 +67,8 @@ export function progressKey(type: string, id: string | number, season?: number |
 function parseWatchedKey(k: string): { type: string; showId?: string; id: string; season: number | null; episode: number | null } | null {
   let m = k.match(/^watched:tv-(\d+)-S(\d+)E(\d+)$/);
   if (m) return { type: 'tv', showId: m[1], id: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  m = k.match(/^watched:tv-(\d+)$/);
+  if (m) return { type: 'tv', showId: m[1], id: m[1], season: null, episode: null };
   m = k.match(/^watched:movie-(.+)$/);
   if (m) return { type: 'movie', id: m[1], season: null, episode: null };
   return null;
@@ -181,7 +184,70 @@ export function markUnwatched(type: MediaType, id: string | number, season?: num
   removeFromWatchedIndex(key);
 
   if (currentUserId) {
-    watchedRepository.unmark(currentUserId, type, Number(id), season, episode);
+    if (type === 'tv' && season == null && episode == null) {
+      watchedRepository.unmarkSeries(currentUserId, Number(id));
+    } else {
+      watchedRepository.unmark(currentUserId, type, Number(id), season, episode);
+    }
+  }
+}
+
+export function isSeriesWatched(showId: string | number): boolean {
+  return localStorage.getItem(watchedKey('tv', showId, null, null)) !== null;
+}
+
+export function getSeriesWatchedFlag(showId: string | number): { watched: boolean; source?: 'explicit' | 'auto' } {
+  const raw = localStorage.getItem(watchedKey('tv', showId, null, null));
+  if (!raw) return { watched: false };
+  try {
+    const data = JSON.parse(raw) as WatchedData;
+    return { watched: true, source: (data.meta?.source as 'explicit' | 'auto') || 'explicit' };
+  } catch {
+    return { watched: true };
+  }
+}
+
+export function markSeriesWatched(showId: string | number, showName: string, poster: string, source: 'explicit' | 'auto' = 'explicit'): void {
+  const meta = { title: showName, poster, source };
+  const key = watchedKey('tv', showId, null, null);
+  safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, watchedAt: Date.now(), meta }));
+  addToWatchedIndex(key);
+
+  if (currentUserId) {
+    watchedRepository.mark({
+      user_id: currentUserId,
+      media_type: 'tv',
+      tmdb_id: Number(showId),
+      title: showName,
+      season: null,
+      episode: null,
+      watched_at: new Date().toISOString(),
+      meta: meta as never,
+    });
+  }
+}
+
+export function unmarkSeriesWatched(showId: string | number): void {
+  const key = watchedKey('tv', showId, null, null);
+  localStorage.removeItem(key);
+  removeFromWatchedIndex(key);
+
+  if (currentUserId) {
+    watchedRepository.unmarkSeries(currentUserId, Number(showId));
+  }
+}
+
+// Keeps the implicit (auto) series flag in sync with the per-episode watched
+// state: set when every known episode is watched, cleared when new episodes
+// air or are unmarked. Explicit marks are never touched.
+export function syncSeriesWatchedFlag(showId: string | number, seasons: { season_number: number; episode_count: number }[], showName: string, poster: string): void {
+  if (seasons.length === 0) return;
+  const allWatched = seasons.every((s) => getWatchedCount(showId, s.season_number, s.episode_count) >= s.episode_count);
+  const flag = getSeriesWatchedFlag(showId);
+  if (allWatched) {
+    if (!flag.watched) markSeriesWatched(showId, showName, poster, 'auto');
+  } else if (flag.watched && flag.source === 'auto') {
+    unmarkSeriesWatched(showId);
   }
 }
 
@@ -656,14 +722,16 @@ export async function getStorageUsage(): Promise<StorageUsage> {
 export function getStats(): Stats {
   let moviesWatched = 0;
   let episodesWatched = 0;
+  let seriesWatched = 0;
   const index = getWatchedIndex();
   for (const k of index) {
     if (k.includes('movie-')) moviesWatched++;
     else if (k.match(/tv-\d+-S\d+E\d+/)) episodesWatched++;
+    else if (k.match(/^watched:tv-\d+$/)) seriesWatched++;
   }
   const wl = getWatchLater();
   const epWl = getEpisodeWatchLater();
-  return { moviesWatched, episodesWatched, watchLaterCount: wl.length + epWl.length };
+  return { moviesWatched, episodesWatched, seriesWatched, watchLaterCount: wl.length + epWl.length };
 }
 
 export function clearAllData(): void {

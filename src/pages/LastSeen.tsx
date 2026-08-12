@@ -5,6 +5,8 @@ import {
   markUnwatched,
   clearProgress,
   clearShowHistory,
+  getSeriesWatchedFlag,
+  unmarkSeriesWatched,
 } from "../api/storage";
 import { imageUrl } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
@@ -25,7 +27,12 @@ interface SeriesGroup {
 
 function formatEpisodeLabel(item: LastSeenItem): string {
   if (item.season && item.episode) return `S${item.season}E${item.episode}`;
+  if (item.season == null && item.episode == null) return "Series";
   return "Episode";
+}
+
+function watchedEpisodeCount(group: SeriesGroup): number {
+  return group.episodes.filter((e: LastSeenItem) => e.season && e.episode).length;
 }
 
 export default function LastSeen() {
@@ -49,7 +56,7 @@ export default function LastSeen() {
     const movieItems: LastSeenItem[] = [];
 
     items.forEach((item: LastSeenItem) => {
-      if (item.type === "tv" && item.season && item.episode) {
+      if (item.type === "tv") {
         const key = String(item.id);
         const rawTitle =
           (item.meta?.title as string) || item.title || `Show ${item.id}`;
@@ -141,6 +148,10 @@ export default function LastSeen() {
     } else if (item.season && item.episode) {
       markUnwatched("tv", item.id, item.season, item.episode);
       clearProgress("tv", item.id, item.season, item.episode);
+      if (getSeriesWatchedFlag(item.id).source === "auto") unmarkSeriesWatched(item.id);
+      removed = true;
+    } else if (item.type === "tv") {
+      markUnwatched("tv", item.id);
       removed = true;
     }
     setItems(getLastSeen());
@@ -263,8 +274,9 @@ export default function LastSeen() {
                         <div className="media-card-info">
                           <h3>{show.title}</h3>
                           <span className="media-card-year">
-                            {show.episodes.length} episode
-                            {show.episodes.length === 1 ? "" : "s"}
+                            {show.episodes.length === 1 && !show.episodes[0].season
+                              ? "Watched"
+                              : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
                           </span>
                         </div>
                       </Link>
@@ -308,8 +320,9 @@ export default function LastSeen() {
                           {selectedSeries.title}
                         </h3>
                         <p className={styles.lastSeenSeriesSubtitle}>
-                          {selectedSeries.episodes.length} watched episode
-                          {selectedSeries.episodes.length === 1 ? "" : "s"}
+                          {watchedEpisodeCount(selectedSeries) === 0
+                            ? "Watched"
+                            : `${watchedEpisodeCount(selectedSeries)} watched episode${watchedEpisodeCount(selectedSeries) === 1 ? "" : "s"}`}
                         </p>
                       </div>
                     </div>
@@ -325,7 +338,7 @@ export default function LastSeen() {
                         onClick={() => {
                           if (
                             window.confirm(
-                              `Remove all ${selectedSeries.episodes.length} watched episode${selectedSeries.episodes.length === 1 ? "" : "s"} for "${selectedSeries.title}"?`,
+                              `Remove all ${watchedEpisodeCount(selectedSeries)} watched episode${watchedEpisodeCount(selectedSeries) === 1 ? "" : "s"} for "${selectedSeries.title}"?`,
                             )
                           )
                             handleRemoveShow(selectedSeries.id);
@@ -343,7 +356,7 @@ export default function LastSeen() {
                         className={styles.lastSeenEpisodeRow}
                       >
                         <Link
-                          to={`/tv/${selectedSeries.id}?season=${item.season}&episode=${item.episode}`}
+                          to={item.season && item.episode ? `/tv/${selectedSeries.id}?season=${item.season}&episode=${item.episode}` : `/tv/${selectedSeries.id}`}
                           className={styles.lastSeenEpisode}
                         >
                           <span className={styles.lsLabel}>

@@ -75,7 +75,9 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
           query = query.eq('user_id', d.userId as string);
           if (d.mediaType != null) query = query.eq('media_type', d.mediaType as string);
           if (d.tmdbId != null) query = query.eq('tmdb_id', d.tmdbId as number);
-          if (d.mediaType === 'tv' || d.season != null) {
+          if (d.seriesOnly === true) {
+            query = query.is('season', null).is('episode', null);
+          } else if (d.mediaType === 'tv' || d.season != null) {
             if (d.season != null) query = query.eq('season', d.season as number);
             if (d.episode != null) query = query.eq('episode', d.episode as number);
           }

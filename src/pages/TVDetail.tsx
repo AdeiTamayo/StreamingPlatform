@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -41,6 +41,7 @@ export default function TVDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
+  const [seriesWatched, setSeriesWatched] = useState(false);
   const [startAt, setStartAt] = useState<number | null>(null);
   const [inWL, setInWL] = useState(false);
   const [inEpWL, setInEpWL] = useState(false);
@@ -151,6 +152,15 @@ export default function TVDetail() {
     if (!id) return;
     setWatchedCount(getWatchedCount(id, season, episodeCount));
   }, [id, season, episodeCount, watched]);
+
+  // Keep the implicit series flag in sync with per-episode state and expose
+  // the derived "series watched" status (flag OR all episodes watched) to the
+  // header toggle.
+  useEffect(() => {
+    if (!id || !show || seasons.length === 0) return;
+    syncSeriesWatchedFlag(id, seasons, show.name, show?.poster_path ?? '');
+    setSeriesWatched(getSeriesWatchedFlag(id).watched || allWatched());
+  }, [id, seasons, show, watched, watchedCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Watched dots for the current season - recomputed whenever any bulk
   // operation updates the count for it.
@@ -288,6 +298,30 @@ export default function TVDetail() {
     }
   }
 
+  function toggleSeriesWatched() {
+    if (!show || !id) return;
+    if (seriesWatched) {
+      const flag = getSeriesWatchedFlag(id);
+      if (flag.watched && flag.source === 'explicit') {
+        unmarkSeriesWatched(id);
+        setSeriesWatched(false);
+        toast?.('Series removed from watched');
+      } else {
+        if (!window.confirm('Unmark all episodes of this series? This cannot be undone.')) return;
+        unmarkAllSeasonsWatched(id, seasons);
+        unmarkSeriesWatched(id);
+        setWatchedCount(getWatchedCount(id, season, episodeCount));
+        setWatched(isWatched('tv', id, season, episode));
+        setSeriesWatched(false);
+        toast?.('Series removed from watched');
+      }
+    } else {
+      markSeriesWatched(id, show.name, show?.poster_path ?? '', 'explicit');
+      setSeriesWatched(true);
+      toast?.('Series marked as watched');
+    }
+  }
+
   function goPrev() {
     if (episode > 1) {
       setEpisode(episode - 1);
@@ -364,6 +398,7 @@ export default function TVDetail() {
                 if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
                 else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : '+ Watch'}</button>
+              <button className={`badge-btn ${seriesWatched ? 'in-wl' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? 'Series watched' : 'Mark series watched'}</button>
             </div>
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (

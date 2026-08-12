@@ -273,6 +273,7 @@ export interface StorageUsage {
 export interface Stats {
   moviesWatched: number;
   episodesWatched: number;
+  seriesWatched: number;
   watchLaterCount: number;
 }
 

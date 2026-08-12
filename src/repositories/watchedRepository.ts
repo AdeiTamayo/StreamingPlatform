@@ -60,6 +60,25 @@ export const watchedRepository = {
     }
   },
 
+  // Removes only the series-level watched row (season/episode null), never
+  // the per-episode rows of the show.
+  async unmarkSeries(userId: string, tmdbId: number): Promise<void> {
+    try {
+      const { error }: any = await withRetry(async () =>
+        requireSupabase().from('watched')
+          .delete()
+          .eq('user_id', userId)
+          .eq('media_type', 'tv')
+          .eq('tmdb_id', tmdbId)
+          .is('season', null)
+          .is('episode', null),
+      );
+      if (error) throw error;
+    } catch {
+      enqueueWrite('watched', 'delete', { userId, mediaType: 'tv', tmdbId, seriesOnly: true });
+    }
+  },
+
   async getAll(userId: string): Promise<WatchedRow[]> {
     try {
       const { data, error }: any = await withRetry(async () =>

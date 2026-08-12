@@ -11,6 +11,7 @@ import {
   getLastSeen, getContinueWatching,
   getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified,
   clearAllData, exportData, importData,
+  isSeriesWatched, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag,
 } from './storage';
 
 beforeEach(() => {
@@ -168,6 +169,12 @@ describe('clearShowHistory', () => {
     expect(getProgress('tv', '1', 1, 1)).toBeNull();
     expect(getProgress('tv', '1', 1, 2)).toBeNull();
     expect(getProgress('tv', '2', 1, 1)).not.toBeNull();
+  });
+
+  it('removes the series flag with the history', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    clearShowHistory('1');
+    expect(isSeriesWatched('1')).toBe(false);
   });
 });
 
@@ -387,11 +394,100 @@ describe('search history', () => {
   });
 });
 
+describe('series watched flag', () => {
+  it('marks and unmarks a series', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    expect(isSeriesWatched('1')).toBe(true);
+    expect(isWatched('tv', '1')).toBe(true);
+    unmarkSeriesWatched('1');
+    expect(isSeriesWatched('1')).toBe(false);
+    expect(isWatched('tv', '1')).toBe(false);
+  });
+
+  it('keeps episodes isolated from the series flag', () => {
+    markWatched('tv', '1', 'Show', 1, 1);
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    expect(isSeriesWatched('1')).toBe(true);
+    expect(getWatchedCount('1', 1, 10)).toBe(1);
+    expect(getWatchedEpisodeSet('1', 1)).toEqual(new Set([1]));
+    expect(isWatched('tv', '1', 1, 1)).toBe(true);
+    expect(isWatched('tv', '1', 2, 1)).toBe(false);
+  });
+
+  it('records the source of the mark', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg', 'auto');
+    expect(getSeriesWatchedFlag('1')).toEqual({ watched: true, source: 'auto' });
+    markSeriesWatched('2', 'Show 2', 'p.jpg', 'explicit');
+    expect(getSeriesWatchedFlag('2')).toEqual({ watched: true, source: 'explicit' });
+  });
+
+  it('appears in last seen with null season/episode', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    const seen = getLastSeen();
+    expect(seen).toHaveLength(1);
+    expect(seen[0].type).toBe('tv');
+    expect(seen[0].season).toBeNull();
+    expect(seen[0].episode).toBeNull();
+    expect(seen[0].title).toBe('Show');
+  });
+
+  it('is ignored by getLastWatchedEpisode', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    expect(getLastWatchedEpisode('1')).toBeNull();
+  });
+
+  it('unmarking via markUnwatched(tv, id) removes only the flag', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    markWatched('tv', '1', 'Show', 1, 1);
+    markUnwatched('tv', '1');
+    expect(isSeriesWatched('1')).toBe(false);
+    expect(isWatched('tv', '1', 1, 1)).toBe(true);
+  });
+
+  it('sync sets an auto flag when every episode is watched', () => {
+    markWatched('tv', '1', 'Show', 1, 1);
+    markWatched('tv', '1', 'Show', 1, 2);
+    markWatched('tv', '1', 'Show', 2, 1);
+    syncSeriesWatchedFlag('1', [
+      { season_number: 1, episode_count: 2 },
+      { season_number: 2, episode_count: 1 },
+    ], 'Show', 'p.jpg');
+    expect(getSeriesWatchedFlag('1')).toEqual({ watched: true, source: 'auto' });
+  });
+
+  it('sync clears an auto flag when episodes are missing', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg', 'auto');
+    markWatched('tv', '1', 'Show', 1, 1);
+    syncSeriesWatchedFlag('1', [{ season_number: 1, episode_count: 2 }], 'Show', 'p.jpg');
+    expect(isSeriesWatched('1')).toBe(false);
+  });
+
+  it('sync never clears an explicit flag', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg', 'explicit');
+    markWatched('tv', '1', 'Show', 1, 1);
+    syncSeriesWatchedFlag('1', [{ season_number: 1, episode_count: 2 }], 'Show', 'p.jpg');
+    expect(isSeriesWatched('1')).toBe(true);
+  });
+
+  it('sync does nothing when there are no seasons', () => {
+    markWatched('tv', '1', 'Show', 1, 1);
+    syncSeriesWatchedFlag('1', [], 'Show', 'p.jpg');
+    expect(isSeriesWatched('1')).toBe(false);
+  });
+
+  it('markSeriesWatched is idempotent', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    expect(getLastSeen()).toHaveLength(1);
+  });
+});
+
 describe('getStats', () => {
   it('returns zero counts when nothing exists', () => {
     const stats = getStats();
     expect(stats.moviesWatched).toBe(0);
     expect(stats.episodesWatched).toBe(0);
+    expect(stats.seriesWatched).toBe(0);
     expect(stats.watchLaterCount).toBe(0);
   });
 
@@ -404,6 +500,15 @@ describe('getStats', () => {
     const stats = getStats();
     expect(stats.moviesWatched).toBe(2);
     expect(stats.episodesWatched).toBe(2);
+    expect(stats.seriesWatched).toBe(0);
+  });
+
+  it('counts series watched flags separately from episodes', () => {
+    markSeriesWatched('1', 'Show', '');
+    markWatched('tv', '1', 'Show', 1, 1);
+    const stats = getStats();
+    expect(stats.seriesWatched).toBe(1);
+    expect(stats.episodesWatched).toBe(1);
   });
 
   it('counts episode watch later items', () => {
@@ -428,9 +533,11 @@ describe('clearAllData', () => {
   it('clears watched entries', () => {
     markWatched('movie', '1', 'Movie');
     markWatched('tv', '1', 'Show', 1, 1);
+    markSeriesWatched('1', 'Show', 'p.jpg');
     clearAllData();
     expect(isWatched('movie', '1')).toBe(false);
     expect(isWatched('tv', '1', 1, 1)).toBe(false);
+    expect(isSeriesWatched('1')).toBe(false);
   });
 
   it('clears progress entries', () => {
@@ -505,6 +612,16 @@ describe('export / import', () => {
     setVideoSource('2embed');
     const data = exportData();
     expect(data['video_source']).toBeUndefined();
+  });
+
+  it('exports and imports series flags', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    const data = exportData();
+    expect(data['watched:tv-1']).toBeTruthy();
+    localStorage.clear();
+    const imported = importData(data, 'merge');
+    expect(imported).toBeGreaterThan(0);
+    expect(isSeriesWatched('1')).toBe(true);
   });
 
   it('import merges data on top of existing', () => {
