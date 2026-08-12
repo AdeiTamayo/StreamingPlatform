@@ -16,6 +16,7 @@ export const WATCHED_INDEX_KEY = 'watched_index';
 export const EP_WL_INDEX_KEY = 'epwl_index';
 export const VIDEO_SOURCE_KEY = 'video_source';
 export const NOTIFICATIONS_KEY = 'notifications';
+export const NOTIFICATIONS_DISMISSED_KEY = 'notifications_dismissed';
 export const SEARCH_HISTORY_KEY = 'search_history';
 export const EP_WL_PREFIX = 'epwl:';
 export const NOTIFICATIONS_MAX = 50;
@@ -33,6 +34,7 @@ export const LOCAL_DATA_KEYS: string[] = [
   EP_WL_INDEX_KEY,
   SEARCH_HISTORY_KEY,
   NOTIFICATIONS_KEY,
+  NOTIFICATIONS_DISMISSED_KEY,
   PROGRESS_INDEX_KEY,
   WATCHED_INDEX_KEY,
   OFFLINE_QUEUE_KEY,
@@ -789,7 +791,45 @@ export function getNotifications(): NotificationItem[] {
   }
 }
 
+const NOTIFICATIONS_DISMISSED_MAX = 500;
+
+function getDismissedNotifications(): { showId: string; season: number; episode: number }[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(NOTIFICATIONS_DISMISSED_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDismissedNotifications(list: { showId: string; season: number; episode: number }[]): void {
+  safeWrite(NOTIFICATIONS_DISMISSED_KEY, JSON.stringify(list.slice(0, NOTIFICATIONS_DISMISSED_MAX)));
+}
+
+function dismissNotification(showId: string | number, season: number, episode: number): void {
+  const sid = String(showId);
+  const list = getDismissedNotifications();
+  if (list.some((d) => d.showId === sid && d.season === season && d.episode === episode)) return;
+  list.unshift({ showId: sid, season, episode });
+  writeDismissedNotifications(list);
+}
+
+// A dismissed episode stays dismissed until it is watched, so scans after a
+// remove/clear don't immediately re-create the same notification. Entries for
+// watched episodes are pruned lazily to keep the list small.
+function isDismissedNotification(showId: string | number, season: number, episode: number): boolean {
+  const sid = String(showId);
+  const list = getDismissedNotifications();
+  const dismissed = list.some((d) => d.showId === sid && d.season === season && d.episode === episode);
+  if (dismissed) {
+    const remaining = list.filter((d) => !isWatched('tv', d.showId, d.season, d.episode));
+    if (remaining.length !== list.length) writeDismissedNotifications(remaining);
+  }
+  return dismissed;
+}
+
 export function addNotification(showId: string | number, showTitle: string, season: number, episode: number, episodeTitle: string | null, type: string, airDate: string | null): string {
+  if (isDismissedNotification(showId, season, episode)) return '';
   const list = getNotifications();
   const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   list.unshift({
@@ -828,6 +868,7 @@ export function removeNotification(id: string): void {
   const item = list.find((n: NotificationItem) => n.id === id);
   safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list.filter((n: NotificationItem) => n.id !== id)));
 
+  if (item) dismissNotification(item.showId, item.season, item.episode);
   if (currentUserId && item) {
     notificationRepository.remove(currentUserId, Number(item.showId), item.season, item.episode);
   }
@@ -844,6 +885,7 @@ export function markAllNotificationsRead(): void {
 }
 
 export function clearAllNotifications(): void {
+  getNotifications().forEach((n: NotificationItem) => dismissNotification(n.showId, n.season, n.episode));
   localStorage.removeItem(NOTIFICATIONS_KEY);
 
   if (currentUserId) {

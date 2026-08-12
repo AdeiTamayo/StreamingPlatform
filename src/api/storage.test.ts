@@ -358,6 +358,33 @@ describe('notifications', () => {
     expect(isAlreadyNotified('2', 1, 1)).toBe(false);
   });
 
+  it('does not re-add a notification after it was removed', () => {
+    const id = addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    removeNotification(id);
+    addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    expect(getNotifications()).toHaveLength(0);
+  });
+
+  it('does not re-add cleared notifications, but notifies new episodes', () => {
+    addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    addNotification('2', 'Other', 2, 5, null, 'new_episode', null);
+    clearAllNotifications();
+    addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    addNotification('1', 'Show', 1, 2, null, 'new_episode', null);
+    const notifs = getNotifications();
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].episode).toBe(2);
+  });
+
+  it('forgets a dismissal once the episode is watched', () => {
+    const id = addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    removeNotification(id);
+    markWatched('tv', '1', 'Show', 1, 1);
+    addNotification('1', 'Show', 1, 1, null, 'new_episode', null);
+    const notifs = getNotifications();
+    expect(notifs.some((n) => n.season === 1 && n.episode === 1)).toBe(false);
+  });
+
   it('caps at NOTIFICATIONS_MAX (50)', () => {
     for (let i = 0; i < 60; i++) {
       addNotification('1', 'Show', 1, i, null, 'new_episode', null);
