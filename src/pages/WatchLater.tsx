@@ -38,6 +38,17 @@ function isFuture(dateStr: string) {
   return d >= new Date();
 }
 
+// The calendar only covers the current month and later months; past days of
+// the current month still show their releases, so the collectors accept
+// anything from the start of the current month onwards.
+function isCalendarRelevant(dateStr: string) {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const d = parseLocalDate(dateStr);
+  d.setHours(23, 59, 59, 999);
+  return d >= monthStart;
+}
+
 function todayLocal() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -143,7 +154,7 @@ export default function WatchLater() {
               ((seasonDetail as Record<string, unknown>)
                 ?.episodes as TMDBEpisode[]) || [];
             for (const ep of episodes) {
-              if (ep.air_date && isFuture(ep.air_date)) {
+              if (ep.air_date && isCalendarRelevant(ep.air_date)) {
                 const dup = results.some(
                   (r) =>
                     r.season === season.season_number &&
@@ -169,7 +180,7 @@ export default function WatchLater() {
           } catch {}
         }
 
-        if (nextEp?.air_date && isFuture(nextEp.air_date)) {
+        if (nextEp?.air_date && isCalendarRelevant(nextEp.air_date)) {
           const n = nextEp;
           const dup = results.some(
             (r) =>
@@ -209,7 +220,7 @@ export default function WatchLater() {
           title?: string;
           poster_path?: string | null;
         };
-        if (detail?.release_date && isFuture(detail.release_date)) {
+        if (detail?.release_date && isCalendarRelevant(detail.release_date)) {
           return {
             date: detail.release_date,
             title: detail.title || "",
@@ -273,7 +284,7 @@ export default function WatchLater() {
             const ep = seasonDetail?.episodes?.find(
               (e) => e.episode_number === epwl.episode,
             );
-            if (ep?.air_date && isFuture(ep.air_date)) {
+            if (ep?.air_date && isCalendarRelevant(ep.air_date)) {
               return {
                 date: ep.air_date,
                 title: epwl.showTitle,
@@ -327,11 +338,21 @@ export default function WatchLater() {
         calendarItems.length > 0 &&
         calendarItems[0]?.date
       ) {
-        const firstDate = calendarItems[0].date;
-        const d = parseLocalDate(firstDate);
-        setCalYear(d.getFullYear());
-        setCalMonth(d.getMonth());
-        setSelectedDate(firstDate);
+        const now = new Date();
+        const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+        // Jump to the next release at/after this month when one exists,
+        // otherwise stay on the current month (whose earlier days may still
+        // have releases) with today selected.
+        const firstRelevant = calendarItems.find((c) => c.date >= currentMonthStart);
+        if (firstRelevant) {
+          const d = parseLocalDate(firstRelevant.date);
+          setCalYear(d.getFullYear());
+          setCalMonth(d.getMonth());
+          setSelectedDate(firstRelevant.date);
+        } else {
+          const latest = calendarItems[calendarItems.length - 1];
+          setSelectedDate(latest?.date || todayLocal());
+        }
         calendarInitedRef.current = true;
       }
     } else {
@@ -419,7 +440,9 @@ export default function WatchLater() {
   const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
 
   const groupedUpcomingList = useMemo(() => {
-    const sorted = Object.keys(itemsByDate).sort();
+    const sorted = Object.keys(itemsByDate)
+      .filter((date) => isFuture(date))
+      .sort();
     return sorted.map((date) => ({ date, items: itemsByDate[date] }));
   }, [itemsByDate]);
 
@@ -433,6 +456,7 @@ export default function WatchLater() {
   }, [groupedUpcomingList, upcomingPage, DAYS_PER_PAGE]);
 
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
+  const upcomingCalendarCount = calendarItems.filter((c) => isFuture(c.date)).length;
 
   useEffect(() => {
     if (upcomingPage >= totalPages)
@@ -444,7 +468,7 @@ export default function WatchLater() {
   }, [listPages, page]);
 
   if (view === "calendar") {
-    const maxPosters = 3;
+    const maxPosters = 1;
 
     if (loadingCalendar) {
       return (
@@ -603,7 +627,7 @@ export default function WatchLater() {
 
                         {releases.length > 0 && (
                           <div
-                            className={`${styles.posterRow} ${styles[`pcount-${Math.min(releases.length, 3)}`]}`}
+                            className={`${styles.posterRow} ${styles[`pcount-${Math.min(releases.length, 2)}`]}`}
                           >
                             {releases.slice(0, maxPosters).map((item, i) => (
                               <img
@@ -863,7 +887,7 @@ export default function WatchLater() {
 
         {!loadingCalendar && (items.length > 0 || epItems.length > 0) && (
           <div className={styles.upcomingBanner}>
-            {calendarItems.length > 0 ? (
+            {upcomingCalendarCount > 0 ? (
               <button
                 className={styles.upcomingToggle}
                 onClick={() => setShowUpcoming((v) => !v)}
@@ -884,7 +908,7 @@ export default function WatchLater() {
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span className={styles.upcomingToggleLabel}>
-                  {calendarItems.length} upcoming
+                  {upcomingCalendarCount} upcoming
                 </span>
                 <span className={styles.upcomingToggleArrow}>
                   {showUpcoming ? "\u25B2" : "\u25BC"}

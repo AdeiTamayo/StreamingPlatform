@@ -374,6 +374,8 @@
 
   min-height: 120px;
 
+  max-height: 150px;
+
   padding: 0.65rem;
 
   border-radius: 14px;
@@ -466,15 +468,11 @@
   color: #fff;
 }
 
-/* Past days: greyed out to signal the date has passed */
+/* Past days: the cell itself stays fully visible so every release of the
+   month keeps showing; only the poster thumbs of older dates get shaded to
+   signal the day has passed. */
 .past {
-  opacity: 0.5;
-
   border-color: transparent;
-}
-
-.past:hover {
-  opacity: 0.8;
 }
 
 .past .dayNumber {
@@ -484,12 +482,16 @@
 .past .posterThumb,
 .past .posterMore {
   filter: grayscale(1);
+
+  opacity: 0.75;
 }
 
 .past:hover .posterThumb {
   transform: translateY(-2px) scale(1.06);
 
   filter: grayscale(0.5);
+
+  opacity: 0.9;
 }
 
 .selected {
@@ -517,7 +519,7 @@
 
   gap: 4px;
 
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 
   align-items: center;
 
