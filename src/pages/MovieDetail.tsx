@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
+import { getImdbRating, type ImdbRating } from '../api/omdb';
 import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource } from '../api/storage';
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
@@ -34,6 +35,7 @@ export default function MovieDetail() {
   const [inWL, setInWL] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [imdbRating, setImdbRating] = useState<ImdbRating | null>(null);
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
@@ -76,6 +78,18 @@ export default function MovieDetail() {
       })
       .finally(() => setLoading(false));
   }, [id, refreshFromStorage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!movie?.imdb_id) {
+      setImdbRating(null);
+      return;
+    }
+    let cancelled = false;
+    getImdbRating(movie.imdb_id, 'movie').then((r) => {
+      if (!cancelled) setImdbRating(r);
+    });
+    return () => { cancelled = true; };
+  }, [movie?.imdb_id]);
 
   if (!id) return <div className="page"><div className="loading">Movie not found</div></div>;
 
@@ -175,10 +189,21 @@ export default function MovieDetail() {
           <div className="detail-meta">
             <h1>{movie.title} <span className="year">({year})</span></h1>
             <div className="detail-badges">
-              <span className="badge rating">{movie.vote_average?.toFixed(1)}</span>
+              {!imdbRating && movie.vote_average != null && <span className="badge rating">{movie.vote_average.toFixed(1)}</span>}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{movie.runtime} min</span>
               {startAt && <span className="badge resume-badge">Resume at {formatResume(startAt)}</span>}
+              {movie.imdb_id && (
+                <a
+                  className="badge-btn imdb-badge"
+                  href={`https://www.imdb.com/title/${movie.imdb_id}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                >
+                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
+                </a>
+              )}
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (

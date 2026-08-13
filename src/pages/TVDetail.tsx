@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
+import { getImdbRating, type ImdbRating } from '../api/omdb';
 import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
@@ -52,6 +53,7 @@ export default function TVDetail() {
   const [episodeFetchTick, setEpisodeFetchTick] = useState(0);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
+  const [imdbRating, setImdbRating] = useState<ImdbRating | null>(null);
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
   const watchedRef = useRef(false);
@@ -128,6 +130,18 @@ export default function TVDetail() {
     setEpisode(requestedEpisode);
     setPlayerOpen(true);
   }, [urlSeason, urlEpisode, show]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!show?.imdb_id) {
+      setImdbRating(null);
+      return;
+    }
+    let cancelled = false;
+    getImdbRating(show.imdb_id, 'series').then((r) => {
+      if (!cancelled) setImdbRating(r);
+    });
+    return () => { cancelled = true; };
+  }, [show?.imdb_id]);
 
   useEffect(() => {
     if (!id) return;
@@ -418,7 +432,7 @@ export default function TVDetail() {
           <div className="detail-meta">
             <h1>{show.name} <span className="year">({endYear ? `${year}-${endYear}` : year})</span></h1>
             <div className="detail-badges">
-              <span className="badge rating">{show.vote_average?.toFixed(1)}</span>
+              {!imdbRating && show.vote_average != null && <span className="badge rating">{show.vote_average.toFixed(1)}</span>}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
               <button className={`badge-btn ${inWL ? 'in-wl' : ''}`} onClick={() => {
@@ -426,6 +440,17 @@ export default function TVDetail() {
                 else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : '+ Watch'}</button>
               <button className={`badge-btn ${seriesWatched ? 'in-wl' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? 'Series watched' : 'Mark series watched'}</button>
+              {show.imdb_id && (
+                <a
+                  className="badge-btn imdb-badge"
+                  href={`https://www.imdb.com/title/${show.imdb_id}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                >
+                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
+                </a>
+              )}
             </div>
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (

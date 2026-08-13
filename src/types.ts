@@ -23,6 +23,7 @@ export interface TMDBMovie {
   popularity?: number;
   adult?: boolean;
   video?: boolean;
+  imdb_id?: string;
 }
 
 export interface TMDBSeries {
@@ -53,6 +54,7 @@ export interface TMDBSeries {
   in_production?: boolean;
   last_air_date?: string;
   next_episode_to_air?: TMDBEpisodeToAir;
+  imdb_id?: string;
   number_of_seasons?: number;
   number_of_episodes?: number;
   type?: string;

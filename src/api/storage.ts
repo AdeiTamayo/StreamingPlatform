@@ -41,6 +41,7 @@ export const LOCAL_DATA_KEYS: string[] = [
   NEW_EPISODE_SCAN_KEY,
   'app_errors',
   'player_debug',
+  'omdb:',
 ];
 
 let currentUserId: string | null = null;

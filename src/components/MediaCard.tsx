@@ -2,6 +2,7 @@ import { useState, useEffect, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { imageUrl } from '../api/tmdb';
 import { isWatched, markWatched, markUnwatched, isInWatchLater, addWatchLater, removeWatchLater, clearProgress } from '../api/storage';
+import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../api/omdb';
 import { useTVStatus } from '../hooks/useTVStatus';
 import { useAuth } from '../hooks/useAuth';
 import type { TMDBMovie, TMDBSeries, MediaType } from '../types';
@@ -18,6 +19,10 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const inferredType: MediaType = mediaType || ((item as unknown as Record<string, string>).media_type as MediaType) || (isMovie ? 'movie' : 'tv');
   const [inWL, setInWL] = useState(() => isInWatchLater(inferredType, item.id));
   const [isWatchedState, setIsWatchedState] = useState(() => isWatched(inferredType, item.id));
+  const [imdbRating, setImdbRating] = useState<ImdbRating | null>(() => {
+    const peek = peekOmdbRatingByTmdb(item.id);
+    return peek.state === 'cached' ? peek.rating : null;
+  });
   const { isAuthenticated, syncVersion } = useAuth();
   const type = inferredType;
   const id = item.id;
@@ -35,6 +40,19 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const rating = item.vote_average ? item.vote_average.toFixed(1) : '?';
   const poster = imageUrl(item.poster_path);
   const posterSrc = imgError ? imageUrl(null) : poster;
+
+  useEffect(() => {
+    const peek = peekOmdbRatingByTmdb(id);
+    if (peek.state !== 'fresh') {
+      setImdbRating(peek.rating);
+      return;
+    }
+    let cancelled = false;
+    getOmdbRatingByTitle(id, title, year, type).then((r) => {
+      if (!cancelled) setImdbRating(r);
+    });
+    return () => { cancelled = true; };
+  }, [type, id, title, year]);
 
   function toggleWL(e: React.MouseEvent) {
     e.preventDefault();
@@ -74,7 +92,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             onError={() => setImgError(true)}
             style={{ opacity: loaded ? 1 : 0 }}
           />
-          {loaded && <span className="media-card-rating">{rating}</span>}
+          {loaded && <span className="media-card-rating" title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : `TMDB rating ${rating}/10`}>{imdbRating ? imdbRating.rating : rating}</span>}
           {loaded && <span className={`media-card-type ${type}`}>{type === 'tv' ? 'TV' : 'Movie'}</span>}
         </div>
         <div className="media-card-info">
