@@ -11,11 +11,13 @@ import {
 import { imageUrl } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import FilterDropdown from "../components/FilterDropdown";
+import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
 import type { LastSeenItem } from "../types";
 import styles from "./LastSeen.module.css";
 
 const MOVIES_PER_PAGE = 20;
+const SERIES_PER_PAGE = 20;
 
 interface SeriesGroup {
   id: number | string;
@@ -42,6 +44,7 @@ export default function LastSeen() {
   const [filterType, setFilterType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [moviePage, setMoviePage] = useState(0);
+  const [seriesPage, setSeriesPage] = useState(0);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
   const toast = useToast();
 
@@ -139,6 +142,16 @@ export default function LastSeen() {
     (safeMoviePage + 1) * MOVIES_PER_PAGE,
   );
 
+  const totalSeriesPages = Math.max(
+    1,
+    Math.ceil(series.length / SERIES_PER_PAGE),
+  );
+  const safeSeriesPage = Math.min(seriesPage, totalSeriesPages - 1);
+  const visibleSeries = series.slice(
+    safeSeriesPage * SERIES_PER_PAGE,
+    (safeSeriesPage + 1) * SERIES_PER_PAGE,
+  );
+
   function handleRemove(item: LastSeenItem) {
     let removed = false;
     if (item.type === "movie") {
@@ -170,6 +183,7 @@ export default function LastSeen() {
   function showSeriesEpisodes(show: SeriesGroup) {
     setSelectedSeriesId(String(show.id));
     setMoviePage(0);
+    setSeriesPage(0);
   }
 
   function backToSeries() {
@@ -238,6 +252,7 @@ export default function LastSeen() {
                     setSortBy("recent");
                     setSearchQuery("");
                     setSelectedSeriesId(null);
+                    setSeriesPage(0);
                   }}
                 >
                   Clear filters
@@ -251,7 +266,7 @@ export default function LastSeen() {
                   TV Series ({series.length})
                 </h3>
                 <div className="media-grid">
-                  {series.map((show) => (
+                  {visibleSeries.map((show) => (
                     <div
                       key={show.id}
                       className={`media-card ${styles.lastSeenCard}`}
@@ -289,6 +304,14 @@ export default function LastSeen() {
                     </div>
                   ))}
                 </div>
+                {totalSeriesPages > 1 && (
+                  <Pagination
+                    page={safeSeriesPage + 1}
+                    totalPages={totalSeriesPages}
+                    onChange={(p) => setSeriesPage(p - 1)}
+                    style={{ marginTop: "1rem" }}
+                  />
+                )}
               </>
             )}
 
@@ -409,23 +432,12 @@ export default function LastSeen() {
                   ))}
                 </div>
                 {totalMoviePages > 1 && (
-                  <div className="pagination" style={{ marginTop: "1rem" }}>
-                    <button
-                      disabled={safeMoviePage === 0}
-                      onClick={() => setMoviePage((p) => p - 1)}
-                    >
-                      Prev
-                    </button>
-                    <span>
-                      Page {safeMoviePage + 1} of {totalMoviePages}
-                    </span>
-                    <button
-                      disabled={safeMoviePage >= totalMoviePages - 1}
-                      onClick={() => setMoviePage((p) => p + 1)}
-                    >
-                      Next
-                    </button>
-                  </div>
+                  <Pagination
+                    page={safeMoviePage + 1}
+                    totalPages={totalMoviePages}
+                    onChange={(p) => setMoviePage(p - 1)}
+                    style={{ marginTop: "1rem" }}
+                  />
                 )}
               </section>
             )}

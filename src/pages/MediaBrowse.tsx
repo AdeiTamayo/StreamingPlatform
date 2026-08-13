@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getPopularMovies, getPopularTV, getMovieGenres, getTVGenres, getCountries, discover, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
+import Pagination from '../components/Pagination';
 import FilterBar from '../components/FilterBar';
 import FilterDropdown from '../components/FilterDropdown';
 import DatePickerField from '../components/DatePickerField';
@@ -119,11 +120,7 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
               ))}
             </div>
             {totalPages > 1 && (
-              <div className="pagination">
-                <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-                <span>Page {page} of {totalPages}</span>
-                <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
-              </div>
+              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
             )}
           </>
         )}

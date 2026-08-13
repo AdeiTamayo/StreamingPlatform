@@ -14,6 +14,7 @@ import {
 } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import FilterDropdown from "../components/FilterDropdown";
+import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
 import { useAbortController } from "../hooks/useAbortController";
 import type {
@@ -431,18 +432,16 @@ export default function WatchLater() {
     return groupedUpcomingList.slice(start, start + DAYS_PER_PAGE);
   }, [groupedUpcomingList, upcomingPage, DAYS_PER_PAGE]);
 
+  const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
+
   useEffect(() => {
     if (upcomingPage >= totalPages)
       setUpcomingPage(Math.max(0, totalPages - 1));
   }, [totalPages, upcomingPage]);
 
   useEffect(() => {
-    const listPages = Math.max(
-      1,
-      Math.ceil(sortedItems.length / ITEMS_PER_PAGE),
-    );
     if (page > listPages) setPage(listPages);
-  }, [sortedItems.length, page]);
+  }, [listPages, page]);
 
   if (view === "calendar") {
     const maxPosters = 3;
@@ -816,27 +815,8 @@ export default function WatchLater() {
                       </div>
                     ))}
                 </div>
-                {Math.ceil(sortedItems.length / ITEMS_PER_PAGE) > 1 && (
-                  <div className="pagination">
-                    <button
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => p - 1)}
-                    >
-                      Prev
-                    </button>
-                    <span>
-                      Page {page} of{" "}
-                      {Math.ceil(sortedItems.length / ITEMS_PER_PAGE)}
-                    </span>
-                    <button
-                      disabled={
-                        page >= Math.ceil(sortedItems.length / ITEMS_PER_PAGE)
-                      }
-                      onClick={() => setPage((p) => p + 1)}
-                    >
-                      Next
-                    </button>
-                  </div>
+                {listPages > 1 && (
+                  <Pagination page={page} totalPages={listPages} onChange={setPage} />
                 )}
               </>
             )}

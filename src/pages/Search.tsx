@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
+import Pagination from '../components/Pagination';
 import { getSearchHistory, addSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
 import type { TMDBMovie, TMDBSeries } from '../types';
@@ -128,11 +129,12 @@ export default function Search() {
               ))}
             </div>
             {totalPages > 1 && (
-              <div className="pagination">
-                <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>Prev</button>
-                <span>Page {safePage} of {totalPages}{filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}</span>
-                <button disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>Next</button>
-              </div>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onChange={setPage}
+                label={`Page ${safePage} of ${totalPages}${filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}`}
+              />
             )}
           </>
         )}
