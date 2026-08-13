@@ -62,7 +62,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   }
 
   return (
-    <div className="media-card">
+    <div className={`media-card${isWatchedState ? ' seen' : ''}${inWL ? ' watch-later' : ''}`}>
       <Link to={`/${type === 'tv' ? 'tv' : 'movie'}/${id}`} className="media-card-link">
         <div className="media-card-poster">
           {!loaded && <div className="media-card-skeleton" />}
