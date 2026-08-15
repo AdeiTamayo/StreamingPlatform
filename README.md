@@ -46,6 +46,7 @@ flowchart TD
 
     E --> J[TMDB API<br>metadata + images]
     E --> K[VidSrc Embed<br>video player]
+    E --> O[OMDb API<br>IMDb ratings]
     E --> L[storage.ts<br>localStorage adapter]
 
     G --> L
@@ -67,6 +68,7 @@ flowchart TD
     subgraph TMDB [External APIs]
         J
         K
+        O
     end
 
     subgraph Storage [Storage]
@@ -81,14 +83,16 @@ flowchart TD
 ## Features
 
 ### Browsing & Watching
-- **Browse** movies and TV shows with filters (genre, country, year, sort order)
+- **Browse** movies and TV shows with filters (genre, country, year, date range, sort order, original language, minimum vote count), on both movie and TV pages
 - **Search** across movies, TV shows, and people
 - **Watch** content via embedded video player with resume playback
+- **IMDb ratings** (OMDb) shown on cards, detail pages, and per episode; falls back to TMDB ratings where unavailable
 - **Continue Watching** tracks progress and shows unfinished content on the home page
 - **Auto-detect watched** episodes are marked automatically when you click Next or reach the end
 - **Episode navigation** season/episode dropdowns with keyboard search, prev/next buttons
 - **Trailers** YouTube trailers on detail pages when available
 - **Recommendations** "You might also like" section on movie and show detail pages
+- **Background new-episode scan** detects fresh releases for your Watch Later series and marks "series watched" shows with new episodes, showing them in the notification bell (throttled to once/hour)
 - **Request cancellation** in-flight API requests are cancelled on navigation to prevent stale data
 
 ### Watch Later
@@ -123,6 +127,7 @@ flowchart TD
 - [React 19](https://react.dev) + [Vite](https://vite.dev) + TypeScript
 - [React Router](https://reactrouter.com) for client-side routing
 - [TMDB API](https://developer.themoviedb.org) for metadata, images, and search
+- [OMDb API](https://www.omdbapi.com) for IMDb ratings (cards, detail pages, episodes)
 - [VidSrc](https://vidsrc.fyi) for video embeds
 - [Supabase](https://supabase.com) for optional authentication and cloud sync (Postgres + RLS)
 - CSS Modules for scoped styling
@@ -134,8 +139,9 @@ flowchart TD
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.19+ (or 22.12+)
 - A free [TMDB API key](https://www.themoviedb.org/settings/api)
+- Optional: a free [OMDb API key](https://www.omdbapi.com/apikey.aspx) for IMDb ratings
 - Optional: a free [Supabase project](https://supabase.com) for accounts + cloud sync
 
 ### Setup
@@ -150,16 +156,17 @@ Create a `.env` file in the project root (see `.env.example`):
 
 ```
 VITE_TMDB_API_KEY=your_tmdb_api_key_here
+VITE_OMDB_API_KEY=your_omdb_api_key_here        # optional, enables IMDb ratings
 VITE_SUPABASE_URL=your_supabase_project_url   # optional
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 ```
 
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are optional — without them the app runs entirely in local-only mode (no sign-in).
+`VITE_OMDB_API_KEY` is optional — without it the app shows TMDB ratings instead. `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are optional — without them the app runs entirely in local-only mode (no sign-in).
 
 ### Setting up Supabase (optional)
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. In the SQL editor, run the migration file in `supabase/migrations/001_initial_schema.sql` — this creates all 6 tables (watched, progress, watch_later, notifications, search_history, settings), indexes, and Row Level Security policies
+2. In the SQL editor, run the migration file in `supabase/migrations/001_initial_schema.sql` — this creates all 6 tables (watched, progress, watch_later, notifications, search_history, settings), their indexes and unique constraints, and Row Level Security policies
 3. Copy your project URL and anon key into `.env`
 
 ### Migrating existing local data
@@ -192,7 +199,7 @@ This project is ready for Vercel deployment. The `vercel.json` configures SPA ro
 
 1. Push to GitHub
 2. Import the repo on [vercel.com](https://vercel.com)
-3. Add `VITE_TMDB_API_KEY`, and optionally `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`, as environment variables in the Vercel dashboard
+3. Add `VITE_TMDB_API_KEY`, optionally `VITE_OMDB_API_KEY`, `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`, as environment variables in the Vercel dashboard
 4. Deploy
 
 Vercel will auto-deploy on every push to `main`.
@@ -203,11 +210,13 @@ Vercel will auto-deploy on every push to `main`.
 src/
   api/
     tmdb.ts             # TMDB API calls with caching + AbortSignal support
+    omdb.ts             # OMDb IMDb rating lookups (per-episode + by title), cached in localStorage
     vidsrc.ts           # Embed URL builders
     storage.ts          # Local-first data adapter (localStorage + Supabase dual writes)
     storageBackup.ts    # Export/import Supabase data as JSON
     tmdbCache.ts        # IndexedDB cache for TMDB API responses
     tvStatusCache.ts    # Cache for TV airing status
+    newEpisodeScan.ts   # Background new-episode detection for Watch Later series
   repositories/
     watchedRepository.ts       # Supabase writes for watched marks
     progressRepository.ts      # Supabase writes for playback progress
@@ -246,6 +255,7 @@ src/
     useAbortController.ts # Auto-abort in-flight requests on unmount
     useClickOutside.ts  # Detect clicks outside a ref
     useDropdownSearch.ts # Keyboard-driven type-to-search
+    useDropdownKeys.ts  # Arrow-key + Enter navigation for dropdowns
     useTVStatus.ts      # TV airing status logic
   utils/
     retry.ts            # Exponential backoff retry helper
@@ -260,7 +270,7 @@ src/
     shared.css          # Global shared styles
   config.ts             # Environment variable setup
 supabase/migrations/
-  001_initial_schema.sql  # Tables, indexes, and RLS policies
+  001_initial_schema.sql  # Tables, indexes, unique constraints, and RLS policies
 scripts/
   transfer-localstorage-to-supabase.ts  # One-time data transfer helper
 ```

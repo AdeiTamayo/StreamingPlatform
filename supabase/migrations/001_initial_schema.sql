@@ -1,5 +1,5 @@
 -- StreamFlow Supabase Schema
--- Migration 001: Initial schema with all tables, RLS, and policies
+-- Initial schema: all tables, indexes, RLS policies, and the watched unique index
 
 -- 1. WATCHED TABLE
 create table if not exists public.watched (
@@ -20,6 +20,10 @@ create index if not exists idx_watched_user_id on public.watched using btree (us
 create index if not exists idx_watched_user_media on public.watched using btree (user_id, media_type);
 create index if not exists idx_watched_user_tmdb on public.watched using btree (user_id, tmdb_id);
 create index if not exists idx_watched_lookup on public.watched using btree (user_id, media_type, tmdb_id, season, episode);
+
+-- Prevents duplicate watched rows when the same track is watched again.
+create unique index if not exists watched_unique_track_idx
+  on public.watched (user_id, media_type, tmdb_id, coalesce(season, -1), coalesce(episode, -1));
 
 alter table public.watched enable row level security;
 
