@@ -797,6 +797,15 @@
   font-weight: 500;
 }
 
+.episode-selector .imdb-badge {
+  margin-left: auto;
+}
+
+.episode-selector .watch-toggle {
+  min-height: 42px;
+  padding: 0.4rem 1.25rem;
+}
+
 /* Custom Select */
 .custom-select {
   position: relative;

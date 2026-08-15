@@ -108,6 +108,14 @@ export async function getSeasonDetails(id: string | number, seasonNumber: number
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
 
+export async function getTVExternalIds(id: string | number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/external_ids?api_key=${CONFIG.TMDB_API_KEY}`, signal);
+}
+
+export async function getEpisodeExternalIds(id: string | number, seasonNumber: number, episodeNumber: number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}/external_ids?api_key=${CONFIG.TMDB_API_KEY}`, signal);
+}
+
 export async function getMovieGenres(signal?: AbortSignal) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/movie/list?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }

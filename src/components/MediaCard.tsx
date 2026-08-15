@@ -48,7 +48,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
       return;
     }
     let cancelled = false;
-    getOmdbRatingByTitle(id, title, year, type).then((r) => {
+    getOmdbRatingByTitle(id, title, year, type === 'tv' ? 'series' : 'movie').then((r) => {
       if (!cancelled) setImdbRating(r);
     });
     return () => { cancelled = true; };

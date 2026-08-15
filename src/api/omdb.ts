@@ -14,7 +14,7 @@ interface OmdbCacheEntry {
   data: ImdbRating | null;
 }
 
-type OmdbMediaType = 'movie' | 'series';
+type OmdbMediaType = 'movie' | 'series' | 'episode';
 
 function cacheKey(imdbId: string): string {
   return `omdb:${imdbId}`;
@@ -65,7 +65,7 @@ async function fetchRating(url: string, signal?: AbortSignal): Promise<ImdbRatin
     if (!res.ok) return null;
     return extractRating(await res.json());
   } catch (err) {
-    if ((err as Error)?.name !== 'AbortError') logDebug('OMDb fetch failed', err);
+    if ((err as Error)?.name !== 'AbortError') logDebug(`OMDb fetch failed: ${(err as Error)?.message ?? String(err)}`);
     return null;
   }
 }
