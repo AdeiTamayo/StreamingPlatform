@@ -107,6 +107,12 @@ export interface TMDBCountry {
   native_name: string;
 }
 
+export interface TMDBLanguage {
+  iso_639_1: string;
+  english_name: string;
+  name: string;
+}
+
 export interface TMDBVideo {
   id: string;
   key: string;

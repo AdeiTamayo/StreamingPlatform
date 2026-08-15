@@ -16,7 +16,7 @@
   padding: 0.55rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+  background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   font-size: 0.84rem;
   font-weight: 500;
@@ -37,7 +37,7 @@
 }
 
 .date-picker-value.empty {
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .date-picker-inline-label {

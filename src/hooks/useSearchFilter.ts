@@ -16,8 +16,8 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
   fetchFnRef.current = fetchFn;
   const { getSignal } = useAbortController();
 
-  const { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil } = deps;
-  const filterKey = `${query}||${genre}||${country}||${year}||${sortBy}||${releaseDateFrom}||${releaseDateUntil}`;
+  const { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount } = deps;
+  const filterKey = `${query}||${genre}||${country}||${year}||${sortBy}||${releaseDateFrom}||${releaseDateUntil}||${language}||${voteCount}`;
   const prevFilterKey = useRef(filterKey);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
     // response can never overwrite the newer results.
     getSignal();
     fetchRef.current = setTimeout(() => {
-      fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil }, getSignal())
+      fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount }, getSignal())
         .then((data) => {
           if (requestId !== requestIdRef.current) return;
           setResults(data.results || []);
@@ -52,7 +52,7 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
         });
     }, query?.trim() ? 400 : 0);
     return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
-  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, getSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filterKey, query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount, getSignal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return { results, page, setPage, totalPages, loading, error };
 }

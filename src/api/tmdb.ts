@@ -130,6 +130,12 @@ export async function getCountries(signal?: AbortSignal) {
   return [...(data as { english_name: string }[])].sort((a, b) => a.english_name.localeCompare(b.english_name));
 }
 
+export async function getLanguages(signal?: AbortSignal) {
+  const data = await fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/configuration/languages?api_key=${CONFIG.TMDB_API_KEY}`, signal);
+  if (!Array.isArray(data)) return [];
+  return [...(data as { iso_639_1: string; english_name: string }[])].sort((a, b) => a.english_name.localeCompare(b.english_name));
+}
+
 export async function discover(type: string, filters: Record<string, string | undefined>, page = 1, signal?: AbortSignal) {
   let url = `${CONFIG.TMDB_BASE_URL}/discover/${type}?api_key=${CONFIG.TMDB_API_KEY}&page=${page}`;
   if (filters?.genreId) url += `&with_genres=${filters.genreId}`;
@@ -138,6 +144,8 @@ export async function discover(type: string, filters: Record<string, string | un
   if (filters?.sortBy) url += `&sort_by=${filters.sortBy}`;
   if (filters?.releaseDateGte) url += type === 'tv' ? `&first_air_date.gte=${filters.releaseDateGte}` : `&primary_release_date.gte=${filters.releaseDateGte}`;
   if (filters?.releaseDateLte) url += type === 'tv' ? `&first_air_date.lte=${filters.releaseDateLte}` : `&primary_release_date.lte=${filters.releaseDateLte}`;
+  if (filters?.originalLanguage) url += `&with_original_language=${filters.originalLanguage}`;
+  if (filters?.voteCountGte) url += `&vote_count.gte=${filters.voteCountGte}`;
   return fetchWithFallback(url, signal);
 }
 

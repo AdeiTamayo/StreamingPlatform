@@ -181,6 +181,33 @@
   color: var(--text-muted);
 }
 
+.more-filters-panel .filter-number-input {
+  width: 7rem;
+  min-height: 42px;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 500;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.more-filters-panel .filter-number-input::-webkit-outer-spin-button,
+.more-filters-panel .filter-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.more-filters-panel .filter-number-input:focus {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+}
+
 /* Media Grid */
 .media-grid {
   display: grid;
