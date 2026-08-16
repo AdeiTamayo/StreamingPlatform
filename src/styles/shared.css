@@ -790,6 +790,18 @@
   line-height: 1.5;
 }
 
+.detail-person-link {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.detail-person-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
 .detail-crew {
   margin-top: 0.4rem;
   font-size: 0.85rem;

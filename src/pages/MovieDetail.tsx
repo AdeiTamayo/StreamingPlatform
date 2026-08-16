@@ -7,6 +7,7 @@ import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clear
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
+import PersonList from '../components/PersonList';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
@@ -208,14 +209,14 @@ export default function MovieDetail() {
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast">
-                <strong>Cast:</strong> {cast.map((c) => c.name).join(', ')}
+                <strong>Cast:</strong> <PersonList people={cast} />
               </div>
             )}
             {director && (
-              <div className="detail-crew"><strong>Director:</strong> {director.name}</div>
+              <div className="detail-crew"><strong>Director:</strong> <PersonList people={[director]} /></div>
             )}
             {writers.length > 0 && (
-              <div className="detail-crew"><strong>Writers:</strong> {writers.map((w) => w.name).join(', ')}</div>
+              <div className="detail-crew"><strong>Writers:</strong> <PersonList people={writers} /></div>
             )}
           </div>
         </div>

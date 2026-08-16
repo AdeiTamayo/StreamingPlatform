@@ -9,6 +9,7 @@ import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
 import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
+import PersonList from '../components/PersonList';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
@@ -518,10 +519,10 @@ export default function TVDetail() {
             </div>
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (
-              <div className="detail-cast"><strong>Cast:</strong> {cast.map((c) => c.name).join(', ')}</div>
+              <div className="detail-cast"><strong>Cast:</strong> <PersonList people={cast} /></div>
             )}
             {created.length > 0 && (
-              <div className="detail-crew"><strong>Created by:</strong> {created.map((c) => c.name).join(', ')}</div>
+              <div className="detail-crew"><strong>Created by:</strong> <PersonList people={created} /></div>
             )}
             {networks.length > 0 && (
               <div className="detail-crew"><strong>Network:</strong> {networks.map((n) => n.name).join(', ')}</div>
