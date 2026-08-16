@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
+import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../api/omdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
@@ -50,6 +51,7 @@ export default function Home() {
   const [error, setError] = useState(false);
   const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
   const [heroIdx, setHeroIdx] = useState(0);
+  const [heroImdbRating, setHeroImdbRating] = useState<ImdbRating | null>(null);
   const [cwFilter, setCwFilter] = useState<string>('all');
   const [heroPaused, setHeroPaused] = useState(false);
   const toast = useToast();
@@ -84,6 +86,30 @@ export default function Home() {
 
   const heroItems = trending.slice(0, 8);
   const hero = heroItems[heroIdx];
+
+  // IMDb rating for the current hero slide via OMDb, falling back to the
+  // TMDB vote average while (or if) no IMDb rating is available.
+  useEffect(() => {
+    if (!hero) {
+      setHeroImdbRating(null);
+      return;
+    }
+    const peek = peekOmdbRatingByTmdb(hero.id);
+    if (peek.state !== 'fresh') {
+      setHeroImdbRating(peek.rating);
+      return;
+    }
+    const isMovie = !!(hero as TMDBMovie).title;
+    const title = isMovie ? (hero as TMDBMovie).title : (hero as TMDBSeries).name;
+    const year = isMovie
+      ? ((hero as TMDBMovie).release_date || '').slice(0, 4)
+      : (hero as TMDBSeries).first_air_date?.slice(0, 4) || '';
+    let cancelled = false;
+    getOmdbRatingByTitle(hero.id, title, year, isMovie ? 'movie' : 'series').then((r) => {
+      if (!cancelled) setHeroImdbRating(r);
+    });
+    return () => { cancelled = true; };
+  }, [hero]);
 
   function handleRemoveCW(item: ContinueWatchingItem) {
     clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
@@ -147,9 +173,11 @@ export default function Home() {
             <span className={styles.heroBadge}>{(hero as unknown as { media_type?: string }).media_type === 'tv' ? 'TV Series' : 'Movie'}</span>
             <h1 className={styles.heroTitle}>{(hero as TMDBMovie).title || (hero as TMDBSeries).name}</h1>
             <div className={styles.heroMeta}>
-              {hero.vote_average > 0 && (
-                <span className={styles.heroRating}>{hero.vote_average.toFixed(1)}</span>
-              )}
+              {heroImdbRating ? (
+                <span className={styles.heroRating} title={`IMDb ${heroImdbRating.rating}/10${heroImdbRating.votes ? ` \u00b7 ${heroImdbRating.votes} votes` : ''}`}>IMDb {heroImdbRating.rating}</span>
+              ) : hero.vote_average > 0 ? (
+                <span className={styles.heroRating} title={`TMDB rating ${hero.vote_average.toFixed(1)}/10`}>{hero.vote_average.toFixed(1)}</span>
+              ) : null}
               <span className={styles.heroYear}>{((hero as TMDBMovie).release_date || (hero as TMDBSeries).first_air_date || '').slice(0, 4)}</span>
             </div>
             {hero.overview && <p className={styles.heroOverview}>{hero.overview}</p>}
