@@ -171,7 +171,7 @@ export default function TVDetail() {
         const id = ((ext as { imdb_id?: string })?.imdb_id) || null;
         setEpImdbId(id);
         if (id) {
-          getImdbRating(id, 'episode').then((r) => {
+          getImdbRating(id, 'episode', undefined, season, episode).then((r) => {
             if (!cancelled) setEpImdbRating(r);
           });
         }
@@ -340,7 +340,7 @@ export default function TVDetail() {
         try {
           const ext = (await getEpisodeExternalIds(show.id, season, ep.episode_number)) as { imdb_id?: string };
           if (cancelled) return;
-          if (ext?.imdb_id) rating = await getImdbRating(ext.imdb_id, 'episode');
+          if (ext?.imdb_id) rating = await getImdbRating(ext.imdb_id, 'episode', undefined, season, ep.episode_number);
         } catch {}
         if (cancelled) return;
         setEpImdbRatings((prev) => ({ ...prev, [ep.episode_number]: rating }));
@@ -706,9 +706,11 @@ export default function TVDetail() {
                         <div className={styles.epMeta}>
                           {ep.air_date && <span>{ep.air_date}</span>}
                           {ep.runtime && <span> &middot; {ep.runtime}m</span>}
-                          {epImdbRatings[ep.episode_number] != null && (
+                          {epImdbRatings[ep.episode_number] != null ? (
                             <span> &middot; IMDb {epImdbRatings[ep.episode_number]?.rating}</span>
-                          )}
+                          ) : ep.vote_average > 0 ? (
+                            <span title={`TMDB rating ${ep.vote_average.toFixed(1)}/10`}> &middot; TMDB {ep.vote_average.toFixed(1)}</span>
+                          ) : null}
                         </div>
                         {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
                       </div>
