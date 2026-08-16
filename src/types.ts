@@ -147,6 +147,29 @@ export interface TMDBCredits {
   crew: TMDBCrewMember[];
 }
 
+export interface TMDBPersonCredit {
+  id: number;
+  media_type: 'movie' | 'tv';
+  title?: string;
+  name?: string;
+  poster_path: string | null;
+  backdrop_path?: string | null;
+  release_date?: string;
+  first_air_date?: string;
+  vote_average?: number;
+  vote_count?: number;
+  character?: string;
+  job?: string;
+  department?: string;
+  credit_id?: string;
+}
+
+export interface TMDBPersonCredits {
+  id: number;
+  cast: TMDBPersonCredit[];
+  crew: TMDBPersonCredit[];
+}
+
 export interface TMDBCreator {
   id: number;
   name: string;

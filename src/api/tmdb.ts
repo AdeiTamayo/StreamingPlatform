@@ -116,6 +116,14 @@ export async function getEpisodeExternalIds(id: string | number, seasonNumber: n
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}/episode/${episodeNumber}/external_ids?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
 
+export async function getPersonCredits(id: string | number, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/person/${id}/combined_credits?api_key=${CONFIG.TMDB_API_KEY}`, signal);
+}
+
+export async function searchPerson(query: string, signal?: AbortSignal) {
+  return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/search/person?api_key=${CONFIG.TMDB_API_KEY}&query=${encodeURIComponent(query)}`, signal);
+}
+
 export async function getMovieGenres(signal?: AbortSignal) {
   return fetchWithFallback(`${CONFIG.TMDB_BASE_URL}/genre/movie/list?api_key=${CONFIG.TMDB_API_KEY}`, signal);
 }
