@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { searchMulti, searchMovies, searchTV } from '../api/tmdb';
+import { searchMulti, searchMovies, searchTV, getPersonCredits } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
 import { getSearchHistory, addSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
-import type { TMDBMovie, TMDBSeries } from '../types';
+import type { TMDBMovie, TMDBSeries, TMDBPersonCredits } from '../types';
 import styles from './Search.module.css';
 
 const TABS: { key: string; label: string }[] = [
@@ -14,9 +14,13 @@ const TABS: { key: string; label: string }[] = [
   { key: 'tv', label: 'TV Shows' },
 ];
 
+// TMDB pages are 20 items; person credits use the same page size client-side.
+const PAGE_SIZE = 20;
+
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const personId = searchParams.get('person') || '';
   const [input, setInput] = useState(query);
   const inputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState('all');
@@ -32,6 +36,29 @@ export default function Search() {
   useEffect(() => { setHistory(getSearchHistory()); }, []);
 
   useEffect(() => {
+    if (!personId) return;
+    setLoading(true);
+    setError(false);
+    getPersonCredits(personId, getSignal())
+      .then((data) => {
+        const credits = data as TMDBPersonCredits;
+        const cast = (credits.cast || []).filter((c) => c.media_type === 'movie' || c.media_type === 'tv');
+        const crew = (credits.crew || []).filter((c) => (c.media_type === 'movie' || c.media_type === 'tv') && c.department === 'Directing');
+        const combined = [...cast, ...crew].filter(
+          (item, i, arr) => arr.findIndex((x) => x.id === item.id && x.media_type === item.media_type) === i,
+        );
+        setResults(combined as unknown as (TMDBMovie | TMDBSeries)[]);
+        setTotalPages(1);
+      })
+      .catch((err) => {
+        if (err?.name === 'AbortError') return;
+        setError(true);
+      })
+      .finally(() => setLoading(false));
+  }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (personId) return; // person credits are owned by the personId effect
     if (!query.trim()) {
       setResults([]);
       setTotalPages(1);
@@ -50,21 +77,24 @@ export default function Search() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [query, page, tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { setPage(1); }, [query, tab]);
+  }, [personId, query, page, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    setPage(1);
+  }, [query, tab, personId]);
+
+  useEffect(() => {
+    if (personId) return;
     if (query.trim()) {
       addSearchHistory(query.trim());
       setHistory(getSearchHistory());
     }
-  }, [query]);
+  }, [query, personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setInput(query); }, [query]);
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!personId && !query.trim()) {
       inputRef.current?.focus();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -79,15 +109,23 @@ export default function Search() {
     setSearchParams({ q });
   }
 
-  const filtered = tab === 'all'
-    ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
-    : results;
-  const safePage = Math.min(page, totalPages);
+  const filtered = personId
+    ? tab === 'all'
+      ? results
+      : results.filter((item) => (item as { media_type?: string }).media_type === tab)
+    : tab === 'all'
+      ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
+      : results;
+  // Person credits come back unpaginated - slice them client-side to match
+  // the page size the query search gets from TMDB.
+  const displayTotalPages = personId ? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)) : totalPages;
+  const safePage = Math.min(page, displayTotalPages);
+  const visible = personId ? filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : filtered;
 
   return (
     <div className="page">
       <section className="section">
-        <h2 className="section-title">{query ? `Search Results for "${query}"` : 'Search'}</h2>
+        <h2 className="section-title">{personId ? `Movies & TV featuring "${query}"` : query ? `Search Results for "${query}"` : 'Search'}</h2>
         <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
           <input
             ref={inputRef}
@@ -124,16 +162,16 @@ export default function Search() {
         ) : (
           <>
             <div className="media-grid">
-              {filtered.map((item) => (
+              {visible.map((item) => (
                 <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
               ))}
             </div>
-            {totalPages > 1 && (
+            {displayTotalPages > 1 && (
               <Pagination
-                page={page}
-                totalPages={totalPages}
+                page={safePage}
+                totalPages={displayTotalPages}
                 onChange={setPage}
-                label={`Page ${safePage} of ${totalPages}${filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}`}
+                label={`Page ${safePage} of ${displayTotalPages}${filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}`}
               />
             )}
           </>
