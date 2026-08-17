@@ -190,13 +190,9 @@ export default function MovieDetail() {
           <div className="detail-meta">
             <h1>{movie.title} <span className="year">({year})</span></h1>
             <div className="detail-badges">
-              {!imdbRating && movie.vote_average != null && <span className="badge rating">{movie.vote_average.toFixed(1)}</span>}
-              {genres && <span className="badge">{genres}</span>}
-              <span className="badge">{movie.runtime} min</span>
-              {startAt && <span className="badge resume-badge">Resume at {formatResume(startAt)}</span>}
-              {movie.imdb_id && (
+              {movie.imdb_id ? (
                 <a
-                  className="badge-btn imdb-badge"
+                  className="badge rating"
                   href={`https://www.imdb.com/title/${movie.imdb_id}/`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -204,7 +200,11 @@ export default function MovieDetail() {
                 >
                   IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
                 </a>
-              )}
+              ) : movie.vote_average != null ? (
+                <span className="badge rating">TMDB {movie.vote_average.toFixed(1)}</span>
+              ) : null}
+              {genres && <span className="badge">{genres}</span>}
+              <span className="badge">{movie.runtime} min</span>
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (

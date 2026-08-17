@@ -836,7 +836,7 @@
   font-weight: 500;
 }
 
-.episode-selector .imdb-badge {
+.episode-selector > a.badge {
   margin-left: auto;
 }
 

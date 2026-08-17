@@ -492,7 +492,19 @@ export default function TVDetail() {
           <div className="detail-meta">
             <h1>{show.name} <span className="year">({endYear ? `${year}-${endYear}` : year})</span></h1>
             <div className="detail-badges">
-              {!imdbRating && show.vote_average != null && <span className="badge rating">{show.vote_average.toFixed(1)}</span>}
+              {imdbId ? (
+                <a
+                  className="badge rating"
+                  href={`https://www.imdb.com/title/${imdbId}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                >
+                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
+                </a>
+              ) : show.vote_average != null ? (
+                <span className="badge rating">TMDB {show.vote_average.toFixed(1)}</span>
+              ) : null}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
               <button className={`badge-btn ${inWL ? 'in-wl' : ''}`} onClick={() => {
@@ -504,17 +516,6 @@ export default function TVDetail() {
                 <button className="badge-btn" onClick={() => setShowTrailer((s: boolean) => !s)} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
                   {showTrailer ? 'Hide Trailer' : 'Trailer'}
                 </button>
-              )}
-              {imdbId && (
-                <a
-                  className="badge-btn imdb-badge"
-                  href={`https://www.imdb.com/title/${imdbId}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
-                >
-                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
-                </a>
               )}
             </div>
             <p className="detail-overview">{show.overview}</p>
@@ -559,14 +560,9 @@ export default function TVDetail() {
               if (inEpWL) { removeEpisodeWatchLater(safeId, season, episode); setInEpWL(false); toast?.('Removed from Watch Later'); }
               else { addEpisodeWatchLater(safeId, season, episode, show.name); setInEpWL(true); toast?.('Added to Watch Later'); }
             }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
-            {startAt && (
-              <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('tv', safeId, season, episode); }}>
-                Restart
-              </button>
-            )}
-            {epImdbId && (
+            {epImdbId ? (
               <a
-                className="badge-btn imdb-badge"
+                className="badge rating"
                 href={`https://www.imdb.com/title/${epImdbId}/`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -574,7 +570,9 @@ export default function TVDetail() {
               >
                 IMDb{epImdbRating ? ` ${epImdbRating.rating}` : ''}
               </a>
-            )}
+            ) : (episodes.find((ep) => ep.episode_number === episode)?.vote_average ?? 0) > 0 ? (
+              <span className="badge rating">TMDB {episodes.find((ep) => ep.episode_number === episode)!.vote_average.toFixed(1)}</span>
+            ) : null}
           </div>
           <div className={styles.seasonProgress}>
             <div className={styles.spHeader}>
