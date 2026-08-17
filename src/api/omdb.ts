@@ -36,6 +36,7 @@ function readEntry(key: string): OmdbCacheEntry | null {
     if (!raw) return null;
     const entry = JSON.parse(raw) as OmdbCacheEntry;
     if (!entry || typeof entry.fetchedAt !== 'number' || !('data' in entry)) return null;
+    if (entry.data && (typeof entry.data.rating !== 'string' || typeof entry.data.votes !== 'string')) return null;
     return entry;
   } catch {
     return null;
@@ -192,7 +193,8 @@ export async function getOmdbRatingByTitle(
   let promise = inFlight.get(key);
   if (!promise) {
     const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&y=${encodeURIComponent(year)}&type=${type}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
-    promise = fetchRating(url).then((rating) => {
+    promise = fetchRating(url).then((outcome) => {
+      const rating = outcome.status === 'ok' ? outcome.rating : null;
       writeEntry(key, rating);
       inFlight.delete(key);
       return rating;
