@@ -102,6 +102,7 @@ export default function WatchLater() {
   const [filterType, setFilterType] = useState("all");
   const [view, setView] = useState<"list" | "calendar">("list");
   const [showUpcoming, setShowUpcoming] = useState(false);
+  const [hideUnreleasedPosters, setHideUnreleasedPosters] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
   const calendarInitedRef = useRef(false);
@@ -398,8 +399,28 @@ export default function WatchLater() {
     return map;
   }, [calendarItems]);
 
+  // Items with a future-dated release (from the calendar data) are
+  // "unreleased" - their cards can be hidden while they stay in the
+  // calendar. Keyed by `type-id` to match the WatchLaterItem grid.
+  // Calendar items use type "episode" for TV shows, map it back to "tv".
+  const unreleasedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const c of calendarItems) {
+      if (isFuture(c.date)) {
+        const mediaType = c.type === "episode" ? "tv" : c.type;
+        keys.add(`${mediaType}-${String(c.id)}`);
+      }
+    }
+    return keys;
+  }, [calendarItems]);
+
   const sortedItems = useMemo(() => {
     let list = [...items];
+    if (hideUnreleasedPosters)
+      list = list.filter(
+        (i: WatchLaterItem) =>
+          !unreleasedKeys.has(`${i.type}-${String(i.id)}`),
+      );
     if (filterType === "movies")
       list = list.filter((i: WatchLaterItem) => i.type === "movie");
     else if (filterType === "tv")
@@ -410,7 +431,7 @@ export default function WatchLater() {
       list.sort((a, b) => (b.year || "0").localeCompare(a.year || "0"));
     else list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     return list;
-  }, [items, sortBy, filterType]);
+  }, [items, sortBy, filterType, hideUnreleasedPosters, unreleasedKeys]);
 
   const daysGrid = useMemo(
     () => getMonthDays(calYear, calMonth),
@@ -774,6 +795,46 @@ export default function WatchLater() {
                       setPage(1);
                     }}
                   />
+                  {unreleasedKeys.size > 0 && (
+                    <button
+                      className={`${styles.wlClearBtn} ${hideUnreleasedPosters ? styles.active : ""}`}
+                      onClick={() => setHideUnreleasedPosters((v) => !v)}
+                      title={
+                        hideUnreleasedPosters
+                          ? "Show unreleased titles"
+                          : "Hide unreleased titles"
+                      }
+                    >
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ verticalAlign: "-2px" }}
+                      >
+                        {hideUnreleasedPosters ? (
+                          <>
+                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                            <line x1="2" y1="2" x2="22" y2="22" />
+                          </>
+                        ) : (
+                          <>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </>
+                        )}
+                      </svg>
+                      {hideUnreleasedPosters
+                        ? "Show unreleased"
+                        : "Hide unreleased"}
+                    </button>
+                  )}
                   {(filterType !== "all" || sortBy !== "recent") && (
                     <button
                       className={styles.wlClearBtn}
