@@ -218,8 +218,9 @@
 /* Media Card */
 .media-card {
   position: relative;
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: calc(var(--radius) + 4px);
   overflow: hidden;
+  padding: 4px;
   background: linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95));
   border: 1px solid var(--border);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -255,6 +256,7 @@
   position: relative;
   aspect-ratio: 2 / 3;
   overflow: hidden;
+  border-radius: calc(var(--radius) + 2px);
 }
 
 .media-card-poster::before {

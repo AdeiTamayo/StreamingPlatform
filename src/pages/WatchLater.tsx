@@ -106,7 +106,7 @@ export default function WatchLater() {
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
   const calendarInitedRef = useRef(false);
-  const ITEMS_PER_PAGE = 12;
+  const ITEMS_PER_PAGE = 20;
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
   const { getSignal } = useAbortController();
