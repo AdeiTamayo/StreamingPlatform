@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -17,6 +17,7 @@ import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, Episode
 import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
+const NEXT_EPISODE_COUNTDOWN_SECONDS = 8;
 
 const EpisodeDot = memo(function EpisodeDot({ ep, current, done, onClick }: { ep: number; current: boolean; done: boolean; onClick: (ep: number) => void }) {
   return (
@@ -61,6 +62,7 @@ export default function TVDetail() {
   const [epImdbRatings, setEpImdbRatings] = useState<Record<number, ImdbRating | null>>({});
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [nextUpIn, setNextUpIn] = useState<number | null>(null);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
   const lastTimeRef = useRef<number | null>(null);
@@ -189,6 +191,7 @@ export default function TVDetail() {
     watchedRef.current = isWatched('tv', id, season, episode);
     autoWatchedRef.current = null;
     lastTimeRef.current = null;
+    setNextUpIn(null);
   }, [id, season, episode]);
 
   useEffect(() => {
@@ -349,6 +352,49 @@ export default function TVDetail() {
     return () => { cancelled = true; };
   }, [playerOpen, show, season, episodes]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Leaving the player cancels a running countdown so it can't advance the
+  // episode invisibly after "Back to episodes".
+  useEffect(() => {
+    if (!playerOpen) setNextUpIn(null);
+  }, [playerOpen]);
+
+  // Next-episode autoplay countdown started by handleEnded. Ticks down once
+  // per second; at zero it advances via goNext() unless the user cancelled.
+  useEffect(() => {
+    if (nextUpIn === null) return;
+    if (nextUpIn <= 0) {
+      setNextUpIn(null);
+      goNext();
+      return;
+    }
+    const t = setTimeout(() => setNextUpIn((s) => (s === null ? null : s - 1)), 1000);
+    return () => clearTimeout(t);
+  }, [nextUpIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keyboard shortcuts while the player is open: N = next episode,
+  // P = previous episode, W = toggle watched. Ignored while typing in a
+  // field or with modifier keys held.
+  useEffect(() => {
+    if (!playerOpen || showTrailer) return;
+    function isTypingTarget(t: EventTarget | null): boolean {
+      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (isTypingTarget(e.target)) return;
+      const k = e.key.toLowerCase();
+      if (k === 'n') {
+        if (hasNext) { e.preventDefault(); goNext(); }
+      } else if (k === 'p') {
+        if (hasPrev) { e.preventDefault(); goPrev(); }
+      } else if (k === 'w') {
+        toggleWatched();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [playerOpen, showTrailer, hasNext, hasPrev, season, episode, watched]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
     if (!show || !id || watchedRef.current || autoWatchedRef.current === episodeKey) return;
@@ -362,12 +408,25 @@ export default function TVDetail() {
 
   function handleProgress(currentTime: number, duration: number) {
     lastTimeRef.current = currentTime;
-    if (watchedRef.current || !show || !id) return;
-    saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path }, duration || undefined);
 
+    // Runtime estimate: real duration when the embed reports one, else TMDB
+    // metadata for the current episode/series.
     const currentEpisode = episodes.find((item) => item.episode_number === episode);
-    const tmdbRuntime = currentEpisode?.runtime || show.episode_run_time?.[0] || null;
+    const tmdbRuntime = currentEpisode?.runtime || show?.episode_run_time?.[0] || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
+
+    // Arm the up-next countdown BEFORE any early returns. Replays of
+    // already-watched episodes bail out at the guard below, and without
+    // this block they would never reach it - which is exactly the main
+    // scenario where the countdown must still fire.
+    if (runtimeSeconds) {
+      const nextUpThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
+      if (nextUpThreshold > 0 && currentTime >= nextUpThreshold) armNextUp();
+    }
+
+    if (watchedRef.current || !show || !id) return;
+
+    saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path }, duration || undefined);
 
     logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}`);
 
@@ -380,8 +439,17 @@ export default function TVDetail() {
     }
   }
 
+  // Arms the up-next countdown once per episode. The ?? form ignores repeat
+  // calls from later progress ticks or the ended event, so a running
+  // countdown never restarts.
+  function armNextUp() {
+    if (!hasNext || showTrailer) return;
+    setNextUpIn((s) => s ?? NEXT_EPISODE_COUNTDOWN_SECONDS);
+  }
+
   function handleEnded() {
     autoMarkWatched();
+    armNextUp();
   }
 
   function toggleWatched() {
@@ -482,6 +550,13 @@ export default function TVDetail() {
   const genres = show.genres?.map((g) => g.name).join(', ') || '';
   const recommendations = show.recommendations?.results?.slice(0, 10) || [];
 
+  // What the autoplay countdown will advance to (mirrors goNext logic).
+  const nextUp = hasNext
+    ? (episode < episodeCount
+        ? { season, episode: episode + 1 }
+        : { season: seasons[seasonIdx + 1].season_number, episode: 1 })
+    : null;
+
   return (
     <div className="page">
       <div className="detail-header" style={{ backgroundImage: `url(${backdrop})` }}>
@@ -513,7 +588,7 @@ export default function TVDetail() {
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : 'Watch Later'}</button>
               <button className={`badge-btn ${seriesWatched ? 'in-wl' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? '\u2713 Watched' : 'Watched'}</button>
               {trailerKey && (
-                <button className="badge-btn" onClick={() => setShowTrailer((s: boolean) => !s)} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
+                <button className="badge-btn" onClick={() => { setNextUpIn(null); setShowTrailer((s: boolean) => !s); }} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
                   {showTrailer ? 'Hide Trailer' : 'Trailer'}
                 </button>
               )}
@@ -614,6 +689,14 @@ export default function TVDetail() {
               startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
             />
           )}
+          {nextUpIn !== null && nextUp && (
+            <div className={styles.nextUp} role="status">
+              <span className={styles.nextUpLabel}>Up next &middot; S{nextUp.season}E{nextUp.episode}</span>
+              <span className={styles.nextUpCount}>in {nextUpIn}s</span>
+              <button type="button" className={styles.nextUpPlay} onClick={() => { setNextUpIn(null); goNext(); }}>Play now</button>
+              <button type="button" className={styles.nextUpCancel} onClick={() => setNextUpIn(null)}>Cancel</button>
+            </div>
+          )}
           <div className={styles.epNav}>
             <div className={styles.epNavCenter}>
               <button className={styles.epNavBtn} disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
@@ -625,13 +708,14 @@ export default function TVDetail() {
               value={videoSource}
               options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
               placeholder="Source"
-              onSelect={(val: string) => setVideoSource(val)}
+              onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
               className="source-dropdown"
             />
           </div>
+          <div className={styles.epNavHints}>Shortcuts: N next &middot; P previous &middot; W watched</div>
 
           <div className={styles.episodeListToggle}>
-            <button className="watch-toggle" onClick={() => setPlayerOpen(false)}>
+            <button className="watch-toggle" onClick={() => { setNextUpIn(null); setPlayerOpen(false); }}>
               Back to episodes
             </button>
           </div>

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
-import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource, setVideoSource as persistVideoSource } from '../api/storage';
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
@@ -16,14 +16,6 @@ import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 120;
-
-function formatResume(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 
 export default function MovieDetail() {
   const { id } = useParams<{ id: string }>();
@@ -268,7 +260,7 @@ export default function MovieDetail() {
             value={videoSource}
             options={SOURCE_KEYS.map((key: string) => ({ value: key, label: getSourceLabel(key) }))}
             placeholder="Source"
-            onSelect={(val: string) => setVideoSource(val)}
+            onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
             className="source-dropdown"
           />
         </div>

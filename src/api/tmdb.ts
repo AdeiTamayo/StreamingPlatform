@@ -24,6 +24,15 @@ async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = 
     let res: Response;
     try {
       res = await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      // Caller aborted (navigation/unmount) - propagate immediately.
+      if (signal?.aborted) throw err;
+      // Network failure or our own timeout - retry like a bad status would.
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+        continue;
+      }
+      throw new Error(`TMDB request failed: ${(err as Error)?.message ?? String(err)}`);
     } finally {
       clearTimeout(timeoutId);
       signal?.removeEventListener('abort', onAbort);

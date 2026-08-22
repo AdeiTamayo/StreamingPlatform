@@ -248,6 +248,85 @@
   border-color: rgba(74, 222, 128, 0.3);
 }
 
+/* Next-episode autoplay countdown */
+.next-up {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  border-radius: 12px;
+  background: var(--bg-card);
+  animation: next-up-in 0.25s ease;
+}
+
+@keyframes next-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.next-up-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.next-up-count {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2rem;
+}
+
+.next-up-play {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--green);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.next-up-play:hover {
+  background: rgba(74, 222, 128, 0.28);
+}
+
+.next-up-cancel {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.next-up-cancel:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.ep-nav-hints {
+  margin-top: 0.35rem;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
 @media (max-width: 480px) {
   .ep-nav {
     gap: 0.5rem;

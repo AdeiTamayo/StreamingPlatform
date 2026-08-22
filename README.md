@@ -90,6 +90,8 @@ flowchart TD
 - **Continue Watching** tracks progress and shows unfinished content on the home page
 - **Auto-detect watched** episodes are marked automatically when you click Next or reach the end
 - **Episode navigation** season/episode dropdowns with keyboard search, prev/next buttons
+- **Next-episode autoplay** when an episode finishes (or reaches the end), a short countdown offers "Play now" or "Cancel" to advance automatically
+- **Keyboard shortcuts** while watching: N = next episode, P = previous episode, W = toggle watched
 - **Trailers** YouTube trailers on detail pages when available
 - **Recommendations** "You might also like" section on movie and show detail pages
 - **Background new-episode scan** detects fresh releases for your Watch Later series and marks "series watched" shows with new episodes, showing them in the notification bell (throttled to once/hour)
