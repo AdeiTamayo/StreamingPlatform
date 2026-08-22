@@ -553,10 +553,16 @@ export const dataMigration = {
     // otherwise the next login retries the incomplete sections.
     if (hasData && !failed) {
       clearLegacyData();
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      await this.syncFromSupabase(userId);
+    } else if (failed) {
+      // Don't set the flag; next login will retry the failed sections.
+      await this.syncFromSupabase(userId);
+    } else {
+      // No local data to migrate; just sync and set the flag.
+      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      await this.syncFromSupabase(userId);
     }
-
-    localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
-    await this.syncFromSupabase(userId);
   },
 
   async syncFromSupabase(userId: string): Promise<void> {

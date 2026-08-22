@@ -56,9 +56,16 @@ create table if not exists public.progress (
   meta jsonb,
   updated_at timestamptz not null default now(),
 
-  constraint progress_pkey primary key (id),
-  constraint progress_unique_track unique (user_id, media_type, tmdb_id, coalesce(season, -1), coalesce(episode, -1))
+  constraint progress_pkey primary key (id)
 );
+
+-- Expression-based uniqueness (NULLs treated as equal) cannot be a plain
+-- UNIQUE table constraint in PostgreSQL (only column lists allowed there).
+-- Use an EXCLUDE constraint instead - still targetable by
+-- ON CONFLICT ON CONSTRAINT in upserts.
+alter table public.progress drop constraint if exists progress_unique_track;
+alter table public.progress add constraint progress_unique_track
+  exclude using btree (user_id with =, media_type with =, tmdb_id with =, coalesce(season, -1) with =, coalesce(episode, -1) with =);
 
 create index if not exists idx_progress_user_id on public.progress using btree (user_id);
 create index if not exists idx_progress_user_tmdb on public.progress using btree (user_id, tmdb_id);

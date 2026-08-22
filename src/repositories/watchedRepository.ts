@@ -42,18 +42,20 @@ export const watchedRepository = {
 
   async unmark(userId: string, mediaType: MediaType, tmdbId: number, season?: number | null, episode?: number | null): Promise<void> {
     try {
-      let query: any = requireSupabase().from('watched')
-        .delete()
-        .eq('user_id', userId)
-        .eq('media_type', mediaType)
-        .eq('tmdb_id', tmdbId);
+      const { error }: any = await withRetry(async () => {
+        // Build a fresh query per attempt - builders are single-use thenables.
+        let query: any = requireSupabase().from('watched')
+          .delete()
+          .eq('user_id', userId)
+          .eq('media_type', mediaType)
+          .eq('tmdb_id', tmdbId);
 
-      if (mediaType === 'tv') {
-        if (season != null) query = query.eq('season', season);
-        if (episode != null) query = query.eq('episode', episode);
-      }
-
-      const { error }: any = await withRetry(async () => query);
+        if (mediaType === 'tv') {
+          if (season != null) query = query.eq('season', season);
+          if (episode != null) query = query.eq('episode', episode);
+        }
+        return query;
+      });
       if (error) throw error;
     } catch {
       enqueueWrite('watched', 'delete', { userId, mediaType, tmdbId, season, episode });
