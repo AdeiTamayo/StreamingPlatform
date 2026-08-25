@@ -133,6 +133,11 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             placeholder={`Search ${isMovie ? 'movies' : 'TV shows'}...`}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
           />
         </div>
         {error ? (

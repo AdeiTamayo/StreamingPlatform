@@ -297,6 +297,11 @@ const Navbar = memo(function Navbar() {
               onChange={(e) =>
                 setQuery(e.target.value)
               }
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
               className={
                 searchOpen
                   ? styles.open
@@ -527,6 +532,11 @@ const Navbar = memo(function Navbar() {
             onChange={(e) =>
               setQuery(e.target.value)
             }
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
           />
 
           <button type="submit">

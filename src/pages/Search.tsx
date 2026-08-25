@@ -135,6 +135,11 @@ export default function Search() {
             aria-label="Search"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
           />
           <button type="submit" className={styles.searchSubmitBtn}>Search</button>
         </form>
