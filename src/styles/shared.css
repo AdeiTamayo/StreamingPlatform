@@ -229,14 +229,42 @@
 .media-card-link {
   display: block;
   color: inherit;
+  border-radius: inherit;
+  outline: none;
+  cursor: pointer;
 }
 
-.media-card:hover {
+/* Using outline for focus ring to respect border-radius */
+.media-card:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+  /* Keep existing border hover styles for pointer devices */
+}
+
+/* Hover state without focus */
+.media-card:hover:not(:focus-within) {
   transform: translateY(-5px);
   border-color: rgba(125, 211, 252, 0.24);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
 }
 
+/* Focus state with seen/watch-later combination */
+.media-card.seen:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.media-card.watch-later:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.media-card.seen.watch-later:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+/* Original state styles */
 .media-card.seen {
   border-color: rgba(74, 222, 128, 0.6);
   box-shadow: inset 0 0 0 1px rgba(74, 222, 128, 0.25), 0 0 14px rgba(74, 222, 128, 0.12);

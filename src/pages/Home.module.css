@@ -227,15 +227,29 @@
   transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 
-.cw-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(125, 211, 252, 0.2);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-}
-
 .cw-card-link {
   display: block;
   color: inherit;
+  border-radius: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+.cw-card-link:focus-visible {
+  outline: none;
+}
+
+/* Using outline for focus ring to respect border-radius */
+.cw-card:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+/* Hover state without focus */
+.cw-card:hover:not(:focus-within) {
+  transform: translateY(-3px);
+  border-color: rgba(125, 211, 252, 0.2);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .cw-remove {

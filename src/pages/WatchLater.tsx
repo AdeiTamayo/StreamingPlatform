@@ -403,12 +403,25 @@ export default function WatchLater() {
   // "unreleased" - their cards can be hidden while they stay in the
   // calendar. Keyed by `type-id` to match the WatchLaterItem grid.
   // Calendar items use type "episode" for TV shows, map it back to "tv".
+  // A TV show is only considered unreleased if ALL its episodes are future-dated
+  // (meaning the show hasn't premiered yet).
   const unreleasedKeys = useMemo(() => {
-    const keys = new Set<string>();
+    // Group calendar items by (type, id)
+    const grouped = new Map<string, CalendarItem[]>();
     for (const c of calendarItems) {
-      if (isFuture(c.date)) {
-        const mediaType = c.type === "episode" ? "tv" : c.type;
-        keys.add(`${mediaType}-${String(c.id)}`);
+      const key = `${c.type === "episode" ? "tv" : c.type}-${String(c.id)}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key)!.push(c);
+    }
+
+    const keys = new Set<string>();
+    for (const [key, items] of grouped.entries()) {
+      // A group is "unreleased" only if ALL items are future-dated
+      // (i.e., no episodes have aired yet)
+      if (items.every(item => isFuture(item.date))) {
+        keys.add(key);
       }
     }
     return keys;
