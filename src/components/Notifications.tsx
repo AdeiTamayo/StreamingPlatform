@@ -26,6 +26,20 @@ function formatRelativeTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
+function formatAirDate(airDate: string | null): string {
+  if (!airDate) return '';
+  const date = new Date(airDate);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 1) return 'Today';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
+}
+
+function isRecentEpisode(airDate: string | null): boolean {
+  if (!airDate) return false;
+  return Date.now() - new Date(airDate).getTime() < 7 * 24 * 60 * 60 * 1000;
+}
+
 type NotificationPanelProps = {
   panelRef: RefObject<HTMLDivElement | null>;
   panelId: string;
@@ -36,6 +50,7 @@ type NotificationPanelProps = {
   onRemove: (id: string) => void;
   onMarkAllRead: () => void;
   onClearAll: () => void;
+  onScan: () => void;
   sidebar?: boolean;
 };
 
@@ -49,6 +64,7 @@ function NotificationPanel({
   onRemove,
   onMarkAllRead,
   onClearAll,
+  onScan,
   sidebar,
 }: NotificationPanelProps) {
   return (
@@ -67,16 +83,7 @@ function NotificationPanel({
         tabIndex={-1}
       >
         <div className={styles.header}>
-          <div className={styles.headerCopy}>
-            <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
-            <p className={styles.headerSubtitle}>
-              {notifications.length === 0
-                ? 'You will see episode alerts here.'
-                : unreadCount > 0
-                  ? `${unreadCount} unread ${unreadCount === 1 ? 'alert' : 'alerts'}`
-                  : ''}
-            </p>
-          </div>
+          <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
           <div className={styles.headerActions}>
             {unreadCount > 0 && (
               <button onClick={onMarkAllRead} className={styles.headerAction}>Mark all read</button>
@@ -95,23 +102,29 @@ function NotificationPanel({
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                 <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                <line x1="1" y1="1" x2="23" y2="23" />
               </svg>
             </div>
-            <div className={styles.emptyTitle}>No notifications yet</div>
-            <div className={styles.emptyText}>Episode alerts will appear here when new releases are detected.</div>
+            <div className={styles.emptyTitle}>No new episodes</div>
+            <button className={styles.emptyAction} onClick={onScan}>
+              Scan now
+            </button>
           </div>
         ) : (
           <ul className={styles.list}>
             {notifications.map((n) => (
               <li key={n.id} className={`${styles.item} ${!n.read ? styles.unread : ''}`}>
                 <div className={styles.itemContent}>
-                  <div className={styles.itemTitle}>{n.showTitle}</div>
+                  <div className={styles.itemTitle}>
+                    {n.showTitle}
+                    {isRecentEpisode(n.airDate) && <span className={styles.newBadge}>NEW</span>}
+                  </div>
                   <div className={styles.itemSub}>
                     S{n.season} E{n.episode}
                     {n.episodeTitle && <span> &middot; {n.episodeTitle}</span>}
                   </div>
                   <div className={styles.itemMeta}>
-                    {n.airDate && <span>Airs {n.airDate}</span>}
+                    {n.airDate && <span>Airs {formatAirDate(n.airDate)}</span>}
                     <span>{formatRelativeTime(n.createdAt)}</span>
                   </div>
                 </div>
@@ -167,15 +180,15 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   }
 
   async function scan() {
-    await scanForNewEpisodes();
+    await scanForNewEpisodes(true);
     load();
   }
 
   const { syncVersion } = useAuth();
 
-  // Background new-episode detection: scan at startup (throttled to once per
-  // hour) and keep refreshing the list so the bell reflects new releases
-  // without visiting the series page.
+  // Background new-episode detection: scan at startup and keep
+  // refreshing so the bell reflects new releases within the last
+  // week without visiting the series page.
   useEffect(() => {
     load();
     void scan();
@@ -288,6 +301,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
             onRemove={handleRemove}
             onMarkAllRead={handleMarkAllRead}
             onClearAll={handleClearAll}
+onScan={scan}
             sidebar
           />,
           document.body,
@@ -303,6 +317,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
           onRemove={handleRemove}
           onMarkAllRead={handleMarkAllRead}
           onClearAll={handleClearAll}
+          onScan={handleToggle}
         />
       ))}
     </div>

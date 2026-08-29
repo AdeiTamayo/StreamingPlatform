@@ -257,6 +257,7 @@ export default function TVDetail() {
                 if (added >= 5) break;
                 if (!ep.air_date) continue;
                 if (new Date(ep.air_date) > now) continue;
+                if (new Date(ep.air_date).getTime() < now.getTime() - 7 * 24 * 60 * 60 * 1000) continue;
                 if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
                 if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
                 addNotification(id, show.name, latestSeason.season_number, ep.episode_number, ep.name, 'new_episode', ep.air_date);
@@ -281,6 +282,7 @@ export default function TVDetail() {
               const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
               if (!ep || !ep.air_date) continue;
               if (new Date(ep.air_date) > now) continue;
+              if (new Date(ep.air_date).getTime() < now.getTime() - 7 * 24 * 60 * 60 * 1000) continue;
               if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
               if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;
               addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);

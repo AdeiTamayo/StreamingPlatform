@@ -16,6 +16,7 @@ import type { TMDBSeries, TMDBEpisode } from '../types';
 const SCAN_MIN_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_NOTIFICATIONS = 10;
 const MAX_SHOWS = 15;
+const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
 let scanInProgress = false;
 
@@ -59,7 +60,9 @@ function collectCandidates(): ScanCandidate[] {
 
 function addEpisodeNotification(showId: string | number, showTitle: string, season: number, episode: TMDBEpisode): boolean {
   if (!episode.air_date) return false;
-  if (new Date(episode.air_date).getTime() > Date.now()) return false;
+  const airDateMs = new Date(episode.air_date).getTime();
+  if (airDateMs > Date.now()) return false;
+  if (airDateMs < Date.now() - WEEK_IN_MS) return false;
   if (isWatched('tv', showId, season, episode.episode_number)) return false;
   if (isAlreadyNotified(showId, season, episode.episode_number)) return false;
   addNotification(showId, showTitle, season, episode.episode_number, episode.name || null, 'new_episode', episode.air_date);
