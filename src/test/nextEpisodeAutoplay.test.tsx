@@ -160,7 +160,7 @@ describe('next-episode autoplay countdown', () => {
     fireEvent.click(screen.getByText('fire-end'));
     await waitFor(() => expect(screen.getByText(/Up next/)).toBeInTheDocument());
 
-    fireEvent.click(screen.getByRole('button', { name: /Back to episodes/i }));
+    fireEvent.click(screen.getByRole('link', { name: /Back to episodes/i }));
     await waitFor(() => expect(screen.queryByText(/Up next/)).not.toBeInTheDocument());
     expect(screen.queryByText('fire-end')).not.toBeInTheDocument();
   });

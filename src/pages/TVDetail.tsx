@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
@@ -18,6 +18,13 @@ import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 const NEXT_EPISODE_COUNTDOWN_SECONDS = 8;
+
+// A plain unmodified left-click (no Ctrl/Cmd/Shift/Alt and not the middle
+// button) - the only case where we want client-side state to react too.
+// Modified clicks let the browser open the link in a new tab instead.
+function isPlainLeftClick(e: { defaultPrevented?: boolean; button?: number; metaKey?: boolean; altKey?: boolean; ctrlKey?: boolean; shiftKey?: boolean }): boolean {
+  return !e.defaultPrevented && e.button === 0 && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
+}
 
 const EpisodeDot = memo(function EpisodeDot({ ep, current, done, onClick }: { ep: number; current: boolean; done: boolean; onClick: (ep: number) => void }) {
   return (
@@ -717,9 +724,9 @@ export default function TVDetail() {
           <div className={styles.epNavHints}>Shortcuts: N next &middot; P previous &middot; W watched</div>
 
           <div className={styles.episodeListToggle}>
-            <button className="watch-toggle" onClick={() => { setNextUpIn(null); setPlayerOpen(false); }}>
+            <Link className="watch-toggle" to={`/tv/${safeId}`} onClick={(e) => { if (isPlainLeftClick(e)) setPlayerOpen(false); }} style={{ textDecoration: 'none', display: 'inline-block' }}>
               Back to episodes
-            </button>
+            </Link>
           </div>
         </section>
       ) : (
@@ -779,7 +786,7 @@ export default function TVDetail() {
               ) : episodes.length > 0 ? (
                 <div className={styles.episodeList}>
                   {episodes.map((ep) => (
-                    <div key={ep.episode_number} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${watchedMap[ep.episode_number] ? styles.watched : ''}`} onClick={() => { setEpisode(ep.episode_number); setPlayerOpen(true); }}>
+                    <Link key={ep.episode_number} to={`/tv/${safeId}?season=${season}&episode=${ep.episode_number}`} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${watchedMap[ep.episode_number] ? styles.watched : ''}`} onClick={(e) => { if (isPlainLeftClick(e)) { setEpisode(ep.episode_number); setPlayerOpen(true); } }}>
                       {ep.still_path && (
                         <div className={styles.episodeCardThumb}>
                           <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
@@ -799,7 +806,7 @@ export default function TVDetail() {
                         {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
                       </div>
                       {watchedMap[ep.episode_number] && <span className={styles.epWatchedBadge}>&#10003;</span>}
-                    </div>
+                    </Link>
                   ))}
                 </div>
               ) : null}

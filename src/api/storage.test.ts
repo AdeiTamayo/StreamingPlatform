@@ -9,7 +9,7 @@ import {
   getEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, isInEpisodeWatchLater,
   saveProgress, getProgress, clearProgress,
   getLastSeen, getContinueWatching,
-  getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified,
+  getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified, pruneOldNotifications, NOTIFICATIONS_KEY,
   clearAllData, exportData, importData,
   isSeriesWatched, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, getSeriesWatchedShows, syncSeriesWatchedFlag,
 } from './storage';
@@ -391,6 +391,45 @@ describe('notifications', () => {
     }
     const notifs = getNotifications();
     expect(notifs).toHaveLength(50);
+  });
+
+  it('prunes notifications whose episode aired more than a week ago', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
+    addNotification('1', 'Old', 1, 1, 'Ep 1', 'new_episode', daysAgo(20));
+    addNotification('1', 'New', 1, 2, 'Ep 2', 'new_episode', daysAgo(2));
+    pruneOldNotifications();
+    const notifs = getNotifications();
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].showTitle).toBe('New');
+  });
+
+  it('prunes notifications without an air date when created more than a week ago', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const old = [{
+      id: 'old', showId: '1', showTitle: 'Old', season: 1, episode: 1,
+      episodeTitle: null, type: 'new_episode', airDate: null,
+      createdAt: Date.now() - 20 * DAY, read: false,
+    }];
+    const fresh = [{
+      id: 'fresh', showId: '1', showTitle: 'New', season: 1, episode: 2,
+      episodeTitle: null, type: 'new_episode', airDate: null,
+      createdAt: Date.now(), read: false,
+    }];
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify([...old, ...fresh]));
+    pruneOldNotifications();
+    const notifs = getNotifications();
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].showTitle).toBe('New');
+  });
+
+  it('leaves recent notifications untouched', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const daysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
+    addNotification('1', 'A', 1, 1, null, 'new_episode', daysAgo(1));
+    addNotification('1', 'B', 1, 2, null, 'new_episode', daysAgo(6));
+    pruneOldNotifications();
+    expect(getNotifications()).toHaveLength(2);
   });
 });
 

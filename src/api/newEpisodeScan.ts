@@ -13,7 +13,7 @@ import {
 } from './storage';
 import type { TMDBSeries, TMDBEpisode } from '../types';
 
-const SCAN_MIN_INTERVAL_MS = 60 * 60 * 1000;
+const SCAN_MIN_INTERVAL_MS = 15 * 60 * 1000;
 const MAX_NOTIFICATIONS = 10;
 const MAX_SHOWS = 15;
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
@@ -72,7 +72,7 @@ function addEpisodeNotification(showId: string | number, showTitle: string, seas
 // Detects new episodes for watch-later shows and series marked as watched
 // without requiring a visit to the series page. Adds new-episode
 // notifications and moves watched series with unwatched new episodes to
-// Watch Later. Throttled to one full run per hour unless forced.
+// Watch Later. Throttled to one full run per 15 minutes unless forced.
 export async function scanForNewEpisodes(force = false): Promise<number> {
   if (scanInProgress) return 0;
   if (!force && isNewEpisodeScanThrottled()) return 0;

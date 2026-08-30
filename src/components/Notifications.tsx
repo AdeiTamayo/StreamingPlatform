@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useId, memo, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications } from '../api/storage';
+import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications, pruneOldNotifications } from '../api/storage';
 import { scanForNewEpisodes } from '../api/newEpisodeScan';
 import { useAuth } from '../hooks/useAuth';
 import type { NotificationItem } from '../types';
@@ -124,7 +124,7 @@ function NotificationPanel({
                     {n.episodeTitle && <span> &middot; {n.episodeTitle}</span>}
                   </div>
                   <div className={styles.itemMeta}>
-                    {n.airDate && <span>Airs {formatAirDate(n.airDate)}</span>}
+                    {n.airDate && <span>Aired {formatAirDate(n.airDate)}</span>}
                     <span>{formatRelativeTime(n.createdAt)}</span>
                   </div>
                 </div>
@@ -174,12 +174,20 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   const panelId = useId();
 
   function load() {
+    pruneOldNotifications();
     const list: NotificationItem[] = getNotifications();
     setNotifications(list);
     setUnreadCount(list.filter((n) => !n.read).length);
   }
 
-  async function scan() {
+  // Periodic background refresh is throttled to avoid hammering the TMDB API;
+  // one-off actions (startup, opening the panel, sync) force an immediate scan.
+  async function refresh() {
+    await scanForNewEpisodes();
+    load();
+  }
+
+  async function forceScan() {
     await scanForNewEpisodes(true);
     load();
   }
@@ -191,16 +199,16 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   // week without visiting the series page.
   useEffect(() => {
     load();
-    void scan();
+    void forceScan();
     const interval = setInterval(() => {
       load();
-      void scan();
+      void refresh();
     }, 30000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (syncVersion > 0) void scan();
+    if (syncVersion > 0) void forceScan();
   }, [syncVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -301,7 +309,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
             onRemove={handleRemove}
             onMarkAllRead={handleMarkAllRead}
             onClearAll={handleClearAll}
-onScan={scan}
+            onScan={forceScan}
             sidebar
           />,
           document.body,
@@ -317,7 +325,7 @@ onScan={scan}
           onRemove={handleRemove}
           onMarkAllRead={handleMarkAllRead}
           onClearAll={handleClearAll}
-          onScan={handleToggle}
+          onScan={forceScan}
         />
       ))}
     </div>

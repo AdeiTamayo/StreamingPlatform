@@ -792,6 +792,19 @@ export function getNotifications(): NotificationItem[] {
   }
 }
 
+// Notifications are only relevant for episodes aired within the last week, so
+// anything older is dropped. Air date is the source of truth; when it's
+// missing we fall back to when the notification was created.
+export function pruneOldNotifications(): void {
+  const list = getNotifications();
+  if (list.length === 0) return;
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const kept = list.filter((n) => (n.airDate ? new Date(n.airDate).getTime() : n.createdAt) >= cutoff);
+  if (kept.length !== list.length) {
+    safeWrite(NOTIFICATIONS_KEY, JSON.stringify(kept));
+  }
+}
+
 const NOTIFICATIONS_DISMISSED_MAX = 500;
 
 function getDismissedNotifications(): { showId: string; season: number; episode: number }[] {
