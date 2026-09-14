@@ -110,4 +110,18 @@ export const watchedRepository = {
       enqueueWrite('watched', 'delete', { userId, mediaType: 'tv', tmdbId });
     }
   },
+
+  async clearAllMovies(userId: string): Promise<void> {
+    try {
+      const { error }: any = await withRetry(async () =>
+        requireSupabase().from('watched')
+          .delete()
+          .eq('user_id', userId)
+          .eq('media_type', 'movie'),
+      );
+      if (error) throw error;
+    } catch {
+      enqueueWrite('watched', 'delete', { userId, mediaType: 'movie' });
+    }
+  },
 };

@@ -5,6 +5,7 @@ import {
   markUnwatched,
   clearProgress,
   clearShowHistory,
+  clearAllMoviesWatched,
   getSeriesWatchedFlag,
   unmarkSeriesWatched,
 } from "../api/storage";
@@ -171,13 +172,25 @@ export default function LastSeen() {
     if (removed) toast?.("Removed from history");
   }
 
-  function handleRemoveShow(showId: string | number) {
+   function handleRemoveShow(showId: string | number) {
     clearShowHistory(showId);
     setItems(getLastSeen());
     if (selectedSeriesId && String(selectedSeriesId) === String(showId)) {
       setSelectedSeriesId(null);
     }
     toast?.("Series removed from history");
+  }
+
+  function handleRemoveAllMovies() {
+    if (
+      !window.confirm(
+        `Remove all ${movies.length} watched movie${movies.length === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    )
+      return;
+    clearAllMoviesWatched();
+    setItems(getLastSeen());
+    toast?.("All watched movies removed from history");
   }
 
   function showSeriesEpisodes(show: SeriesGroup) {
@@ -300,6 +313,20 @@ export default function LastSeen() {
                         onClick={() => showSeriesEpisodes(show)}
                       >
                         View
+                      </button>
+                      <button
+                        className="wl-remove"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Remove all ${show.episodes.length} watched episode${show.episodes.length === 1 ? "" : "s"} for "${show.title}"?`,
+                            )
+                          )
+                            handleRemoveShow(show.id);
+                        }}
+                        title="Remove all episodes"
+                      >
+                        &times;
                       </button>
                     </div>
                   ))}
@@ -431,6 +458,14 @@ export default function LastSeen() {
                     </div>
                   ))}
                 </div>
+                {movies.length > 0 && (
+                  <button
+                    className="watch-toggle danger"
+                    onClick={handleRemoveAllMovies}
+                  >
+                    Remove all
+                  </button>
+                )}
                 {totalMoviePages > 1 && (
                   <Pagination
                     page={safeMoviePage + 1}

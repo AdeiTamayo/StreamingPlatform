@@ -1,5 +1,4 @@
-import CONFIG from '../config';
-import { getCached, setCache } from './tmdbCache';
+import { getTVDetail } from './tmdb';
 import type { TMDBSeries } from '../types';
 
 export interface TVStatus {
@@ -51,14 +50,8 @@ export async function fetchTVStatus(id: number) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const url = `${CONFIG.TMDB_BASE_URL}/tv/${id}?api_key=${CONFIG.TMDB_API_KEY}`;
-    let data = await getCached(url);
-    if (!data) {
-      const res = await fetch(url, { headers: { accept: 'application/json' }, signal: controller.signal });
-      if (!res.ok) return;
-      data = await res.json();
-      await setCache(url, data);
-    }
+    // Reuses the TMDB client so v3 keys and v4 Bearer tokens both work.
+    const data = await getTVDetail(id, controller.signal);
     const series = data as TMDBSeries;
     if (series.status) {
       remember(id, {

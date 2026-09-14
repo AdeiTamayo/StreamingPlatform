@@ -646,6 +646,55 @@ export function unmarkAllSeasonsWatched(showId: string | number, seasons: { seas
   }
 }
 
+export async function clearAllMoviesWatched(): Promise<void> {
+  const watchedIndex = getWatchedIndex();
+  const movieKeys: string[] = [];
+  for (const k of watchedIndex) {
+    const p = parseWatchedKey(k);
+    if (p && p.type === 'movie') {
+      localStorage.removeItem(k);
+      movieKeys.push(k);
+    }
+  }
+  const remaining = watchedIndex.filter((k) => !movieKeys.includes(k));
+  saveIndex(WATCHED_INDEX_KEY, remaining);
+
+  const progressIndex = getProgressIndex();
+  const progressKeys: string[] = [];
+  for (const k of progressIndex) {
+    const p = parseProgressKey(k);
+    if (p && p.type === 'movie') {
+      localStorage.removeItem(k);
+      progressKeys.push(k);
+    }
+  }
+  const remainingProgress = progressIndex.filter((k) => !progressKeys.includes(k));
+  saveIndex(PROGRESS_INDEX_KEY, remainingProgress);
+
+  let orphans = false;
+  const sweep: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    if (parseWatchedKey(k)?.type === 'movie') {
+      sweep.push(k);
+      orphans = true;
+    } else if (parseProgressKey(k)?.type === 'movie') {
+      sweep.push(k);
+      orphans = true;
+    }
+  }
+  sweep.forEach((k) => localStorage.removeItem(k));
+  if (orphans) {
+    saveIndex(WATCHED_INDEX_KEY, getWatchedIndex());
+    saveIndex(PROGRESS_INDEX_KEY, getProgressIndex());
+  }
+
+  if (currentUserId) {
+    await watchedRepository.clearAllMovies(currentUserId);
+  }
+}
+
 export function getSearchHistory(): string[] {
   try {
     return JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || '[]') as string[] || [];
