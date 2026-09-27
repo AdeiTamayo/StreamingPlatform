@@ -90,7 +90,6 @@ flowchart TD
 - **Continue Watching** tracks progress and shows unfinished content on the home page
 - **Auto-detect watched** episodes are marked automatically when you click Next or reach the end
 - **Episode navigation** season/episode dropdowns with keyboard search, prev/next buttons
-- **Next-episode autoplay** when an episode finishes (or reaches the end), a short countdown offers "Play now" or "Cancel" to advance automatically
 - **Keyboard shortcuts** while watching: N = next episode, P = previous episode, W = toggle watched
 - **Trailers** YouTube trailers on detail pages when available
 - **Recommendations** "You might also like" section on movie and show detail pages
@@ -110,7 +109,7 @@ flowchart TD
 ### Accounts & Sync (optional)
 - **Guest mode** — browse, search, and watch everything with no account; personal features (Watch Later, Last Seen, Notifications, Settings) prompt a sign-in
 - **Sign In / Register** via a global modal (forgot-password flow included) with focus trap, scroll lock, and Escape/outside-click to close
-- **Cloud sync** — watched marks, progress, watch later, notifications, search history, and settings sync to Supabase with Row Level Security
+- **Cloud sync** — watched marks, watch later, and search history sync to Supabase with Row Level Security (playback progress, video source, and notifications stay local-only)
 - **Local-first storage** — every write goes to localStorage instantly and to Supabase in the background; the app is fully functional offline or without Supabase configured
 - **Offline resilience** — failed sync writes are queued and retried with exponential backoff
 - **One-time migration** — after signing in, local data is uploaded to the cloud and the app continues reading from localStorage
@@ -168,7 +167,7 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 ### Setting up Supabase (optional)
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. In the SQL editor, run the migration file in `supabase/migrations/001_initial_schema.sql` — this creates all 6 tables (watched, progress, watch_later, notifications, search_history, settings), their indexes and unique constraints, and Row Level Security policies
+2. In the SQL editor, run `supabase/migrations/001_initial_schema.sql` — a single migration that creates the 3 tables (watched, watch_later, search_history), their indexes and unique constraints, and Row Level Security policies. It also drops the legacy `progress`, `settings`, and `notifications` tables if they exist (playback progress, the video source preference, and episode notifications are local-only). The file is idempotent, so re-running it is safe
 3. Copy your project URL and anon key into `.env`
 
 ### Migrating existing local data
@@ -221,11 +220,8 @@ src/
     newEpisodeScan.ts   # Background new-episode detection for Watch Later series
   repositories/
     watchedRepository.ts       # Supabase writes for watched marks
-    progressRepository.ts      # Supabase writes for playback progress
     watchLaterRepository.ts    # Supabase writes for watch later lists
-    notificationRepository.ts  # Supabase writes for notifications
     searchHistoryRepository.ts # Supabase writes for search history
-    settingsRepository.ts      # Supabase writes for settings
   services/auth/
     authService.ts      # Supabase auth wrapper (sign in/up/out, reset password, session)
   context/
