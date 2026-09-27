@@ -152,7 +152,7 @@ button.date-picker-month:hover {
 
 .date-picker-cell.selected {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #03111e;
+  color: var(--ink);
   font-weight: 800;
 }
 
@@ -194,7 +194,7 @@ button.date-picker-month:hover {
 
 .date-picker-action.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #03111e;
+  color: var(--ink);
 }
 
 :global(.more-filters-panel) .date-picker {

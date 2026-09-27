@@ -23,6 +23,19 @@
   --radius: 16px;
   --radius-sm: 12px;
 
+  /* Semantic palette - one meaning, one token. Rules:
+     - Watch Later is always gold (--accent-warm fills, --gold-text text).
+     - Watched is always green (--green fills/borders, --green-text text,
+       --green-solid for solid fills like badges/dots).
+     - Never hardcode #f5c518/#4ade80/#22c55e/#16a34a outside this block. */
+  --gold-text: #f5c518;
+  --green-text: #4ade80;
+  --green-solid: #16a34a;
+  --danger: #f87171;
+  --danger-strong: #ef4444;
+  --ink: #03111e;
+  --surface-1: #141f31;
+
   /* z-index scale */
   --z-nav: 100;
   --z-notif-overlay: 199;
@@ -49,6 +62,11 @@
   --accent-strong: #0369a1;
   --accent-warm: #b45309;
   --green: #16a34a;
+  --gold-text: #b45309;
+  --green-text: #16a34a;
+  --danger: #dc2626;
+  --danger-strong: #b91c1c;
+  --surface-1: #e2e8f0;
 }
 
 html {
@@ -101,4 +119,19 @@ a:focus-visible,
 select:focus-visible {
   outline: 2px solid rgba(125, 211, 252, 0.7);
   outline-offset: 2px;
+}
+
+/* Respect reduced-motion: kill shimmers, fades, slides and smooth scroll. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

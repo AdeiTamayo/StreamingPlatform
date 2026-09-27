@@ -132,7 +132,7 @@
 }
 
 .genre-select option {
-  background: #141f31;
+  background: var(--surface-1);
   color: #e2e8f0;
 }
 
@@ -215,6 +215,12 @@
   gap: 1rem;
 }
 
+/* Skip layout/paint for off-screen cards; intrinsic size avoids scrollbar jump. */
+.media-grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
 /* Media Card */
 .media-card {
   position: relative;
@@ -248,6 +254,29 @@
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
 }
 
+/* Hover keeps the state colors - only the lift applies, so watched and
+   watch-later cards stay visibly marked while hovered. */
+.media-card.seen:hover:not(:focus-within) {
+  transform: translateY(-5px);
+  border-color: rgba(22, 163, 74, 0.85);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.35), 0 18px 34px rgba(0, 0, 0, 0.32);
+}
+
+.media-card.watch-later:hover:not(:focus-within) {
+  transform: translateY(-5px);
+  border-color: rgba(245, 197, 24, 0.75);
+  box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.25), 0 18px 34px rgba(0, 0, 0, 0.32);
+}
+
+.media-card.seen.watch-later:hover:not(:focus-within) {
+  transform: translateY(-5px);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95)) padding-box,
+    linear-gradient(135deg, rgba(22, 163, 74, 1) 0 50%, rgba(245, 197, 24, 1) 50% 100%) border-box;
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
+}
+
 /* Focus state with seen/watch-later combination */
 .media-card.seen:focus-within {
   outline: 2px solid rgba(125, 211, 252, 0.7);
@@ -275,9 +304,15 @@
   box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.2);
 }
 
+/* Both states: split border, half green (watched) half gold (watch later).
+   A transparent border over a border-box gradient draws the two colors while
+   respecting the card radius (border-image would ignore it). */
 .media-card.seen.watch-later {
-  border-color: rgba(22, 163, 74, 0.65);
-  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.3), 0 0 14px rgba(22, 163, 74, 0.14);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95)) padding-box,
+    linear-gradient(135deg, rgba(22, 163, 74, 0.9) 0 50%, rgba(245, 197, 24, 0.9) 50% 100%) border-box;
+  box-shadow: 0 0 14px rgba(22, 163, 74, 0.14), 0 0 14px rgba(245, 197, 24, 0.1);
 }
 
 .media-card-poster {
@@ -294,6 +329,12 @@
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.11) 50%, rgba(255, 255, 255, 0.05) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Poster shimmer sits under the loaded image - remove it so dozens of
+   finished cards don't keep repainting forever. */
+.media-card-poster.loaded::before {
+  display: none;
 }
 
 .media-card-poster img {
@@ -329,7 +370,7 @@
 
 .media-card-type.tv {
   background: rgba(56, 189, 248, 0.85);
-  color: #03111e;
+  color: var(--ink);
 }
 
 .media-card-type.movie {
@@ -342,7 +383,7 @@
   top: 6px;
   right: 6px;
   background: rgba(7, 17, 31, 0.8);
-  color: #4ade80;
+  color: var(--green-text);
   font-size: 0.7rem;
   font-weight: 700;
   padding: 2px 6px;
@@ -392,17 +433,18 @@
 
 .media-card-wl.active {
   color: var(--accent-warm);
+  background: rgba(245, 197, 24, 0.22);
 }
 
 .media-card-watched-btn:hover {
   background: rgba(22, 163, 74, 0.28);
-  color: #22c55e;
+  color: var(--green-text);
 }
 
 .media-card-watched-btn.active {
   opacity: 1;
   background: rgba(22, 163, 74, 0.25);
-  color: #22c55e;
+  color: var(--green-text);
 }
 
 .media-card-info {
@@ -466,7 +508,6 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-  transform: translateX(-100%);
   animation: shimmer 1.5s infinite;
 }
 
@@ -781,16 +822,22 @@
 }
 
 .badge-btn.in-wl {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(245, 197, 24, 0.14);
+  color: var(--gold-text);
+  border-color: rgba(245, 197, 24, 0.35);
+}
+
+.badge-btn.in-watched {
+  background: rgba(22, 163, 74, 0.16);
+  color: var(--green-text);
+  border-color: rgba(22, 163, 74, 0.45);
 }
 
 .imdb-badge {
   display: inline-flex;
   align-items: center;
   background: rgba(245, 197, 24, 0.14);
-  color: #f5c518;
+  color: var(--gold-text);
   border-color: rgba(245, 197, 24, 0.3);
   text-decoration: none;
   font-weight: 700;
@@ -798,12 +845,12 @@
 
 .imdb-badge:hover {
   background: rgba(245, 197, 24, 0.24);
-  color: #f5c518;
+  color: var(--gold-text);
 }
 
 .resume-badge {
   background: rgba(22, 163, 74, 0.16);
-  color: #4ade80;
+  color: var(--green-text);
 }
 
 .detail-overview {
@@ -1024,7 +1071,7 @@
 }
 
 .custom-select-item.watched {
-  color: #22c55e;
+  color: var(--green-text);
 }
 
 .cs-check {
@@ -1045,7 +1092,7 @@
 
 .watch-toggle.watched {
   background: rgba(22, 163, 74, 0.16);
-  color: #4ade80;
+  color: var(--green-text);
   border-color: rgba(22, 163, 74, 0.45);
 }
 
@@ -1060,14 +1107,14 @@
 }
 
 .watch-toggle.in-wl {
-  background: rgba(59, 130, 246, 0.12);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(245, 197, 24, 0.14);
+  color: var(--gold-text);
+  border-color: rgba(245, 197, 24, 0.35);
 }
 
 .watch-toggle.danger:hover {
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger-strong);
 }
 
 .detail-actions {

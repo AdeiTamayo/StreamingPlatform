@@ -59,7 +59,7 @@
   height: 16px;
   padding: 0 1px;
   border-radius: 999px;
-  background: #ef4444;
+  background: var(--danger-strong);
   color: #fff;
   font-size: 0.65rem;
   font-weight: 700;
@@ -226,7 +226,7 @@
   font-size: 0.58rem;
   font-weight: 700;
   color: #fff;
-  background: #22c55e;
+  background: var(--green-solid);
   padding: 0.1em 0.4em;
   border-radius: 999px;
   margin-left: 0.4em;
@@ -291,7 +291,7 @@
   padding: 0;
   border-radius: 999px;
   background: rgba(239, 68, 68, 0.08);
-  color: #f87171;
+  color: var(--danger);
   border: none;
   cursor: pointer;
   transition: background 0.15s, transform 0.15s;

@@ -111,7 +111,7 @@
   font-size: 0.9rem;
   font-weight: 700;
   background: linear-gradient(135deg, var(--accent), #38bdf8);
-  color: #06121f;
+  color: var(--ink);
   transition: opacity 0.2s, transform 0.15s;
 }
 

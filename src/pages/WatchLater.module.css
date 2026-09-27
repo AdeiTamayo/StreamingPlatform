@@ -849,7 +849,7 @@
 .releaseCard:hover .openBtn {
   background: linear-gradient(135deg, var(--accent), #38bdf8);
 
-  color: #06121f;
+  color: var(--ink);
 
   border-color: transparent;
 
