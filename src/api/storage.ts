@@ -1,11 +1,8 @@
 import { logDebug, logError } from '../utils/logger';
 import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
 import { watchedRepository } from '../repositories/watchedRepository';
-import { progressRepository } from '../repositories/progressRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
-import { notificationRepository } from '../repositories/notificationRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
-import { settingsRepository } from '../repositories/settingsRepository';
 import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
 import type { WatchedInsert } from '../types/database';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
@@ -340,7 +337,6 @@ export async function clearShowHistory(showId: string | number): Promise<void> {
 
   if (currentUserId) {
     await watchedRepository.clearShowHistory(currentUserId, Number(showId));
-    await progressRepository.clearByShowId(currentUserId, Number(showId));
   }
 }
 
@@ -362,6 +358,8 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
   return last;
 }
 
+// Playback progress is local-only (no Supabase table) - resume points and
+// Continue Watching never leave this browser.
 export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>, duration?: number): void {
   const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(duration ? { duration } : {}), ...(meta ? { meta } : {}) };
   try {
@@ -370,19 +368,6 @@ export function saveProgress(type: MediaType, id: string | number, currentTime: 
     logDebug(`saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}`);
   } catch (err) {
     logDebug(`saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${String(err)}`);
-  }
-
-  if (currentUserId) {
-    progressRepository.save({
-      user_id: currentUserId,
-      media_type: type,
-      tmdb_id: Number(id),
-      season: season ?? null,
-      episode: episode ?? null,
-      current_time: currentTime,
-      duration: duration ?? null,
-      meta: (meta ?? null) as never,
-    });
   }
 }
 
@@ -399,10 +384,6 @@ export function getProgress(type: string, id: string | number, season?: number |
 export function clearProgress(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
   localStorage.removeItem(progressKey(type, id, season, episode));
   removeFromProgressIndex(progressKey(type, id, season, episode));
-
-  if (currentUserId) {
-    progressRepository.clear(currentUserId, type, Number(id), season, episode);
-  }
 }
 
 export function getWatchLater(): WatchLaterItem[] {
@@ -716,6 +697,18 @@ export function addSearchHistory(query: string): void {
   }
 }
 
+export function removeSearchHistory(query: string): void {
+  const trimmed = query.trim();
+  if (!trimmed) return;
+  const lowered = trimmed.toLowerCase();
+  const list = getSearchHistory().filter((q: string) => q.toLowerCase() !== lowered);
+  safeWrite(SEARCH_HISTORY_KEY, JSON.stringify(list));
+
+  if (currentUserId) {
+    searchHistoryRepository.remove(currentUserId, trimmed);
+  }
+}
+
 const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history', 'watched_index', 'progress_index', 'notifications'];
 
 function isExportKey(k: string): boolean {
@@ -825,12 +818,9 @@ export function getVideoSource(): string {
   return localStorage.getItem(VIDEO_SOURCE_KEY) || 'vidsrc';
 }
 
+// The preferred video source is local-only (no Supabase table).
 export function setVideoSource(source: string): void {
   safeWrite(VIDEO_SOURCE_KEY, source);
-
-  if (currentUserId) {
-    settingsRepository.upsert({ user_id: currentUserId, preferred_video_source: source });
-  }
 }
 
 export function getNotifications(): NotificationItem[] {
@@ -891,6 +881,8 @@ function isDismissedNotification(showId: string | number, season: number, episod
   return dismissed;
 }
 
+// Episode notifications are local-only (no Supabase table) - the bell,
+// scans, and dismissals never leave this browser.
 export function addNotification(showId: string | number, showTitle: string, season: number, episode: number, episodeTitle: string | null, type: string, airDate: string | null): string {
   if (isDismissedNotification(showId, season, episode)) return '';
   const list = getNotifications();
@@ -910,19 +902,6 @@ export function addNotification(showId: string | number, showTitle: string, seas
   if (list.length > NOTIFICATIONS_MAX) list.length = NOTIFICATIONS_MAX;
   safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list));
 
-  if (currentUserId) {
-    notificationRepository.add({
-      user_id: currentUserId,
-      title: showTitle,
-      message: episodeTitle || null,
-      media_type: 'tv',
-      tmdb_id: Number(showId),
-      season,
-      episode,
-      read: false,
-    });
-  }
-
   return id;
 }
 
@@ -932,28 +911,17 @@ export function removeNotification(id: string): void {
   safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list.filter((n: NotificationItem) => n.id !== id)));
 
   if (item) dismissNotification(item.showId, item.season, item.episode);
-  if (currentUserId && item) {
-    notificationRepository.remove(currentUserId, Number(item.showId), item.season, item.episode);
-  }
 }
 
 export function markAllNotificationsRead(): void {
   const list = getNotifications();
   list.forEach((n: NotificationItem) => { n.read = true; });
   safeWrite(NOTIFICATIONS_KEY, JSON.stringify(list));
-
-  if (currentUserId) {
-    notificationRepository.markAllRead(currentUserId);
-  }
 }
 
 export function clearAllNotifications(): void {
   getNotifications().forEach((n: NotificationItem) => dismissNotification(n.showId, n.season, n.episode));
   localStorage.removeItem(NOTIFICATIONS_KEY);
-
-  if (currentUserId) {
-    notificationRepository.clearAll(currentUserId);
-  }
 }
 
 export function isAlreadyNotified(showId: string | number, season: number, episode: number): boolean {

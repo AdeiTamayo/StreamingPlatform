@@ -92,24 +92,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [setAuth, runMigration]);
 
+  // Sign-in/out wire the storage-layer user id and the local->cloud
+  // migration directly instead of relying solely on the auth-state event:
+  // if SIGNED_IN/SIGNED_OUT is ever missed, remote writes (search history,
+  // notifications, ...) would silently stay local-only and the Supabase
+  // tables would stay empty while the UI looks logged in.
   const signIn = useCallback(async (email: string, password: string) => {
     const result = await authService.signIn(email, password);
     if (result.user && result.session) {
+      setCurrentUserId(result.user.id);
       setAuth(result.user, result.session);
+      runMigration(result.user.id);
     }
     return result;
-  }, [setAuth]);
+  }, [setAuth, runMigration]);
 
   const signUp = useCallback(async (email: string, password: string) => {
     const result = await authService.signUp(email, password);
     if (result.user && result.session) {
+      setCurrentUserId(result.user.id);
       setAuth(result.user, result.session);
+      runMigration(result.user.id);
     }
     return result;
-  }, [setAuth]);
+  }, [setAuth, runMigration]);
 
   const signOut = useCallback(async () => {
     await authService.signOut();
+    setCurrentUserId(null);
     setAuth(null, null);
     navigate('/');
   }, [setAuth, navigate]);

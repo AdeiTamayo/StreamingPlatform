@@ -182,12 +182,6 @@ export default function LastSeen() {
   }
 
   function handleRemoveAllMovies() {
-    if (
-      !window.confirm(
-        `Remove all ${movies.length} watched movie${movies.length === 1 ? "" : "s"}? This cannot be undone.`,
-      )
-    )
-      return;
     clearAllMoviesWatched();
     setItems(getLastSeen());
     toast?.("All watched movies removed from history");
@@ -316,14 +310,7 @@ export default function LastSeen() {
                       </button>
                       <button
                         className="wl-remove"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Remove all ${show.episodes.length} watched episode${show.episodes.length === 1 ? "" : "s"} for "${show.title}"?`,
-                            )
-                          )
-                            handleRemoveShow(show.id);
-                        }}
+                        onClick={() => handleRemoveShow(show.id)}
                         title="Remove all episodes"
                       >
                         &times;
@@ -385,14 +372,7 @@ export default function LastSeen() {
                       </Link>
                       <button
                         className="watch-toggle danger"
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Remove all ${watchedEpisodeCount(selectedSeries)} watched episode${watchedEpisodeCount(selectedSeries) === 1 ? "" : "s"} for "${selectedSeries.title}"?`,
-                            )
-                          )
-                            handleRemoveShow(selectedSeries.id);
-                        }}
+                        onClick={() => handleRemoveShow(selectedSeries.id)}
                       >
                         Remove all
                       </button>

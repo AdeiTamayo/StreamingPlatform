@@ -116,29 +116,7 @@ async function main() {
   }
   console.log('Watched items transferred:', watchedIndex.length);
 
-  // Sync progress
-  const progressIndex = JSON.parse(localStorage.getItem('progress_index') || '[]');
-  for (const key of progressIndex) {
-    try {
-      const data = JSON.parse(localStorage.getItem(key) || '{}');
-      const m_tv = key.match(/^progress:tv-(\\d+)-S(\\d+)E(\\d+)$/);
-      const m_movie = key.match(/^progress:movie-(.+)$/);
-      if (m_tv) {
-        await supabase.from('progress').upsert({
-          user_id: userId, media_type: 'tv', tmdb_id: Number(m_tv[1]),
-          season: Number(m_tv[2]), episode: Number(m_tv[3]),
-          current_time: data.currentTime || 0, duration: null,
-        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode' });
-      } else if (m_movie) {
-        await supabase.from('progress').upsert({
-          user_id: userId, media_type: 'movie', tmdb_id: Number(m_movie[1]),
-          season: null, episode: null,
-          current_time: data.currentTime || 0, duration: null,
-        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode' });
-      }
-    } catch (e) { console.error('Progress error:', key, e); }
-  }
-  console.log('Progress items transferred:', progressIndex.length);
+  // Playback progress is local-only (no Supabase table) - skipped.
 
   // Sync regular watch later
   const wlItems = JSON.parse(localStorage.getItem('watchlater') || '[]');
@@ -167,19 +145,7 @@ async function main() {
     } catch (e) { console.error('EPWL error:', k, e); }
   }
 
-  // Sync notifications
-  const notifs = JSON.parse(localStorage.getItem('notifications') || '[]');
-  for (const n of notifs) {
-    try {
-      await supabase.from('notifications').insert({
-        user_id: userId, title: n.showTitle || '', message: n.episodeTitle || null,
-        media_type: 'tv', tmdb_id: Number(n.showId) || null,
-        season: n.season || null, episode: n.episode || null,
-        read: n.read || false,
-      });
-    } catch (e) { console.error('Notif error:', n, e); }
-  }
-  console.log('Notifications transferred:', notifs.length);
+  // Notifications are local-only (no Supabase table) - skipped.
 
   // Sync search history
   const searchHistory = JSON.parse(localStorage.getItem('search_history') || '[]');
@@ -192,13 +158,7 @@ async function main() {
   }
   console.log('Search history transferred:', searchHistory.length);
 
-  // Sync settings
-  const videoSource = localStorage.getItem('video_source');
-  if (videoSource) {
-    await supabase.from('settings').upsert({
-      user_id: userId, preferred_video_source: videoSource,
-    }, { onConflict: 'user_id' });
-  }
+  // Video source preference is local-only (no Supabase table) - skipped.
 
   console.log('\\nTransfer complete!');
   // Uncomment to clear localStorage after transfer:

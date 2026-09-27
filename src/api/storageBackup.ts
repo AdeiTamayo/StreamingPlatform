@@ -1,16 +1,15 @@
 import { getCurrentUserId } from './storage';
 import { watchedRepository } from '../repositories/watchedRepository';
-import { progressRepository } from '../repositories/progressRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
-import { notificationRepository } from '../repositories/notificationRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
-import type { WatchedInsert, ProgressInsert, WatchLaterInsert, NotificationInsert, SearchHistoryInsert } from '../types/database';
+import type { WatchedInsert, WatchLaterInsert, SearchHistoryInsert } from '../types/database';
 
 export interface SupabaseBackupData {
   watched: WatchedInsert[];
-  progress: ProgressInsert[];
+  // Kept optional so backups exported before migrations 003/004 still import.
+  progress?: unknown[];
   watchLater: WatchLaterInsert[];
-  notifications: NotificationInsert[];
+  notifications?: unknown[];
   searchHistory: SearchHistoryInsert[];
 }
 
@@ -18,11 +17,9 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
   const userId = getCurrentUserId();
   if (!userId) return null;
 
-  const [watched, progress, watchLater, notifications, searchHistory] = await Promise.all([
+  const [watched, watchLater, searchHistory] = await Promise.all([
     watchedRepository.getAll(userId),
-    progressRepository.getAll(userId),
     watchLaterRepository.getAll(userId),
-    notificationRepository.getAll(userId),
     searchHistoryRepository.getAll(userId),
   ]);
 
@@ -37,16 +34,6 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
       watched_at: r.watched_at,
       meta: r.meta,
     })),
-    progress: progress.map((r) => ({
-      user_id: userId,
-      media_type: r.media_type,
-      tmdb_id: r.tmdb_id,
-      season: r.season,
-      episode: r.episode,
-      current_time: r.current_time,
-      duration: r.duration,
-      meta: r.meta,
-    })),
     watchLater: watchLater.map((r) => ({
       user_id: userId,
       media_type: r.media_type,
@@ -56,16 +43,6 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
       poster: r.poster,
       season: r.season,
       episode: r.episode,
-    })),
-    notifications: notifications.map((r) => ({
-      user_id: userId,
-      title: r.title,
-      message: r.message,
-      media_type: r.media_type,
-      tmdb_id: r.tmdb_id,
-      season: r.season,
-      episode: r.episode,
-      read: r.read,
     })),
     searchHistory: searchHistory.map((r) => ({
       user_id: userId,
@@ -78,11 +55,9 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
 // malformed files before any import work happens.
 export function isSupabaseBackupEmpty(data: SupabaseBackupData): boolean {
   return (
-    data.watched?.length === 0 &&
-    data.progress?.length === 0 &&
-    data.watchLater?.length === 0 &&
-    data.notifications?.length === 0 &&
-    data.searchHistory?.length === 0
+    (data.watched?.length ?? 0) === 0 &&
+    (data.watchLater?.length ?? 0) === 0 &&
+    (data.searchHistory?.length ?? 0) === 0
   );
 }
 
@@ -97,21 +72,9 @@ export async function importSupabaseData(data: SupabaseBackupData): Promise<bool
     operations.push(watchedRepository.markBatch(batch));
   }
 
-  if (data.progress.length > 0) {
-    for (const item of data.progress) {
-      operations.push(progressRepository.save({ ...item, user_id: userId }));
-    }
-  }
-
   if (data.watchLater.length > 0) {
     for (const item of data.watchLater) {
       operations.push(watchLaterRepository.add({ ...item, user_id: userId }));
-    }
-  }
-
-  if (data.notifications.length > 0) {
-    for (const item of data.notifications) {
-      operations.push(notificationRepository.add({ ...item, user_id: userId }));
     }
   }
 

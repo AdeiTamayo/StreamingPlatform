@@ -43,8 +43,14 @@ export function enqueueWrite(table: string, method: QueuedOperation['method'], d
   saveQueue(queue);
 }
 
+// Tables dropped as local-only (progress, settings by migration 003,
+// notifications by 004). Ops queued for them before the upgrade can never
+// succeed - drop them immediately instead of burning retry attempts.
+const DROPPED_TABLES = new Set(['progress', 'settings', 'notifications']);
+
 async function processOperation(op: QueuedOperation): Promise<boolean> {
   try {
+    if (DROPPED_TABLES.has(op.table)) return true;
     switch (op.method) {
       case 'insert':
       case 'upsert': {
@@ -75,8 +81,22 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
           query = query.eq('user_id', d.userId as string);
           if (d.mediaType != null) query = query.eq('media_type', d.mediaType as string);
           if (d.tmdbId != null) query = query.eq('tmdb_id', d.tmdbId as number);
+          if (d.query != null) {
+            // Single search-history removal - match case-insensitively like
+            // the repository does, with LIKE wildcards escaped.
+            const escaped = String(d.query).replace(/[\\%_]/g, (m) => `\\${m}`);
+            query = query.ilike('query', escaped);
+          }
           if (d.seriesOnly === true) {
             query = query.is('season', null).is('episode', null);
+          } else if (op.table === 'watch_later') {
+            // Series/movie-level rows have season/episode null; per-episode
+            // rows have both set. Isolating them keeps removing a series
+            // from Watch Later from wiping its saved episodes (and vice versa).
+            if (d.season != null) query = query.eq('season', d.season as number);
+            else query = query.is('season', null);
+            if (d.episode != null) query = query.eq('episode', d.episode as number);
+            else query = query.is('episode', null);
           } else if (d.mediaType === 'tv' || d.season != null) {
             if (d.season != null) query = query.eq('season', d.season as number);
             if (d.episode != null) query = query.eq('episode', d.episode as number);
