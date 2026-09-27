@@ -29,6 +29,8 @@ jobs:
 
       - name: Test
         run: npm test
+        env:
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
 
       - name: Build
         run: npm run build
