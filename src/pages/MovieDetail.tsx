@@ -33,6 +33,7 @@ export default function MovieDetail() {
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
   const lastTimeRef = useRef<number | null>(null);
+  const playerWrapRef = useRef<HTMLDivElement | null>(null);
   const { getSignal } = useAbortController();
   const { isAuthenticated, syncVersion } = useAuth();
 
@@ -84,6 +85,47 @@ export default function MovieDetail() {
     return () => { cancelled = true; };
   }, [movie?.imdb_id]);
 
+  // Keyboard shortcuts: W = toggle watched, L = toggle Watch Later,
+  // F = toggle player fullscreen. Ignored while typing in a field or with
+  // modifier keys held.
+  useEffect(() => {
+    function isTypingTarget(t: EventTarget | null): boolean {
+      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (isTypingTarget(e.target)) return;
+      const k = e.key.toLowerCase();
+      if (k !== 'w' && k !== 'f' && k !== 'l') return;
+      if (!movie || !id) return;
+      if (k === 'f') {
+        if (showTrailer) return;
+        e.preventDefault();
+        togglePlayerFullscreen();
+        return;
+      }
+      if (k === 'l') {
+        e.preventDefault();
+        toggleWatchLater();
+        return;
+      }
+      e.preventDefault();
+      if (watched) {
+        markUnwatched('movie', id);
+        clearProgress('movie', id);
+        setWatched(false);
+        toast?.('Removed from watched');
+      } else {
+        markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
+        clearProgress('movie', id);
+        setWatched(true);
+        toast?.('Marked as watched');
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [movie, id, watched, inWL, showTrailer, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!id) return <div className="page"><div className="loading">Movie not found</div></div>;
 
   const safeId = id;
@@ -116,6 +158,24 @@ export default function MovieDetail() {
 
   function handleEnded() {
     autoMarkWatched();
+  }
+
+  function togglePlayerFullscreen() {
+    const el = playerWrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else if (typeof el.requestFullscreen === 'function') {
+      void el.requestFullscreen().then(
+        () => {
+          // Hand keyboard focus to the embed once fullscreen engages, so
+          // provider shortcuts (e.g. Space = play/pause) work immediately
+          // without clicking the video first.
+          el.querySelector('iframe')?.focus();
+        },
+        () => {},
+      );
+    }
   }
 
   function toggleWatched() {
@@ -228,7 +288,7 @@ export default function MovieDetail() {
           )}
           {startAt && (
             <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', safeId); }}>
-              Restart from beginning
+              Restart
             </button>
           )}
         </div>
@@ -245,15 +305,17 @@ export default function MovieDetail() {
         ) : (
           // startAt restores the last known position when returning from the
           // trailer, instead of restarting the film at 0:00 mid-watch.
-          <Player
-            key={startAt !== null ? 'resume' : 'fresh'}
-            src={embedUrl}
-            title={movie.title}
-            onProgress={handleProgress}
-            onEnded={handleEnded}
-            runtimeMinutes={movie.runtime ?? null}
-            startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
-          />
+          <div ref={playerWrapRef} className="player-fs-wrap">
+            <Player
+              key={startAt !== null ? 'resume' : 'fresh'}
+              src={embedUrl}
+              title={movie.title}
+              onProgress={handleProgress}
+              onEnded={handleEnded}
+              runtimeMinutes={movie.runtime ?? null}
+              startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
+            />
+          </div>
         )}
         <div className={styles.sourceSelector}>
           <FilterDropdown

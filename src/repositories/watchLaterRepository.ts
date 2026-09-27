@@ -10,12 +10,16 @@ export const watchLaterRepository = {
       const { error }: any = await withRetry(async () =>
         requireSupabase().from('watch_later').insert(data as any),
       );
-      if (error) throw error;
+      // 23505 = duplicate track (unique index on user/media/tmdb/season/episode).
+      // Local state already holds the entry, so duplicates are safe to ignore.
+      if (error && (error as { code?: string })?.code !== '23505') throw error;
     } catch {
       enqueueWrite('watch_later', 'insert', data as any);
     }
   },
 
+  // Series/movie-level remove. Must only delete the series-level row
+  // (season/episode null) - never the per-episode rows of the same show.
   async remove(userId: string, mediaType: MediaType, tmdbId: number): Promise<void> {
     try {
       const { error }: any = await withRetry(async () =>
@@ -23,11 +27,13 @@ export const watchLaterRepository = {
           .delete()
           .eq('user_id', userId)
           .eq('media_type', mediaType)
-          .eq('tmdb_id', tmdbId),
+          .eq('tmdb_id', tmdbId)
+          .is('season', null)
+          .is('episode', null),
       );
       if (error) throw error;
     } catch {
-      enqueueWrite('watch_later', 'delete', { userId, mediaType, tmdbId });
+      enqueueWrite('watch_later', 'delete', { userId, mediaType, tmdbId, seriesOnly: true });
     }
   },
 

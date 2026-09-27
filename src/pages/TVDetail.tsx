@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -17,7 +17,6 @@ import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, Episode
 import styles from './TVDetail.module.css';
 
 const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
-const NEXT_EPISODE_COUNTDOWN_SECONDS = 8;
 
 // A plain unmodified left-click (no Ctrl/Cmd/Shift/Alt and not the middle
 // button) - the only case where we want client-side state to react too.
@@ -26,14 +25,16 @@ function isPlainLeftClick(e: { defaultPrevented?: boolean; button?: number; meta
   return !e.defaultPrevented && e.button === 0 && !e.metaKey && !e.altKey && !e.ctrlKey && !e.shiftKey;
 }
 
-const EpisodeDot = memo(function EpisodeDot({ ep, current, done, onClick }: { ep: number; current: boolean; done: boolean; onClick: (ep: number) => void }) {
+const EpisodeDot = memo(function EpisodeDot({ ep, name, current, done, onClick }: { ep: number; name?: string; current: boolean; done: boolean; onClick: (ep: number) => void }) {
+  const label = name ? `E${ep} \u00b7 ${name}` : `Episode ${ep}`;
   return (
     <span className={styles.spDotWrap} role="listitem">
       <button
         type="button"
         className={`${styles.spDot} ${current ? styles.current : ''} ${done ? styles.done : ''}`}
         onClick={() => onClick(ep)}
-        aria-label={`Episode ${ep}${done ? ', watched' : ''}${current ? ', current' : ''}`}
+        title={label}
+        aria-label={`${label}${done ? ', watched' : ''}${current ? ', current' : ''}`}
       />
     </span>
   );
@@ -52,7 +53,6 @@ export default function TVDetail() {
   const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
   const [seriesWatched, setSeriesWatched] = useState(false);
-  const [startAt, setStartAt] = useState<number | null>(null);
   const [inWL, setInWL] = useState(false);
   const [inEpWL, setInEpWL] = useState(false);
   const [watchedCount, setWatchedCount] = useState(0);
@@ -69,16 +69,22 @@ export default function TVDetail() {
   const [epImdbRatings, setEpImdbRatings] = useState<Record<number, ImdbRating | null>>({});
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
-  const [nextUpIn, setNextUpIn] = useState<number | null>(null);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
-  const lastTimeRef = useRef<number | null>(null);
+  const playerWrapRef = useRef<HTMLDivElement | null>(null);
   const { getSignal } = useAbortController();
 
   const seasons: TMDBSeason[] = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
   const currentSeason = useMemo(() => seasons.find((s) => s.season_number === season), [seasons, season]);
   const episodeCount = currentSeason?.episode_count || 0;
   const episodeNums = useMemo(() => Array.from({ length: episodeCount }, (_, i) => i + 1), [episodeCount]);
+  const episodeNames = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const ep of episodes) {
+      if (ep.name) map.set(ep.episode_number, ep.name);
+    }
+    return map;
+  }, [episodes]);
   const seasonIdx = seasons.findIndex((s) => s.season_number === season);
   const hasPrev = episode > 1 || seasonIdx > 0;
   const hasNext = episodeCount > 0 && (episode < episodeCount || seasonIdx < seasons.length - 1);
@@ -156,6 +162,16 @@ export default function TVDetail() {
     setPlayerOpen(true);
   }, [urlSeason, urlEpisode, show]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Browser Back/Forward changes the URL without touching playerOpen, so
+  // mirror it: landing on the bare /tv/{id} URL (no episode params) always
+  // shows the episode list. This is why Back from an episode used to leave
+  // the player UI on screen.
+  useEffect(() => {
+    if (!show) return;
+    if (Number(urlSeason) > 0 && Number(urlEpisode) > 0) return;
+    setPlayerOpen(false);
+  }, [urlSeason, urlEpisode, show]);
+
   useEffect(() => {
     if (!imdbId) {
       setImdbRating(null);
@@ -193,13 +209,28 @@ export default function TVDetail() {
     if (!id) return;
     setWatched(isWatched('tv', id, season, episode));
     setInEpWL(isInEpisodeWatchLater(id, season, episode));
-    const prog = getProgress('tv', id, season, episode);
-    setStartAt(prog?.currentTime || null);
     watchedRef.current = isWatched('tv', id, season, episode);
     autoWatchedRef.current = null;
-    lastTimeRef.current = null;
-    setNextUpIn(null);
   }, [id, season, episode]);
+
+  // Per-episode Watch Later set for the current season - drives the
+  // episode-list action buttons and card colors.
+  const [epWlSet, setEpWlSet] = useState<Set<number>>(new Set());
+
+  function refreshEpWlSet(showId: string, seasonNum: number) {
+    const set = new Set<number>();
+    for (const item of getEpisodeWatchLater()) {
+      if (String(item.showId) === String(showId) && item.season === seasonNum) {
+        set.add(item.episode);
+      }
+    }
+    setEpWlSet(set);
+  }
+
+  useEffect(() => {
+    if (!id) return;
+    refreshEpWlSet(id, season);
+  }, [id, season]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     watchedRef.current = watched;
@@ -361,28 +392,9 @@ export default function TVDetail() {
     return () => { cancelled = true; };
   }, [playerOpen, show, season, episodes]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Leaving the player cancels a running countdown so it can't advance the
-  // episode invisibly after "Back to episodes".
-  useEffect(() => {
-    if (!playerOpen) setNextUpIn(null);
-  }, [playerOpen]);
-
-  // Next-episode autoplay countdown started by handleEnded. Ticks down once
-  // per second; at zero it advances via goNext() unless the user cancelled.
-  useEffect(() => {
-    if (nextUpIn === null) return;
-    if (nextUpIn <= 0) {
-      setNextUpIn(null);
-      goNext();
-      return;
-    }
-    const t = setTimeout(() => setNextUpIn((s) => (s === null ? null : s - 1)), 1000);
-    return () => clearTimeout(t);
-  }, [nextUpIn]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Keyboard shortcuts while the player is open: N = next episode,
-  // P = previous episode, W = toggle watched. Ignored while typing in a
-  // field or with modifier keys held.
+  // P = previous episode, W = toggle watched, F = toggle fullscreen.
+  // Ignored while typing in a field or with modifier keys held.
   useEffect(() => {
     if (!playerOpen || showTrailer) return;
     function isTypingTarget(t: EventTarget | null): boolean {
@@ -398,44 +410,89 @@ export default function TVDetail() {
         if (hasPrev) { e.preventDefault(); goPrev(); }
       } else if (k === 'w') {
         toggleWatched();
+      } else if (k === 'f') {
+        e.preventDefault();
+        togglePlayerFullscreen();
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [playerOpen, showTrailer, hasNext, hasPrev, season, episode, watched]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // L = toggle Watch Later. On the episode view (player open) it targets the
+  // current episode; on the series view it targets the series itself.
+  // Ignored while typing or with modifiers held.
+  useEffect(() => {
+    function isTypingTarget(t: EventTarget | null): boolean {
+      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+      if (isTypingTarget(e.target)) return;
+      if (e.key.toLowerCase() !== 'l') return;
+      if (!show || !id) return;
+      e.preventDefault();
+      if (playerOpen) {
+        if (inEpWL) {
+          removeEpisodeWatchLater(id, season, episode);
+          setInEpWL(false);
+          toast?.('Episode removed from Watch Later');
+        } else {
+          addEpisodeWatchLater(id, season, episode, show.name);
+          setInEpWL(true);
+          toast?.('Episode added to Watch Later');
+        }
+        return;
+      }
+      if (inWL) {
+        removeWatchLater('tv', id);
+        setInWL(false);
+        toast?.('Removed from Watch Later');
+      } else {
+        addWatchLater('tv', id, show.name, (show.first_air_date || '').slice(0, 4), imageUrl(show.poster_path));
+        setInWL(true);
+        toast?.('Added to Watch Later');
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [show, id, inWL, inEpWL, playerOpen, season, episode, toast]);
+
+  function togglePlayerFullscreen() {
+    const el = playerWrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else if (typeof el.requestFullscreen === 'function') {
+      void el.requestFullscreen().then(
+        () => {
+          // Hand keyboard focus to the embed once fullscreen engages, so
+          // provider shortcuts (e.g. Space = play/pause) work immediately
+          // without clicking the video first.
+          el.querySelector('iframe')?.focus();
+        },
+        () => {},
+      );
+    }
+  }
+
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
     if (!show || !id || watchedRef.current || autoWatchedRef.current === episodeKey) return;
     autoWatchedRef.current = episodeKey;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
-    setStartAt(null);
   }
 
   function handleProgress(currentTime: number, duration: number) {
-    lastTimeRef.current = currentTime;
+    if (watchedRef.current || !show || !id) return;
 
     // Runtime estimate: real duration when the embed reports one, else TMDB
     // metadata for the current episode/series.
     const currentEpisode = episodes.find((item) => item.episode_number === episode);
     const tmdbRuntime = currentEpisode?.runtime || show?.episode_run_time?.[0] || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
-
-    // Arm the up-next countdown BEFORE any early returns. Replays of
-    // already-watched episodes bail out at the guard below, and without
-    // this block they would never reach it - which is exactly the main
-    // scenario where the countdown must still fire.
-    if (runtimeSeconds) {
-      const nextUpThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
-      if (nextUpThreshold > 0 && currentTime >= nextUpThreshold) armNextUp();
-    }
-
-    if (watchedRef.current || !show || !id) return;
-
-    saveProgress('tv', id, currentTime, season, episode, { title: show?.name, poster: show?.poster_path }, duration || undefined);
 
     logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}`);
 
@@ -448,31 +505,48 @@ export default function TVDetail() {
     }
   }
 
-  // Arms the up-next countdown once per episode. The ?? form ignores repeat
-  // calls from later progress ticks or the ended event, so a running
-  // countdown never restarts.
-  function armNextUp() {
-    if (!hasNext || showTrailer) return;
-    setNextUpIn((s) => s ?? NEXT_EPISODE_COUNTDOWN_SECONDS);
-  }
-
   function handleEnded() {
     autoMarkWatched();
-    armNextUp();
   }
 
   function toggleWatched() {
     if (!show || !id) return;
     if (watched) {
       markUnwatched('tv', id, season, episode);
-      clearProgress('tv', id, season, episode);
       setWatched(false);
       toast?.('Removed from watched');
     } else {
       markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-      clearProgress('tv', id, season, episode);
       setWatched(true);
       toast?.('Marked as watched');
+    }
+  }
+
+  function toggleEpisodeWatched(epNum: number) {
+    if (!show || !id) return;
+    if (watchedMap[epNum]) {
+      markUnwatched('tv', id, season, epNum);
+      toast?.(`Episode ${epNum} unmarked`);
+    } else {
+      markWatched('tv', id, show.name, season, epNum, { title: show.name, poster: show?.poster_path });
+      toast?.(`Episode ${epNum} marked as watched`);
+    }
+    setWatchedCount(getWatchedCount(id, season, episodeCount));
+    setWatched(isWatched('tv', id, season, episode));
+  }
+
+  function toggleEpisodeWatchLater(epNum: number) {
+    if (!show || !id) return;
+    if (epWlSet.has(epNum)) {
+      removeEpisodeWatchLater(id, season, epNum);
+      toast?.(`Episode ${epNum} removed from Watch Later`);
+    } else {
+      addEpisodeWatchLater(id, season, epNum, show.name);
+      toast?.(`Episode ${epNum} added to Watch Later`);
+    }
+    refreshEpWlSet(id, season);
+    if (epNum === episode) {
+      setInEpWL(isInEpisodeWatchLater(id, season, epNum));
     }
   }
 
@@ -513,7 +587,6 @@ export default function TVDetail() {
   function markCurrentWatched() {
     if (watchedRef.current || !show || !id) return;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
   }
@@ -548,7 +621,7 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource, startAt ?? undefined);
+  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const ended = show.status === 'Ended';
@@ -558,13 +631,6 @@ export default function TVDetail() {
   const networks = show.networks || [];
   const genres = show.genres?.map((g) => g.name).join(', ') || '';
   const recommendations = show.recommendations?.results?.slice(0, 10) || [];
-
-  // What the autoplay countdown will advance to (mirrors goNext logic).
-  const nextUp = hasNext
-    ? (episode < episodeCount
-        ? { season, episode: episode + 1 }
-        : { season: seasons[seasonIdx + 1].season_number, episode: 1 })
-    : null;
 
   return (
     <div className="page">
@@ -597,7 +663,7 @@ export default function TVDetail() {
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : 'Watch Later'}</button>
               <button className={`badge-btn ${seriesWatched ? 'in-wl' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? '\u2713 Watched' : 'Watched'}</button>
               {trailerKey && (
-                <button className="badge-btn" onClick={() => { setNextUpIn(null); setShowTrailer((s: boolean) => !s); }} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
+                <button className="badge-btn" onClick={() => { setShowTrailer((s: boolean) => !s); }} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
                   {showTrailer ? 'Hide Trailer' : 'Trailer'}
                 </button>
               )}
@@ -618,7 +684,12 @@ export default function TVDetail() {
 
       {playerOpen && seasons.length > 0 ? (
         <section className="section" aria-labelledby="watch-heading-tv">
-          <h2 id="watch-heading-tv" className="section-title">Watch Now</h2>
+          <div className={styles.watchHeader}>
+            <h2 id="watch-heading-tv" className="section-title">Watch Now</h2>
+            <Link className="watch-toggle" to={`/tv/${safeId}`} onClick={(e) => { if (isPlainLeftClick(e)) setPlayerOpen(false); }} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              Back to episodes
+            </Link>
+          </div>
           <div className="episode-selector">
             <label>
               Season:
@@ -658,25 +729,6 @@ export default function TVDetail() {
               <span className="badge rating">TMDB {episodes.find((ep) => ep.episode_number === episode)!.vote_average.toFixed(1)}</span>
             ) : null}
           </div>
-          <div className={styles.seasonProgress}>
-            <div className={styles.spHeader}>
-              <span className={styles.spLabel}>Season {season}</span>
-              <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
-              {watchedCount < episodeCount && (
-                <button className={styles.markSeasonBtn} onClick={() => {
-                  markSeasonWatched(safeId, season, episodeCount, show.name, show?.poster_path ?? '');
-                  setWatchedCount(getWatchedCount(safeId, season, episodeCount));
-                  setWatched(isWatched('tv', safeId, season, episode));
-                  toast?.('Season marked as watched');
-                }}>Mark season watched</button>
-              )}
-            </div>
-            <div className={styles.spBar} role="list" aria-label="Episode progress">
-              {episodeNums.map((ep) => (
-                <EpisodeDot key={ep} ep={ep} current={ep === episode} done={watchedMap[ep]} onClick={setEpisode} />
-              ))}
-            </div>
-          </div>
           {showTrailer && trailerKey ? (
             <div className="trailer-wrapper">
               <iframe
@@ -688,22 +740,15 @@ export default function TVDetail() {
               />
             </div>
           ) : (
-            <Player
-              key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}`}
-              src={embedUrl}
-              title={`${show.name} S${season}E${episode}`}
-              onProgress={handleProgress}
-              onEnded={handleEnded}
-              runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
-              startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
-            />
-          )}
-          {nextUpIn !== null && nextUp && (
-            <div className={styles.nextUp} role="status">
-              <span className={styles.nextUpLabel}>Up next &middot; S{nextUp.season}E{nextUp.episode}</span>
-              <span className={styles.nextUpCount}>in {nextUpIn}s</span>
-              <button type="button" className={styles.nextUpPlay} onClick={() => { setNextUpIn(null); goNext(); }}>Play now</button>
-              <button type="button" className={styles.nextUpCancel} onClick={() => setNextUpIn(null)}>Cancel</button>
+            <div ref={playerWrapRef} className="player-fs-wrap">
+              <Player
+                key={`${season}-${episode}`}
+                src={embedUrl}
+                title={`${show.name} S${season}E${episode}`}
+                onProgress={handleProgress}
+                onEnded={handleEnded}
+                runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
+              />
             </div>
           )}
           <div className={styles.epNav}>
@@ -721,12 +766,12 @@ export default function TVDetail() {
               className="source-dropdown"
             />
           </div>
-          <div className={styles.epNavHints}>Shortcuts: N next &middot; P previous &middot; W watched</div>
-
-          <div className={styles.episodeListToggle}>
-            <Link className="watch-toggle" to={`/tv/${safeId}`} onClick={(e) => { if (isPlainLeftClick(e)) setPlayerOpen(false); }} style={{ textDecoration: 'none', display: 'inline-block' }}>
-              Back to episodes
-            </Link>
+          <div className={`${styles.seasonProgress} ${styles.hidden}`}>
+            <div className={styles.spBar} role="list" aria-label="Episode progress">
+              {episodeNums.map((ep) => (
+                <EpisodeDot key={ep} ep={ep} name={episodeNames.get(ep)} current={ep === episode} done={watchedMap[ep]} onClick={setEpisode} />
+              ))}
+            </div>
           </div>
         </section>
       ) : (
@@ -774,7 +819,7 @@ export default function TVDetail() {
                 </div>
                 <div className={styles.spBar} role="list" aria-label="Episode progress">
                   {episodeNums.map((ep) => (
-                    <EpisodeDot key={ep} ep={ep} current={false} done={watchedMap[ep]} onClick={(e: number) => { setEpisode(e); setPlayerOpen(true); }} />
+                    <EpisodeDot key={ep} ep={ep} name={episodeNames.get(ep)} current={false} done={watchedMap[ep]} onClick={(e: number) => { setEpisode(e); setPlayerOpen(true); }} />
                   ))}
                 </div>
               </div>
@@ -785,8 +830,11 @@ export default function TVDetail() {
                 </div>
               ) : episodes.length > 0 ? (
                 <div className={styles.episodeList}>
-                  {episodes.map((ep) => (
-                    <Link key={ep.episode_number} to={`/tv/${safeId}?season=${season}&episode=${ep.episode_number}`} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${watchedMap[ep.episode_number] ? styles.watched : ''}`} onClick={(e) => { if (isPlainLeftClick(e)) { setEpisode(ep.episode_number); setPlayerOpen(true); } }}>
+                  {episodes.map((ep) => {
+                    const isW = !!watchedMap[ep.episode_number];
+                    const isWL = epWlSet.has(ep.episode_number);
+                    return (
+                    <Link key={ep.episode_number} to={`/tv/${safeId}?season=${season}&episode=${ep.episode_number}`} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${isW ? styles.watched : ''} ${isWL ? styles.watchLater : ''}`} onClick={(e) => { if (isPlainLeftClick(e)) { setEpisode(ep.episode_number); setPlayerOpen(true); } }}>
                       {ep.still_path && (
                         <div className={styles.episodeCardThumb}>
                           <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
@@ -805,9 +853,31 @@ export default function TVDetail() {
                         </div>
                         {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
                       </div>
-                      {watchedMap[ep.episode_number] && <span className={styles.epWatchedBadge}>&#10003;</span>}
+                      <span className={styles.epCardActions} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                        <button
+                          type="button"
+                          className={`${styles.epActionBtn} ${isW ? styles.activeWatched : ''}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEpisodeWatched(ep.episode_number); }}
+                          title={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
+                          aria-label={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
+                          aria-pressed={isW}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.epActionBtn} ${isWL ? styles.activeWatchLater : ''}`}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEpisodeWatchLater(ep.episode_number); }}
+                          title={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
+                          aria-label={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
+                          aria-pressed={isWL}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                        </button>
+                      </span>
                     </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
             </>
