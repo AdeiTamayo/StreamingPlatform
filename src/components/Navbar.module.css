@@ -100,13 +100,124 @@
 ------------------------------ */
 
 .navbarSearch {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
+/* Compact recent-search dropdown for the navbar search bar */
+.navSuggest {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  z-index: var(--z-popover);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  padding: 0.25rem;
+}
+
+.navSuggestRow {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  border-radius: 7px;
+  transition: background 0.15s ease;
+}
+
+.navSuggestRow:hover {
+  background: rgba(125, 211, 252, 0.12);
+}
+
+.navSuggestItem {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.navSuggestItem span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navSuggestRow:hover .navSuggestItem {
+  color: #fff;
+}
+
+.navSuggestRemove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  margin-right: 0.25rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.navSuggestRow:hover .navSuggestRemove,
+.navSuggestRemove:focus-visible {
+  opacity: 1;
+}
+
+.navSuggestRemove:hover {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+}
+
+/* Expanding field: the grid track animates 0fr -> 1fr (no squished text,
+   unlike a width tween) while opacity + a small slide run on the compositor.
+   Fast expo-out curve so it snaps open and settles smoothly. */
+.searchField {
+  display: grid;
+  grid-template-columns: 0fr;
+
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+
+  transition:
+    grid-template-columns 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.16s ease,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.searchField.open {
+  grid-template-columns: 1fr;
+
+  opacity: 1;
+  transform: none;
+  pointer-events: all;
+}
+
+.searchField > input {
+  overflow: hidden;
+}
+
 .navbarSearch input {
-  width: 0;
+  width: min(220px, 38vw);
   min-width: 0;
   padding: 0.5rem 0.9rem;
 
@@ -119,20 +230,9 @@
   font-size: 0.85rem;
   outline: none;
 
-  opacity: 0;
-  pointer-events: none;
-
   transition:
-    width 0.35s ease,
-    opacity 0.25s ease,
     background 0.2s ease,
     border-color 0.2s ease;
-}
-
-.navbarSearch input.open {
-  width: 220px;
-  opacity: 1;
-  pointer-events: all;
 }
 
 .navbarSearch input:focus {
@@ -201,9 +301,23 @@
 
   cursor: pointer;
 
+  animation: navSearchBtnIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+
   transition:
     background .2s ease,
     transform .2s ease;
+}
+
+@keyframes navSearchBtnIn {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .searchGoBtn:hover {

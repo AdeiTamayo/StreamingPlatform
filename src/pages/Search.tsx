@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV, getPersonCredits } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
-import { getSearchHistory, addSearchHistory } from '../api/storage';
+import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
 import type { TMDBMovie, TMDBSeries, TMDBPersonCredits } from '../types';
 import styles from './Search.module.css';
@@ -30,6 +30,7 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
   const { getSignal } = useAbortController();
 
   useEffect(() => { document.title = `Search: ${query} - StreamFlow`; }, [query]);
@@ -107,7 +108,24 @@ export default function Search() {
 
   function handleHistoryClick(q: string) {
     setSearchParams({ q });
+    inputRef.current?.blur();
   }
+
+  function handleRemoveHistory(q: string) {
+    removeSearchHistory(q);
+    setHistory(getSearchHistory());
+  }
+
+  // Suggestions shown while the search bar is focused: the most recent
+  // searches, filtered by what is typed. Capped so the dropdown stays small.
+  const suggestions = (() => {
+    const needle = input.trim().toLowerCase();
+    const matches = needle
+      ? history.filter((q) => q.toLowerCase().includes(needle))
+      : history;
+    return matches.slice(0, 7);
+  })();
+  const showSuggestions = searchFocused && suggestions.length > 0;
 
   const filtered = personId
     ? tab === 'all'
@@ -126,34 +144,90 @@ export default function Search() {
     <div className="page">
       <section className="section">
         <h2 className="section-title">{personId ? `Movies & TV featuring "${query}"` : query ? `Search Results for "${query}"` : 'Search'}</h2>
-        <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
-          <input
-            ref={inputRef}
-            type="search"
-            className={styles.searchInput}
-            placeholder="Search movies, TV shows..."
-            aria-label="Search"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-          />
-          <button type="submit" className={styles.searchSubmitBtn}>Search</button>
-        </form>
+        <div className={styles.searchBoxWrap}>
+          <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
+            <input
+              ref={inputRef}
+              type="search"
+              className={styles.searchInput}
+              placeholder="Search movies, TV shows..."
+              aria-label="Search"
+              autoComplete="off"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+            />
+            <button type="submit" className={styles.searchSubmitBtn}>Search</button>
+          </form>
+          {showSuggestions && (
+            <div className={styles.searchSuggest} role="listbox" aria-label="Recent searches">
+              <div className={styles.searchSuggestLabel}>Recent searches</div>
+              {suggestions.map((q) => (
+                <div key={q} className={styles.searchSuggestRow}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    className={styles.searchSuggestItem}
+                    // mousedown fires before blur: prevent the default so the
+                    // input keeps focus and the click is not swallowed.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleHistoryClick(q)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15.5 14" />
+                    </svg>
+                    <span>{q}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.searchSuggestRemove}
+                    aria-label={`Remove "${q}" from search history`}
+                    title="Remove from history"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleRemoveHistory(q)}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
         <div className={styles.searchTabs} aria-label="Search categories">
           {TABS.map((t) => (
             <button key={t.key} aria-pressed={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
           ))}
         </div>
-        {!query && history.length > 0 && (
+        {!query && !searchFocused && history.length > 0 && (
           <div className={styles.searchHistory}>
             <div className={styles.searchHistoryTitle}>Recent searches</div>
             <div className={styles.searchHistoryList}>
               {history.map((q) => (
-                <button key={q} className={styles.searchHistoryItem} onClick={() => handleHistoryClick(q)}>{q}</button>
+                <span key={q} className={styles.searchHistoryChip}>
+                  <button className={styles.searchHistoryLabel} onClick={() => handleHistoryClick(q)}>{q}</button>
+                  <button
+                    className={styles.searchHistoryRemove}
+                    aria-label={`Remove "${q}" from search history`}
+                    title="Remove from history"
+                    onClick={() => handleRemoveHistory(q)}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </span>
               ))}
             </div>
           </div>

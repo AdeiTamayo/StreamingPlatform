@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, memo } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useClickOutside from '../hooks/useClickOutside';
 import { useAuth } from '../hooks/useAuth';
+import { getSearchHistory, removeSearchHistory } from '../api/storage';
 import Notifications from './Notifications';
 import AccountButton from './AccountButton/AccountButton';
 import styles from './Navbar.module.css';
@@ -45,6 +46,8 @@ const Navbar = memo(function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,6 +62,7 @@ const Navbar = memo(function Navbar() {
   const searchRef = useRef<HTMLInputElement | null>(null);
   const searchBtnRef = useRef<HTMLButtonElement | null>(null);
   const goBtnRef = useRef<HTMLButtonElement | null>(null);
+  const suggestRef = useRef<HTMLDivElement | null>(null);
   const hamburgerRef = useRef<HTMLButtonElement | null>(null);
   const firstSidebarLinkRef = useRef<HTMLAnchorElement | null>(null);
   const lastScrollRef = useRef(0);
@@ -72,6 +76,31 @@ const Navbar = memo(function Navbar() {
       setMenuOpen(false);
     }
   }
+
+  function selectSuggestion(q: string) {
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+    setMenuOpen(false);
+    setSearchOpen(false);
+    setQuery('');
+    searchRef.current?.blur();
+  }
+
+  function removeSuggestion(q: string) {
+    removeSearchHistory(q);
+    setSearchHistory(getSearchHistory());
+  }
+
+  // Compact recent-search suggestions for the navbar search bar, filtered
+  // by what is typed. Fewer rows than the full search page dropdown.
+  const navSuggestions = (() => {
+    const needle = query.trim().toLowerCase();
+    const matches = needle
+      ? searchHistory.filter((h) => h.toLowerCase().includes(needle))
+      : searchHistory;
+    return matches.slice(0, 5);
+  })();
+  const showNavSuggest =
+    searchOpen && searchFocused && navSuggestions.length > 0;
 
   function isActive(path: string) {
     if (path === '/') {
@@ -202,6 +231,7 @@ const Navbar = memo(function Navbar() {
       return;
     }
 
+    setSearchHistory(getSearchHistory());
     searchRef.current?.focus();
 
     function handleClickOutside(e: MouseEvent) {
@@ -219,10 +249,15 @@ const Navbar = memo(function Navbar() {
         goBtnRef.current &&
         !goBtnRef.current.contains(target);
 
+      const outsideSuggest =
+        !suggestRef.current ||
+        !suggestRef.current.contains(target);
+
       if (
         outsideInput &&
         outsideToggle &&
-        outsideGo
+        outsideGo &&
+        outsideSuggest
       ) {
         setSearchOpen(false);
         setQuery('');
@@ -288,26 +323,74 @@ const Navbar = memo(function Navbar() {
             className={styles.navbarSearch}
             onSubmit={handleSubmit}
           >
-            <input
-              ref={searchRef}
-              type="text"
-              placeholder="Search... (/)"
-              aria-label="Search"
-              value={query}
-              onChange={(e) =>
-                setQuery(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
+            <span
               className={
                 searchOpen
-                  ? styles.open
-                  : ''
+                  ? `${styles.searchField} ${styles.open}`
+                  : styles.searchField
               }
-            />
+            >
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search... (/)"
+                aria-label="Search"
+                autoComplete="off"
+                value={query}
+                onChange={(e) =>
+                  setQuery(e.target.value)
+                }
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            </span>
+            {showNavSuggest && (
+              <div
+                ref={suggestRef}
+                className={styles.navSuggest}
+                role="listbox"
+                aria-label="Recent searches"
+              >
+                {navSuggestions.map((h) => (
+                  <div key={h} className={styles.navSuggestRow}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={false}
+                      className={styles.navSuggestItem}
+                      // mousedown fires before blur: prevent the default so
+                      // the input keeps focus and the click is not swallowed.
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectSuggestion(h)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <polyline points="12 7 12 12 15.5 14" />
+                      </svg>
+                      <span>{h}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.navSuggestRemove}
+                      aria-label={`Remove "${h}" from search history`}
+                      title="Remove from history"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => removeSuggestion(h)}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {!searchOpen && (
               <button
