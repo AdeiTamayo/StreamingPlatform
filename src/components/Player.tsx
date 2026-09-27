@@ -102,16 +102,17 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
       // malformed src - fall through to source-based check only
     }
 
+    // Events we act on - anything else from the embed is ignored so a
+    // chatty or hostile frame can't drive playback state.
+    const KNOWN_EVENTS = new Set(['time', 'play', 'pause', 'complete', 'ended', 'seek', 'seeked', 'buffering']);
+
     function handleMessage(e: MessageEvent) {
       const isSameWindow = e.source === iframeRef.current?.contentWindow;
-      logDebug(`msg origin=${e.origin} sameWindow=${isSameWindow} type=${typeof e.data} data=${JSON.stringify(e.data)?.slice(0, 200)}`);
-
-      // Only blocking check: message must come from this exact iframe window.
-      // Robust to internal redirects (vidsrc.fyi -> whatever actually hosts
-      // the player) since the window object survives navigation.
       if (!isSameWindow) return;
 
-      // Origin is logged, not enforced — the embed may redirect internally.
+      // Origin is logged, not enforced — the embed may redirect internally
+      // (vidsrc.fyi -> whatever actually hosts the player) and the window
+      // object survives navigation while the origin changes.
       if (expectedOrigin && e.origin !== expectedOrigin) {
         logDebug(`origin mismatch src=${expectedOrigin} actual=${e.origin}`);
       }
@@ -119,12 +120,24 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
       // Some embeds send e.data as a JSON string, not an object.
       let payload = e.data;
       if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch { logDebug('json parse failed'); return; }
+        try { payload = JSON.parse(payload); } catch { return; }
       }
 
       if (payload?.type !== 'PLAYER_EVENT') return;
 
-      const { event, currentTime, duration } = payload.data ?? {};
+      const data = payload.data;
+      if (data == null || typeof data !== 'object') return;
+      const { event, currentTime, duration } = data as {
+        event?: unknown;
+        currentTime?: unknown;
+        duration?: unknown;
+      };
+      if (typeof event !== 'string' || !KNOWN_EVENTS.has(event)) return;
+      if (currentTime !== undefined && (!Number.isFinite(currentTime) || (currentTime as number) < 0)) return;
+      // Sanity cap: nothing real runs longer than 24h; faulty values must
+      // not poison progress or trigger completion.
+      if (duration !== undefined && (!Number.isFinite(duration) || (duration as number) < 0 || (duration as number) > 86400)) return;
+
       logDebug(`PLAYER_EVENT event=${event} currentTime=${currentTime} duration=${duration}`);
 
       // Real telemetry arrived - stop guessing, and watch for it going stale.
@@ -142,8 +155,10 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
         }
 
         // Duration-based completion check, in case "complete" never fires
-        // (some players stop emitting events right at the very end).
-        if (state.current.duration > 0) {
+        // (some players stop emitting events right at the very end). Only
+        // 'time' ticks count - a seek near the end followed by pause must
+        // not mark the video complete.
+        if (event === 'time' && state.current.duration > 0) {
           const ratio = state.current.currentTime / state.current.duration;
           if (ratio >= COMPLETION_RATIO) markEnded();
         }

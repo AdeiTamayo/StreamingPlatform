@@ -433,8 +433,13 @@ export default function WatchLater() {
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
     setItems(getWatchLater());
+    // TV calendar entries use type "episode", not "tv" - match by id so a
+    // removed show doesn't linger in the calendar/upcoming list.
     setCalendarItems((prev) =>
-      prev.filter((c) => !(String(c.id) === String(id) && c.type === type)),
+      prev.filter((c) => {
+        if (String(c.id) !== String(id)) return true;
+        return type === "movie" ? c.type !== "movie" : c.type !== "episode";
+      }),
     );
     toast?.("Removed from Watch Later");
   }

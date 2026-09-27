@@ -256,7 +256,9 @@ export default function MovieDetail() {
                 <span className="badge rating">TMDB {movie.vote_average.toFixed(1)}</span>
               ) : null}
               {genres && <span className="badge">{genres}</span>}
-              <span className="badge">{movie.runtime} min</span>
+              {movie.runtime != null && movie.runtime > 0 && (
+                <span className="badge">{movie.runtime} min</span>
+              )}
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (

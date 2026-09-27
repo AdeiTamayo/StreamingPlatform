@@ -181,10 +181,23 @@ export default function LastSeen() {
     toast?.("Series removed from history");
   }
 
+  // Removes only the movies currently listed (respects the title filter),
+  // so a filtered view can't wipe unfiltered history by accident.
   function handleRemoveAllMovies() {
-    clearAllMoviesWatched();
+    if (visibleMovies.length >= movies.length) {
+      clearAllMoviesWatched();
+    } else {
+      for (const item of visibleMovies) {
+        markUnwatched("movie", item.id);
+        clearProgress("movie", item.id);
+      }
+    }
     setItems(getLastSeen());
-    toast?.("All watched movies removed from history");
+    toast?.(
+      visibleMovies.length >= movies.length
+        ? "All watched movies removed from history"
+        : `${visibleMovies.length} movie${visibleMovies.length === 1 ? "" : "s"} removed from history`,
+    );
   }
 
   function showSeriesEpisodes(show: SeriesGroup) {

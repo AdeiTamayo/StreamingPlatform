@@ -140,6 +140,11 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             }}
           />
         </div>
+        {query.trim() && (country || genre || year || sortBy || releaseDateFrom || releaseDateUntil || language || voteCount) && (
+          <div className="loading" role="note" style={{ fontSize: "0.8rem", opacity: 0.75 }}>
+            Text search ignores the browse filters above - clear the search to browse with filters.
+          </div>
+        )}
         {error ? (
           <div className="loading" role="alert">Failed to load. Check your connection.</div>
         ) : loading ? (

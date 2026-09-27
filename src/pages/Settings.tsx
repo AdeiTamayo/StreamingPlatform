@@ -260,7 +260,12 @@ export default function Settings() {
               <Row label="Status" value={user ? "Connected" : "Offline"} />
 
               <div className={styles.actions}>
-                <button className="watch-toggle danger" onClick={signOut}>
+                <button
+                  className="watch-toggle danger"
+                  onClick={signOut}
+                  disabled={!user}
+                  title={user ? "Sign out" : "Not signed in"}
+                >
                   Sign Out
                 </button>
               </div>
@@ -363,7 +368,8 @@ export default function Settings() {
                       <div
                         className={styles.storageFill}
                         style={{
-                          width: `${Math.min(100, usage.total / 250000)}%`,
+                          // localStorage quota is ~5MB - show usage against that.
+                          width: `${Math.min(100, (usage.total / 5000000) * 100)}%`,
                         }}
                       />
                     </div>

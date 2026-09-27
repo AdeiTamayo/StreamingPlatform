@@ -84,7 +84,12 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [trending.length, heroPaused]);
 
-  const heroItems = trending.slice(0, 8);
+  // Trending "all" can include people - they have no detail page, so keep
+  // them out of the hero rotation and the grid (MediaCard also guards).
+  const playableTrending = trending.filter(
+    (item) => (item as unknown as { media_type?: string }).media_type !== "person",
+  );
+  const heroItems = playableTrending.slice(0, 8);
   const hero = heroItems[heroIdx];
 
   // IMDb rating for the current hero slide via OMDb, falling back to the
@@ -241,7 +246,7 @@ export default function Home() {
           <div className="loading" role="alert">Failed to load trending. Check your connection.</div>
         ) : (
           <div className="media-grid">
-            {trending.map((item) => (
+            {playableTrending.map((item) => (
               <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
             ))}
           </div>
