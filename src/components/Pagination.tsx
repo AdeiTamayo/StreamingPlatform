@@ -12,6 +12,10 @@ interface PaginationProps {
 const Pagination = ({ page, totalPages, onChange, label, className, style }: PaginationProps) => {
   const [goTo, setGoTo] = useState('');
 
+  // Nothing to paginate - don't render "Page 1 of 0".
+  if (!Number.isFinite(totalPages) || totalPages < 1) return null;
+  const safePage = Math.min(Math.max(1, page), totalPages);
+
   function handleGo(e: React.FormEvent) {
     e.preventDefault();
     const target = parseInt(goTo, 10);
@@ -23,9 +27,9 @@ const Pagination = ({ page, totalPages, onChange, label, className, style }: Pag
 
   return (
     <div className={`pagination${className ? ` ${className}` : ''}`} style={style}>
-      <button disabled={page <= 1} onClick={() => onChange(page - 1)}>Prev</button>
-      <span>{label ?? `Page ${page} of ${totalPages}`}</span>
-      <button disabled={page >= totalPages} onClick={() => onChange(page + 1)}>Next</button>
+      <button disabled={safePage <= 1} onClick={() => onChange(safePage - 1)} aria-label="Previous page">Prev</button>
+      <span>{label ?? `Page ${safePage} of ${totalPages}`}</span>
+      <button disabled={safePage >= totalPages} onClick={() => onChange(safePage + 1)} aria-label="Next page">Next</button>
       <form className="pagination-go" onSubmit={handleGo}>
         <input
           className="pagination-input"

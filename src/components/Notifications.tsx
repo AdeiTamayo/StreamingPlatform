@@ -163,6 +163,19 @@ function NotificationPanel({
   );
 }
 
+// The bell mounts twice (navbar + sidebar). Share one forced scan across
+// instances so startup/sync doesn't hit TMDB twice for the same shows.
+let inflightSharedScan: Promise<number> | null = null;
+
+function sharedForceScan(): Promise<number> {
+  if (!inflightSharedScan) {
+    inflightSharedScan = scanForNewEpisodes(true).finally(() => {
+      inflightSharedScan = null;
+    });
+  }
+  return inflightSharedScan;
+}
+
 const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -188,7 +201,7 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   }
 
   async function forceScan() {
-    await scanForNewEpisodes(true);
+    await sharedForceScan();
     load();
   }
 
@@ -201,6 +214,8 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     load();
     void forceScan();
     const interval = setInterval(() => {
+      // Hidden tabs don't need fresh badges - the scan is throttled anyway.
+      if (document.hidden) return;
       load();
       void refresh();
     }, 30000);

@@ -110,9 +110,23 @@
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.02);
   align-items: flex-start;
-  cursor: pointer;
-  text-decoration: none;
+}
+
+/* Navigation area of the card - actions are siblings, never nested inside. */
+.episode-card-link {
+  display: flex;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+  align-items: flex-start;
   color: inherit;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.episode-card-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .current {
@@ -126,17 +140,17 @@
 }
 
 .episode-card.watch-later {
-  border-color: rgba(59, 130, 246, 0.6);
-  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(245, 197, 24, 0.6);
+  background: rgba(245, 197, 24, 0.1);
 }
 
-/* Both states: half darker green, half blue. */
+/* Both states: half darker green, half gold. */
 .episode-card.watched.watch-later {
   border-color: rgba(22, 163, 74, 0.6);
   background: linear-gradient(
     135deg,
     rgba(22, 163, 74, 0.18) 0 50%,
-    rgba(59, 130, 246, 0.18) 50% 100%
+    rgba(245, 197, 24, 0.16) 50% 100%
   );
 }
 
@@ -145,7 +159,7 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
-  background: #16a34a;
+  background: var(--green-solid);
   color: #fff;
   font-size: 0.75rem;
   font-weight: 700;
@@ -185,13 +199,13 @@
 .ep-action-btn.active-watched {
   background: rgba(22, 163, 74, 0.25);
   border-color: rgba(22, 163, 74, 0.6);
-  color: #22c55e;
+  color: var(--green-text);
 }
 
 .ep-action-btn.active-watch-later {
-  background: rgba(59, 130, 246, 0.22);
-  border-color: rgba(59, 130, 246, 0.6);
-  color: #60a5fa;
+  background: rgba(245, 197, 24, 0.18);
+  border-color: rgba(245, 197, 24, 0.55);
+  color: var(--gold-text);
 }
 
 .episode-card-thumb {
@@ -295,7 +309,7 @@
 }
 
 .done {
-  background: #16a34a;
+  background: var(--green-solid);
 }
 
 .sp-dot.current {

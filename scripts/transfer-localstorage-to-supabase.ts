@@ -90,27 +90,36 @@ async function main() {
       const m_tv = key.match(/^watched:tv-(\\d+)-S(\\d+)E(\\d+)$/);
       const m_series = key.match(/^watched:tv-(\\d+)$/);
       const m_movie = key.match(/^watched:movie-(.+)$/);
+      // Plain inserts: duplicates are skipped via the unique track index
+      // (23505). The onConflict column list can't express the coalesce()
+      // index, so upsert would error on every row.
+      const skipDuplicates = (e: unknown) => (e as { code?: string })?.code === '23505';
       if (m_tv) {
-        await supabase.from('watched').upsert({
+        const { error } = await supabase.from('watched').insert({
           user_id: userId, media_type: 'tv', tmdb_id: Number(m_tv[1]),
           title: data.title || '', season: Number(m_tv[2]), episode: Number(m_tv[3]),
           watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
           meta: data.meta || null,
-        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+        });
+        if (error && !skipDuplicates(error)) throw error;
       } else if (m_series) {
-        await supabase.from('watched').upsert({
+        const { error } = await supabase.from('watched').insert({
           user_id: userId, media_type: 'tv', tmdb_id: Number(m_series[1]),
           title: data.title || '', season: null, episode: null,
           watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
           meta: data.meta || null,
-        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+        });
+        if (error && !skipDuplicates(error)) throw error;
       } else if (m_movie) {
-        await supabase.from('watched').upsert({
-          user_id: userId, media_type: 'movie', tmdb_id: Number(m_movie[1]),
+        const tmdbId = Number(m_movie[1]);
+        if (!Number.isFinite(tmdbId)) { console.error('Watched error: non-numeric movie id', key); continue; }
+        const { error } = await supabase.from('watched').insert({
+          user_id: userId, media_type: 'movie', tmdb_id: tmdbId,
           title: data.title || '', season: null, episode: null,
           watched_at: new Date(data.watchedAt || Date.now()).toISOString(),
           meta: data.meta || null,
-        }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+        });
+        if (error && !skipDuplicates(error)) throw error;
       }
     } catch (e) { console.error('Watched error:', key, e); }
   }
@@ -118,15 +127,18 @@ async function main() {
 
   // Playback progress is local-only (no Supabase table) - skipped.
 
-  // Sync regular watch later
+  // Sync regular watch later (plain inserts; 23505 = already there, skipped)
   const wlItems = JSON.parse(localStorage.getItem('watchlater') || '[]');
   for (const item of wlItems) {
     try {
-      await supabase.from('watch_later').upsert({
-        user_id: userId, media_type: item.type, tmdb_id: Number(item.id),
+      const tmdbId = Number(item.id);
+      if (!Number.isFinite(tmdbId)) { console.error('WL error: non-numeric id', item); continue; }
+      const { error } = await supabase.from('watch_later').insert({
+        user_id: userId, media_type: item.type, tmdb_id: tmdbId,
         title: item.title, year: item.year || null, poster: item.poster || null,
         season: null, episode: null,
-      }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+      });
+      if (error && error.code !== '23505') throw error;
     } catch (e) { console.error('WL error:', item, e); }
   }
   console.log('Watch later items transferred:', wlItems.length);
@@ -137,11 +149,14 @@ async function main() {
     if (!k || !k.startsWith('epwl:')) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}');
-      await supabase.from('watch_later').upsert({
-        user_id: userId, media_type: 'tv', tmdb_id: Number(data.showId),
+      const tmdbId = Number(data.showId);
+      if (!Number.isFinite(tmdbId)) { console.error('EPWL error: non-numeric id', k); continue; }
+      const { error } = await supabase.from('watch_later').insert({
+        user_id: userId, media_type: 'tv', tmdb_id: tmdbId,
         title: data.showTitle || '', year: null, poster: null,
         season: data.season, episode: data.episode,
-      }, { onConflict: 'user_id,media_type,tmdb_id,season,episode', ignoreDuplicates: true });
+      });
+      if (error && error.code !== '23505') throw error;
     } catch (e) { console.error('EPWL error:', k, e); }
   }
 

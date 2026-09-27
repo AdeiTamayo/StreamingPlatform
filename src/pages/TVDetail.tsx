@@ -155,7 +155,12 @@ export default function TVDetail() {
     if (!show || !id) return;
     const requestedSeason = Number(urlSeason);
     const requestedEpisode = Number(urlEpisode);
-    const valid = requestedSeason > 0 && requestedEpisode > 0 && seasons.some((s) => s.season_number === requestedSeason);
+    const valid =
+      Number.isInteger(requestedSeason) &&
+      Number.isInteger(requestedEpisode) &&
+      requestedSeason > 0 &&
+      requestedEpisode > 0 &&
+      seasons.some((s) => s.season_number === requestedSeason);
     if (!valid) return;
     setSeason(requestedSeason);
     setEpisode(requestedEpisode);
@@ -171,6 +176,13 @@ export default function TVDetail() {
     if (Number(urlSeason) > 0 && Number(urlEpisode) > 0) return;
     setPlayerOpen(false);
   }, [urlSeason, urlEpisode, show]);
+
+  // A deep link past the end of the season would target a nonexistent
+  // episode - clamp it to the season's known episode count.
+  useEffect(() => {
+    if (!playerOpen || episodeCount <= 0) return;
+    if (episode > episodeCount) setEpisode(episodeCount);
+  }, [playerOpen, episodeCount, episode]);
 
   useEffect(() => {
     if (!imdbId) {
@@ -555,11 +567,16 @@ export default function TVDetail() {
     if (seriesWatched) {
       const flag = getSeriesWatchedFlag(id);
       if (flag.watched && flag.source === 'explicit') {
+        // Dropping only the flag would leave per-episode marks behind and
+        // the toggle would flip straight back to Watched with a lying toast.
+        // Unmark the episodes too so off really means off.
+        unmarkAllSeasonsWatched(id, seasons);
         unmarkSeriesWatched(id);
+        setWatchedCount(getWatchedCount(id, season, episodeCount));
+        setWatched(isWatched('tv', id, season, episode));
         setSeriesWatched(false);
         toast?.('Series removed from watched');
       } else {
-        if (!window.confirm('Unmark all episodes of this series? This cannot be undone.')) return;
         unmarkAllSeasonsWatched(id, seasons);
         unmarkSeriesWatched(id);
         setWatchedCount(getWatchedCount(id, season, episodeCount));
@@ -661,7 +678,7 @@ export default function TVDetail() {
                 if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
                 else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
               }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : 'Watch Later'}</button>
-              <button className={`badge-btn ${seriesWatched ? 'in-wl' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? '\u2713 Watched' : 'Watched'}</button>
+              <button className={`badge-btn ${seriesWatched ? 'in-watched' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? '\u2713 Watched' : 'Watched'}</button>
               {trailerKey && (
                 <button className="badge-btn" onClick={() => { setShowTrailer((s: boolean) => !s); }} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
                   {showTrailer ? 'Hide Trailer' : 'Trailer'}
@@ -788,7 +805,6 @@ export default function TVDetail() {
             {seasons.length > 0 && (
               <button className={styles.markSeasonBtn} onClick={() => {
                 if (allWatched()) {
-                  if (!window.confirm('Unmark all episodes? This cannot be undone.')) return;
                   unmarkAllSeasonsWatched(safeId, seasons);
                   toast?.('All episodes unmarked');
                 } else {
@@ -834,10 +850,11 @@ export default function TVDetail() {
                     const isW = !!watchedMap[ep.episode_number];
                     const isWL = epWlSet.has(ep.episode_number);
                     return (
-                    <Link key={ep.episode_number} to={`/tv/${safeId}?season=${season}&episode=${ep.episode_number}`} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${isW ? styles.watched : ''} ${isWL ? styles.watchLater : ''}`} onClick={(e) => { if (isPlainLeftClick(e)) { setEpisode(ep.episode_number); setPlayerOpen(true); } }}>
+                    <div key={ep.episode_number} className={`${styles.episodeCard} ${ep.episode_number === episode ? styles.current : ''} ${isW ? styles.watched : ''} ${isWL ? styles.watchLater : ''}`}>
+                      <Link to={`/tv/${safeId}?season=${season}&episode=${ep.episode_number}`} className={styles.episodeCardLink} aria-label={`E${ep.episode_number}. ${ep.name}`} onClick={(e) => { if (isPlainLeftClick(e)) { setEpisode(ep.episode_number); setPlayerOpen(true); } }}>
                       {ep.still_path && (
                         <div className={styles.episodeCardThumb}>
-                          <img src={imageUrl(ep.still_path, 'w300')} alt={ep.name} loading="lazy" />
+                          <img src={imageUrl(ep.still_path, 'w300')} alt="" loading="lazy" />
                         </div>
                       )}
                       <div className={styles.episodeCardInfo}>
@@ -853,11 +870,12 @@ export default function TVDetail() {
                         </div>
                         {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
                       </div>
-                      <span className={styles.epCardActions} onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                      </Link>
+                      <span className={styles.epCardActions}>
                         <button
                           type="button"
                           className={`${styles.epActionBtn} ${isW ? styles.activeWatched : ''}`}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEpisodeWatched(ep.episode_number); }}
+                          onClick={() => toggleEpisodeWatched(ep.episode_number)}
                           title={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
                           aria-label={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
                           aria-pressed={isW}
@@ -867,7 +885,7 @@ export default function TVDetail() {
                         <button
                           type="button"
                           className={`${styles.epActionBtn} ${isWL ? styles.activeWatchLater : ''}`}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEpisodeWatchLater(ep.episode_number); }}
+                          onClick={() => toggleEpisodeWatchLater(ep.episode_number)}
                           title={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
                           aria-label={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
                           aria-pressed={isWL}
@@ -875,7 +893,7 @@ export default function TVDetail() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
                         </button>
                       </span>
-                    </Link>
+                    </div>
                     );
                   })}
                 </div>
@@ -890,7 +908,11 @@ export default function TVDetail() {
           <h2 id="recs-heading-tv" className="section-title">You might also like</h2>
           <div className="media-grid">
             {recommendations.map((item) => (
-              <MediaCard key={(item as { id: number }).id} item={item as TMDBMovie | TMDBSeries} mediaType="tv" />
+              <MediaCard
+                key={`${(item as { media_type?: string }).media_type || "tv"}-${(item as { id: number }).id}`}
+                item={item as TMDBMovie | TMDBSeries}
+                mediaType={(item as { media_type?: string }).media_type === "movie" ? "movie" : "tv"}
+              />
             ))}
           </div>
         </section>

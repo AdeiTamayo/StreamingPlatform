@@ -48,6 +48,7 @@ const Navbar = memo(function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [activeNavSugg, setActiveNavSugg] = useState(-1);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,6 +102,28 @@ const Navbar = memo(function Navbar() {
   })();
   const showNavSuggest =
     searchOpen && searchFocused && navSuggestions.length > 0;
+
+  useEffect(() => {
+    setActiveNavSugg(-1);
+  }, [query, searchFocused, searchOpen, searchHistory]);
+
+  function handleNavSuggestKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (!showNavSuggest) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveNavSugg((i) => Math.min(i + 1, navSuggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveNavSugg((i) => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter' && activeNavSugg >= 0 && activeNavSugg < navSuggestions.length) {
+      e.preventDefault();
+      selectSuggestion(navSuggestions[activeNavSugg]);
+    }
+  }
 
   function isActive(path: string) {
     if (path === '/') {
@@ -330,24 +353,24 @@ const Navbar = memo(function Navbar() {
                   : styles.searchField
               }
             >
-              <input
-                ref={searchRef}
-                type="text"
-                placeholder="Search... (/)"
-                aria-label="Search"
-                autoComplete="off"
-                value={query}
-                onChange={(e) =>
-                  setQuery(e.target.value)
-                }
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') {
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-              />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Search... (/)"
+              aria-label="Search"
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={showNavSuggest}
+              aria-controls="nav-suggest-list"
+              aria-activedescendant={activeNavSugg >= 0 ? `nav-sugg-${activeNavSugg}` : undefined}
+              value={query}
+              onChange={(e) =>
+                setQuery(e.target.value)
+              }
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onKeyDown={handleNavSuggestKeyDown}
+            />
             </span>
             {showNavSuggest && (
               <div
@@ -355,13 +378,15 @@ const Navbar = memo(function Navbar() {
                 className={styles.navSuggest}
                 role="listbox"
                 aria-label="Recent searches"
+                id="nav-suggest-list"
               >
-                {navSuggestions.map((h) => (
-                  <div key={h} className={styles.navSuggestRow}>
+                {navSuggestions.map((h, hi) => (
+                  <div key={h} className={`${styles.navSuggestRow} ${hi === activeNavSugg ? styles.navSuggActive : ""}`}>
                     <button
                       type="button"
                       role="option"
-                      aria-selected={false}
+                      id={`nav-sugg-${hi}`}
+                      aria-selected={hi === activeNavSugg}
                       className={styles.navSuggestItem}
                       // mousedown fires before blur: prevent the default so
                       // the input keeps focus and the click is not swallowed.

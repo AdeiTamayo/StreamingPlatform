@@ -40,7 +40,8 @@
   transition: background 0.15s ease;
 }
 
-.search-suggest-row:hover {
+.search-suggest-row:hover,
+.search-suggest-row.sugg-active {
   background: rgba(125, 211, 252, 0.1);
 }
 
@@ -67,7 +68,8 @@
   white-space: nowrap;
 }
 
-.search-suggest-row:hover .search-suggest-item {
+.search-suggest-row:hover .search-suggest-item,
+.search-suggest-row.sugg-active .search-suggest-item {
   color: var(--text);
 }
 
@@ -89,13 +91,14 @@
 }
 
 .search-suggest-row:hover .search-suggest-remove,
+.search-suggest-row.sugg-active .search-suggest-remove,
 .search-suggest-remove:focus-visible {
   opacity: 1;
 }
 
 .search-suggest-remove:hover {
   background: rgba(248, 113, 113, 0.18);
-  color: #f87171;
+  color: var(--danger);
 }
 
 .search-input {
@@ -163,7 +166,7 @@
 
 .active {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: #03111e;
+  color: var(--ink);
   border-color: transparent;
 }
 
@@ -228,5 +231,5 @@
 
 .search-history-remove:hover {
   background: rgba(248, 113, 113, 0.2);
-  color: #f87171;
+  color: var(--danger);
 }

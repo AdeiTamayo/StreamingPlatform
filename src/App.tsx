@@ -27,8 +27,14 @@ export default function App() {
   }, [location.pathname, location.search]);
 
   useEffect(() => {
+    let ticking = false;
     function onScroll() {
-      setShowBackToTop(window.scrollY > 600);
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        setShowBackToTop(window.scrollY > 600);
+        ticking = false;
+      });
     }
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -40,7 +46,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <ErrorBoundary>
+      <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>
         <div className="app-shell">
           <a href="#main-content" className="skip-link">Skip to content</a>
           <Navbar />

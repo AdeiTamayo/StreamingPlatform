@@ -31,6 +31,7 @@ export default function Search() {
   const [error, setError] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSugg, setActiveSugg] = useState(-1);
   const { getSignal } = useAbortController();
 
   useEffect(() => { document.title = `Search: ${query} - StreamFlow`; }, [query]);
@@ -38,6 +39,7 @@ export default function Search() {
 
   useEffect(() => {
     if (!personId) return;
+    setPage(1);
     setLoading(true);
     setError(false);
     getPersonCredits(personId, getSignal())
@@ -58,12 +60,24 @@ export default function Search() {
       .finally(() => setLoading(false));
   }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Remembers what was last fetched so a query/tab change resets to page 1
+  // instead of firing one request with the stale page and a second right
+  // after (flash of wrong-page results).
+  const lastFetchKey = useRef<string>('');
   useEffect(() => {
     if (personId) return; // person credits are owned by the personId effect
     if (!query.trim()) {
       setResults([]);
       setTotalPages(1);
       return;
+    }
+    const fetchKey = `${query}|${tab}|${personId}`;
+    if (fetchKey !== lastFetchKey.current) {
+      lastFetchKey.current = fetchKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
     }
     setLoading(true);
     setError(false);
@@ -79,10 +93,6 @@ export default function Search() {
       })
       .finally(() => setLoading(false));
   }, [personId, query, page, tab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    setPage(1);
-  }, [query, tab, personId]);
 
   useEffect(() => {
     if (personId) return;
@@ -127,6 +137,29 @@ export default function Search() {
   })();
   const showSuggestions = searchFocused && suggestions.length > 0;
 
+  // Reset the keyboard highlight whenever the list changes.
+  useEffect(() => {
+    setActiveSugg(-1);
+  }, [input, searchFocused, history]);
+
+  function handleSuggestKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (!showSuggestions) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveSugg((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveSugg((i) => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter' && activeSugg >= 0 && activeSugg < suggestions.length) {
+      e.preventDefault();
+      handleHistoryClick(suggestions[activeSugg]);
+    }
+  }
+
   const filtered = personId
     ? tab === 'all'
       ? results
@@ -143,7 +176,7 @@ export default function Search() {
   return (
     <div className="page">
       <section className="section">
-        <h2 className="section-title">{personId ? `Movies & TV featuring "${query}"` : query ? `Search Results for "${query}"` : 'Search'}</h2>
+        <h2 className="section-title">{personId ? (query ? `Movies & TV featuring "${query}"` : 'Movies & TV shows') : query ? `Search Results for "${query}"` : 'Search'}</h2>
         <div className={styles.searchBoxWrap}>
           <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
             <input
@@ -153,27 +186,28 @@ export default function Search() {
               placeholder="Search movies, TV shows..."
               aria-label="Search"
               autoComplete="off"
+              role="combobox"
+              aria-expanded={showSuggestions}
+              aria-controls="search-suggest-list"
+              aria-activedescendant={activeSugg >= 0 ? `search-sugg-${activeSugg}` : undefined}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setSearchFocused(false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
+              onKeyDown={handleSuggestKeyDown}
             />
             <button type="submit" className={styles.searchSubmitBtn}>Search</button>
           </form>
           {showSuggestions && (
-            <div className={styles.searchSuggest} role="listbox" aria-label="Recent searches">
+            <div className={styles.searchSuggest} role="listbox" aria-label="Recent searches" id="search-suggest-list">
               <div className={styles.searchSuggestLabel}>Recent searches</div>
-              {suggestions.map((q) => (
-                <div key={q} className={styles.searchSuggestRow}>
+              {suggestions.map((q, qi) => (
+                <div key={q} className={`${styles.searchSuggestRow} ${qi === activeSugg ? styles.suggActive : ""}`}>
                   <button
                     type="button"
                     role="option"
-                    aria-selected={false}
+                    id={`search-sugg-${qi}`}
+                    aria-selected={qi === activeSugg}
                     className={styles.searchSuggestItem}
                     // mousedown fires before blur: prevent the default so the
                     // input keeps focus and the click is not swallowed.
@@ -236,6 +270,8 @@ export default function Search() {
           <div className="loading" role="alert">Search failed. Check your connection.</div>
         ) : loading ? (
           <div className="loading" role="status">Searching...</div>
+        ) : !personId && !query.trim() ? (
+          <div className="loading" role="status">Type above to search movies and TV shows</div>
         ) : filtered.length === 0 ? (
           <div className="loading" role="status">No results found</div>
         ) : (

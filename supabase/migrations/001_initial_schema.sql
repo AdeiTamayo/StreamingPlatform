@@ -32,6 +32,18 @@ create index if not exists idx_watched_user_media on public.watched using btree 
 create index if not exists idx_watched_user_tmdb on public.watched using btree (user_id, tmdb_id);
 create index if not exists idx_watched_lookup on public.watched using btree (user_id, media_type, tmdb_id, season, episode);
 
+-- Drop older duplicates, keeping the earliest row per track, so the unique
+-- index below can be created on tables that already contain dupes.
+-- (No-op on fresh projects.)
+delete from public.watched a
+using public.watched b
+where a.id > b.id
+  and a.user_id = b.user_id
+  and a.media_type = b.media_type
+  and a.tmdb_id = b.tmdb_id
+  and coalesce(a.season, -1) = coalesce(b.season, -1)
+  and coalesce(a.episode, -1) = coalesce(b.episode, -1);
+
 -- Prevents duplicate watched rows when the same track is watched again.
 create unique index if not exists watched_unique_track_idx
   on public.watched (user_id, media_type, tmdb_id, coalesce(season, -1), coalesce(episode, -1));
@@ -101,6 +113,7 @@ alter table public.watch_later enable row level security;
 
 drop policy if exists "Users can view their own watch later" on public.watch_later;
 drop policy if exists "Users can insert their own watch later" on public.watch_later;
+drop policy if exists "Users can update their own watch later" on public.watch_later;
 drop policy if exists "Users can delete their own watch later" on public.watch_later;
 
 create policy "Users can view their own watch later"
@@ -110,6 +123,10 @@ create policy "Users can view their own watch later"
 create policy "Users can insert their own watch later"
   on public.watch_later for insert
   with check (auth.uid() = user_id);
+
+create policy "Users can update their own watch later"
+  on public.watch_later for update
+  using (auth.uid() = user_id);
 
 create policy "Users can delete their own watch later"
   on public.watch_later for delete
@@ -132,6 +149,7 @@ alter table public.search_history enable row level security;
 
 drop policy if exists "Users can view their own search history" on public.search_history;
 drop policy if exists "Users can insert their own search history" on public.search_history;
+drop policy if exists "Users can update their own search history" on public.search_history;
 drop policy if exists "Users can delete their own search history" on public.search_history;
 
 create policy "Users can view their own search history"
@@ -141,6 +159,10 @@ create policy "Users can view their own search history"
 create policy "Users can insert their own search history"
   on public.search_history for insert
   with check (auth.uid() = user_id);
+
+create policy "Users can update their own search history"
+  on public.search_history for update
+  using (auth.uid() = user_id);
 
 create policy "Users can delete their own search history"
   on public.search_history for delete

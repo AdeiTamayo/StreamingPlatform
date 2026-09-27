@@ -1,5 +1,4 @@
 import { requireSupabase, supabase } from '../../lib/supabase';
-import { withRetry } from '../../utils/retry';
 
 export interface AuthError {
   message: string;
@@ -14,11 +13,11 @@ function toAuthError(err: unknown): AuthError {
 }
 
 export const authService = {
+  // Auth calls are never retried: failures here are credential/user errors,
+  // not blips, and retrying them delays feedback and burns rate limits.
   async signUp(email: string, password: string) {
     try {
-      const { data, error } = await withRetry(() =>
-        requireSupabase().auth.signUp({ email, password }),
-      );
+      const { data, error } = await requireSupabase().auth.signUp({ email, password });
       if (error) throw error;
       return { user: data.user, session: data.session };
     } catch (err) {
@@ -28,9 +27,7 @@ export const authService = {
 
   async signIn(email: string, password: string) {
     try {
-      const { data, error } = await withRetry(() =>
-        requireSupabase().auth.signInWithPassword({ email, password }),
-      );
+      const { data, error } = await requireSupabase().auth.signInWithPassword({ email, password });
       if (error) throw error;
       return { user: data.user, session: data.session };
     } catch (err) {
@@ -50,11 +47,9 @@ export const authService = {
 
   async resetPassword(email: string) {
     try {
-      const { error } = await withRetry(() =>
-        requireSupabase().auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/settings`,
-        }),
-      );
+      const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/settings`,
+      });
       if (error) throw error;
     } catch (err) {
       throw toAuthError(err);

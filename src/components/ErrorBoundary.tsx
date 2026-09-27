@@ -5,21 +5,33 @@ interface ErrorBoundaryProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  // Changing this resets a tripped boundary (e.g. pass the route path so a
+  // crash on one page doesn't stick after navigating away).
+  resetKey?: string | number;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  resetKey: string | number | undefined;
 }
 
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, resetKey: props.resetKey };
   }
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
+  }
+
+  // A new resetKey clears a tripped boundary without setState-in-update.
+  static getDerivedStateFromProps(props: ErrorBoundaryProps, state: ErrorBoundaryState) {
+    if (state.resetKey !== props.resetKey) {
+      return { hasError: false, error: null, resetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
