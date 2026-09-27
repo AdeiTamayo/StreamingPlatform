@@ -5,7 +5,7 @@ import {
   getLastWatchedEpisode, getStats, getWatchedCount, getWatchedEpisodeSet,
   clearShowHistory, markSeasonWatched,
   getVideoSource, setVideoSource,
-  getSearchHistory, addSearchHistory,
+  getSearchHistory, addSearchHistory, removeSearchHistory,
   getEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, isInEpisodeWatchLater,
   saveProgress, getProgress, clearProgress,
   getLastSeen, getContinueWatching,
@@ -723,5 +723,45 @@ describe('export / import', () => {
     importData({ 'watched:movie-2': JSON.stringify({ type: 'movie', id: '2', title: 'Replaced', watchedAt: 100 }) }, 'replace');
     expect(isWatched('movie', '1')).toBe(false);
     expect(isWatched('movie', '2')).toBe(true);
+  });
+
+  it('import merge unions watch later lists instead of replacing', () => {
+    addWatchLater('movie', '1', 'Local', '2024', '');
+    const incoming = JSON.stringify([
+      { type: 'movie', id: '1', title: 'Local', year: '2024', poster: '', addedAt: 1 },
+      { type: 'movie', id: '2', title: 'Imported', year: '2023', poster: '', addedAt: 2 },
+    ]);
+    importData({ watchlater: incoming }, 'merge');
+    const list = getWatchLater();
+    expect(list).toHaveLength(2);
+    expect(list.some((i) => String(i.id) === '1')).toBe(true);
+    expect(list.some((i) => String(i.id) === '2')).toBe(true);
+  });
+
+  it('import merge unions search history case-insensitively', () => {
+    addSearchHistory('Hello');
+    importData({ search_history: JSON.stringify(['hello', 'world']) }, 'merge');
+    expect(getSearchHistory()).toEqual(['Hello', 'world']);
+  });
+
+  it('import treats null values as removals, not "null" strings', () => {
+    addWatchLater('movie', '1', 'Test', '2024', '');
+    importData({ watchlater: null }, 'merge');
+    expect(getWatchLater()).toEqual([]);
+  });
+});
+
+describe('removeSearchHistory', () => {
+  it('removes a query case-insensitively and keeps the rest', () => {
+    addSearchHistory('Hello');
+    addSearchHistory('world');
+    removeSearchHistory('HELLO');
+    expect(getSearchHistory()).toEqual(['world']);
+  });
+
+  it('ignores blank queries', () => {
+    addSearchHistory('hello');
+    removeSearchHistory('   ');
+    expect(getSearchHistory()).toEqual(['hello']);
   });
 });

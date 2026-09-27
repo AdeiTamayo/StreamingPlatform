@@ -1,4 +1,5 @@
 import { getCurrentUserId } from './storage';
+import { dataMigration } from '../utils/dataMigration';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
@@ -67,23 +68,37 @@ export async function importSupabaseData(data: SupabaseBackupData): Promise<bool
 
   const operations: Promise<unknown>[] = [];
 
-  if (data.watched.length > 0) {
-    const batch = data.watched.map((item) => ({ ...item, user_id: userId }));
+  if ((data.watched?.length ?? 0) > 0) {
+    const batch = (data.watched ?? []).map((item) => ({ ...item, user_id: userId }));
     operations.push(watchedRepository.markBatch(batch));
   }
 
-  if (data.watchLater.length > 0) {
-    for (const item of data.watchLater) {
+  if ((data.watchLater?.length ?? 0) > 0) {
+    for (const item of data.watchLater ?? []) {
       operations.push(watchLaterRepository.add({ ...item, user_id: userId }));
     }
   }
 
-  if (data.searchHistory.length > 0) {
-    for (const item of data.searchHistory) {
+  if ((data.searchHistory?.length ?? 0) > 0) {
+    // search_history has no unique constraint - skip queries already on the
+    // server so a repeated import doesn't duplicate every row.
+    const existing = await searchHistoryRepository.getAll(userId).catch(() => []);
+    const seen = new Set(existing.map((r) => r.query.toLowerCase()));
+    for (const item of data.searchHistory ?? []) {
+      if (seen.has(item.query.toLowerCase())) continue;
+      seen.add(item.query.toLowerCase());
       operations.push(searchHistoryRepository.add({ ...item, user_id: userId }));
     }
   }
 
+  if (operations.length === 0) return true;
+
   const results = await Promise.allSettled(operations);
-  return results.some((r) => r.status === 'fulfilled');
+  const ok = results.every((r) => r.status === 'fulfilled');
+  if (ok) {
+    // Mirror the imported rows into localStorage so the UI reflects them
+    // without waiting for the next login sync.
+    await dataMigration.syncFromSupabase(userId);
+  }
+  return ok;
 }

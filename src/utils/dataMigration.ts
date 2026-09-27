@@ -12,10 +12,24 @@ import {
   SEARCH_HISTORY_KEY,
   WATCHED_INDEX_KEY,
   SEARCH_HISTORY_MAX,
-  LOCAL_DATA_KEYS,
 } from '../api/storage';
 
-const MIGRATION_FLAG_KEY = 'supabase_data_migrated';
+// Per-user flag: a global flag skips the upload for a second account on the
+// same browser, silently losing that account's pre-login rows.
+const MIGRATION_FLAG_PREFIX = 'supabase_data_migrated:';
+const LEGACY_MIGRATION_FLAG_KEY = 'supabase_data_migrated';
+
+function migrationFlagKey(userId: string): string {
+  return `${MIGRATION_FLAG_PREFIX}${userId}`;
+}
+
+// Non-numeric ids (movie slugs) can't be stored in the integer tmdb_id
+// column - they stay local-only and are skipped here so one bad row can't
+// poison the batch or the offline queue.
+function finiteTmdbId(raw: unknown): number | null {
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
 
 function getLegacyWatched(): WatchedInsert[] {
   const items: WatchedInsert[] = [];
@@ -52,10 +66,12 @@ function getLegacyWatched(): WatchedInsert[] {
         } else {
           const mm = k.match(/^watched:movie-(.+)$/);
           if (mm) {
+            const tmdbId = finiteTmdbId(mm[1]);
+            if (tmdbId == null) continue;
             items.push({
               user_id: '',
               media_type: 'movie',
-              tmdb_id: Number(mm[1]),
+              tmdb_id: tmdbId,
               title: data.title || '',
               season: null,
               episode: null,
@@ -99,10 +115,12 @@ function getLegacyWatchLater(): Array<{
       const list = JSON.parse(raw);
       if (Array.isArray(list)) {
         for (const item of list) {
+          const tmdbId = finiteTmdbId(item.id);
+          if (tmdbId == null) continue;
           items.push({
             user_id: '',
             media_type: item.type as MediaType,
-            tmdb_id: Number(item.id),
+            tmdb_id: tmdbId,
             title: item.title || '',
             year: item.year || null,
             poster: item.poster || null,
@@ -121,10 +139,12 @@ function getLegacyWatchLater(): Array<{
     if (!k || !k.startsWith(EP_WL_PREFIX)) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}');
+      const tmdbId = finiteTmdbId(data.showId);
+      if (tmdbId == null) continue;
       items.push({
         user_id: '',
         media_type: 'tv',
-        tmdb_id: Number(data.showId),
+        tmdb_id: tmdbId,
         title: data.showTitle || '',
         year: null,
         poster: null,
@@ -152,11 +172,24 @@ function getLegacySearchHistory(): string[] {
   return [];
 }
 
-function clearLegacyData(): void {
+// Keys mirrored to Supabase - safe to wipe after a successful upload because
+// syncFromSupabase re-downloads them straight after. Local-only state
+// (progress/resume points, notifications, the offline queue, caches and logs)
+// has no cloud counterpart and is preserved.
+const MIGRATED_KEYS = [
+  'watched:',
+  WL_KEY,
+  EP_WL_PREFIX,
+  EP_WL_INDEX_KEY,
+  SEARCH_HISTORY_KEY,
+  WATCHED_INDEX_KEY,
+];
+
+function clearMigratedData(): void {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && LOCAL_DATA_KEYS.some((prefix) => k === prefix || k.startsWith(prefix))) {
+    if (k && MIGRATED_KEYS.some((prefix) => k === prefix || k.startsWith(prefix))) {
       keysToRemove.push(k);
     }
   }
@@ -294,7 +327,20 @@ export const dataMigration = {
   },
 
   async runMigration(userId: string): Promise<void> {
-    if (localStorage.getItem(MIGRATION_FLAG_KEY)) {
+    const flagKey = migrationFlagKey(userId);
+    if (localStorage.getItem(flagKey)) {
+      await this.syncFromSupabase(userId);
+      return;
+    }
+    // Upgrade path: migrated under the old global flag - don't re-upload
+    // (search_history has no unique constraint, so re-uploading would
+    // duplicate every row), just mark this user and sync down.
+    if (localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY)) {
+      try {
+        localStorage.setItem(flagKey, 'true');
+      } catch (err) {
+        logError('dataMigration.flag', err);
+      }
       await this.syncFromSupabase(userId);
       return;
     }
@@ -349,18 +395,27 @@ export const dataMigration = {
       }
     }
 
-    // Only clear local data and mark the flag when every section succeeded -
-    // otherwise the next login retries the incomplete sections.
+    // Only clear the mirrored data and mark the flag when every section
+    // succeeded - otherwise the next login retries the incomplete sections.
+    // Local-only state is never wiped here (see clearMigratedData).
     if (hasData && !failed) {
-      clearLegacyData();
-      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      clearMigratedData();
+      try {
+        localStorage.setItem(flagKey, 'true');
+      } catch (err) {
+        logError('dataMigration.flag', err);
+      }
       await this.syncFromSupabase(userId);
     } else if (failed) {
       // Don't set the flag; next login will retry the failed sections.
       await this.syncFromSupabase(userId);
     } else {
       // No local data to migrate; just sync and set the flag.
-      localStorage.setItem(MIGRATION_FLAG_KEY, 'true');
+      try {
+        localStorage.setItem(flagKey, 'true');
+      } catch (err) {
+        logError('dataMigration.flag', err);
+      }
       await this.syncFromSupabase(userId);
     }
   },

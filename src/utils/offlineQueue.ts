@@ -1,4 +1,5 @@
 import { requireSupabase } from '../lib/supabase';
+import { logError } from './logger';
 
 const OFFLINE_QUEUE_KEY = 'supabase_offline_queue';
 export { OFFLINE_QUEUE_KEY };
@@ -114,26 +115,87 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
   }
 }
 
+// The user the queue is currently syncing as. Set from the storage layer
+// (importing storage here would create a module cycle). Ops stamped with a
+// different user_id are left untouched so one user's pending writes are never
+// replayed under another session - they sync when their owner signs back in.
+let syncUserId: string | null = null;
+
+export function setSyncUserId(userId: string | null): void {
+  syncUserId = userId;
+}
+
+function isForeignOp(op: QueuedOperation): boolean {
+  const owner = op.data.user_id ?? op.data.userId;
+  return typeof owner === 'string' && syncUserId != null && owner !== syncUserId;
+}
+
+let syncRunning = false;
+let syncRequested = false;
+
 export async function syncOfflineQueue(): Promise<void> {
+  // Coalesce concurrent triggers (login + online event + interval) instead
+  // of replaying the same ops twice.
+  if (syncRunning) {
+    syncRequested = true;
+    return;
+  }
+  syncRunning = true;
+  try {
+    do {
+      syncRequested = false;
+      await runSyncPass();
+    } while (syncRequested);
+  } finally {
+    syncRunning = false;
+  }
+}
+
+async function runSyncPass(): Promise<void> {
   const queue = getQueue();
   if (queue.length === 0) return;
 
-  const remaining: QueuedOperation[] = [];
+  // Ids this pass resolved (synced or permanently dropped). Anything else
+  // enqueued concurrently keeps its place via the merge below.
+  const resolved = new Set<string>();
+  const attempts = new Map<string, number>();
 
   for (const op of queue) {
+    // Never replay another user's writes under this session; leave them
+    // queued without burning attempts.
+    if (isForeignOp(op)) continue;
     const success = await processOperation(op);
-    if (!success) {
-      op.attempts += 1;
-      if (op.attempts <= MAX_OP_ATTEMPTS) {
-        remaining.push(op);
+    if (success) {
+      resolved.add(op.id);
+    } else {
+      const next = op.attempts + 1;
+      if (next > MAX_OP_ATTEMPTS) {
+        // Permanently dropping - log it so local/remote divergence is
+        // visible instead of silent.
+        logError('offlineQueue.drop', { table: op.table, method: op.method, attempts: next } as unknown as Error);
+        resolved.add(op.id);
+      } else {
+        attempts.set(op.id, next);
       }
     }
   }
 
+  // Merge, don't overwrite: ops enqueued while this pass was awaiting the
+  // network must survive. Failed ops keep their bumped attempt counts.
+  const current = getQueue();
+  const merged: QueuedOperation[] = [];
+  for (const op of current) {
+    if (resolved.has(op.id)) continue;
+    const next = attempts.get(op.id);
+    if (next != null) op.attempts = next;
+    merged.push(op);
+  }
+
   try {
-    saveQueue(remaining);
+    saveQueue(merged);
   } catch {
-    // Queue write failed (e.g. quota) - leave the previous queue intact
+    // Queue write failed (e.g. quota) - in-memory attempt bumps are lost and
+    // the next pass retries from the persisted state.
   }
 }
 

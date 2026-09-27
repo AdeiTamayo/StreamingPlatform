@@ -3,7 +3,7 @@ import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
-import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
+import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, setSyncUserId, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
 import type { WatchedInsert } from '../types/database';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
 
@@ -21,8 +21,9 @@ export const SEARCH_HISTORY_MAX = 15;
 export const EP_WL_MAX = 200;
 export const NEW_EPISODE_SCAN_KEY = 'new_episode_scan_last_run';
 
-// Keys/prefixes owned by this app's data layer. Kept in one place so
-// clearAllData and clearLegacyData can't drift apart.
+// Keys/prefixes owned by this app's data layer. clearAllData (explicit user
+// wipe) removes all of these; the login migration only clears the mirrored
+// subset (see MIGRATED_KEYS in dataMigration) and preserves local-only state.
 export const LOCAL_DATA_KEYS: string[] = [
   'watched:',
   'progress:',
@@ -45,6 +46,9 @@ let currentUserId: string | null = null;
 
 export function setCurrentUserId(userId: string | null): void {
   currentUserId = userId;
+  // Scope queue replay to this user so another account's pending writes are
+  // left queued instead of failing RLS under this session.
+  setSyncUserId(userId);
   if (userId) {
     initOfflineQueueSync();
     syncOfflineQueue().catch(() => {});
@@ -99,7 +103,7 @@ function getIndex(key: string, prefix: string): string[] {
     const k = localStorage.key(i);
     if (k && k.startsWith(prefix)) index.push(k);
   }
-  if (index.length > 0) localStorage.setItem(key, JSON.stringify(index));
+  if (index.length > 0) saveIndex(key, index);
   return index;
 }
 
@@ -148,12 +152,24 @@ function removeFromWatchedIndex(key: string): void {
   removeFromIndex(key, WATCHED_INDEX_KEY, 'watched:');
 }
 
-function safeWrite(key: string, value: string): void {
+// Returns false when the write failed (e.g. quota exceeded). Indexed writers
+// must only update the index on true, otherwise the index points at missing
+// values that readers count as real entries (ghosts).
+function safeWrite(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch (err) {
     logError('storage.setItem', err);
+    return false;
   }
+}
+
+// Remote tables use integer tmdb_id columns. Non-numeric local ids (movie
+// slugs) stay local-only instead of sending NaN to Supabase, where the write
+// would fail, get queued, and burn retries forever.
+function isSyncableId(id: string | number): boolean {
+  return Number.isFinite(Number(id));
 }
 
 export function isWatched(type: MediaType, id: string | number, season?: number | null, episode?: number | null): boolean {
@@ -163,10 +179,11 @@ export function isWatched(type: MediaType, id: string | number, season?: number 
 export function markWatched(type: MediaType, id: string | number, title: string, season?: number | null, episode?: number | null, meta?: Record<string, unknown>): void {
   const data: WatchedData = { type, id, title, season: season ?? undefined, episode: episode ?? undefined, watchedAt: Date.now(), ...(meta ? { meta } : {}) };
   const key = watchedKey(type, id, season, episode);
-  safeWrite(key, JSON.stringify(data));
-  addToWatchedIndex(key);
+  if (safeWrite(key, JSON.stringify(data))) {
+    addToWatchedIndex(key);
+  }
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(id)) {
     watchedRepository.mark({
       user_id: currentUserId,
       media_type: type,
@@ -185,7 +202,7 @@ export function markUnwatched(type: MediaType, id: string | number, season?: num
   localStorage.removeItem(key);
   removeFromWatchedIndex(key);
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(id)) {
     if (type === 'tv' && season == null && episode == null) {
       watchedRepository.unmarkSeries(currentUserId, Number(id));
     } else {
@@ -232,10 +249,11 @@ export function getSeriesWatchedShows(): Array<{ id: string; title: string; post
 export function markSeriesWatched(showId: string | number, showName: string, poster: string, source: 'explicit' | 'auto' = 'explicit'): void {
   const meta = { title: showName, poster, source };
   const key = watchedKey('tv', showId, null, null);
-  safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, watchedAt: Date.now(), meta }));
-  addToWatchedIndex(key);
+  if (safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, watchedAt: Date.now(), meta }))) {
+    addToWatchedIndex(key);
+  }
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(showId)) {
     watchedRepository.mark({
       user_id: currentUserId,
       media_type: 'tv',
@@ -254,7 +272,7 @@ export function unmarkSeriesWatched(showId: string | number): void {
   localStorage.removeItem(key);
   removeFromWatchedIndex(key);
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(showId)) {
     watchedRepository.unmarkSeries(currentUserId, Number(showId));
   }
 }
@@ -399,7 +417,7 @@ export function addWatchLater(type: MediaType, id: string | number, title: strin
   list.push({ type, id, title, year, poster, addedAt: Date.now() });
   safeWrite(WL_KEY, JSON.stringify(list));
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(id)) {
     watchLaterRepository.add({
       user_id: currentUserId,
       media_type: type,
@@ -417,7 +435,7 @@ export function removeWatchLater(type: MediaType, id: string | number): void {
   const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && String(item.id) === String(id)));
   safeWrite(WL_KEY, JSON.stringify(list));
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(id)) {
     watchLaterRepository.remove(currentUserId, type, Number(id));
   }
 }
@@ -517,11 +535,19 @@ export function getEpisodeWatchLater(): EpisodeWatchLaterItem[] {
   return items.sort((a, b) => b.addedAt - a.addedAt);
 }
 
+function readEpwlAddedAt(key: string): number {
+  try {
+    return (JSON.parse(localStorage.getItem(key) || '{}') as EpisodeWatchLaterItem).addedAt || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function pruneEpisodeWatchLater(): void {
   const index = getIndex(EP_WL_INDEX_KEY, EP_WL_PREFIX);
   if (index.length <= EP_WL_MAX) return;
   const entries = index
-    .map((k) => ({ key: k, addedAt: (JSON.parse(localStorage.getItem(k) || '{}') as EpisodeWatchLaterItem).addedAt || 0 }))
+    .map((k) => ({ key: k, addedAt: readEpwlAddedAt(k) }))
     .sort((a, b) => a.addedAt - b.addedAt);
   const toRemove = entries.slice(0, entries.length - EP_WL_MAX);
   toRemove.forEach(({ key }) => {
@@ -532,11 +558,12 @@ function pruneEpisodeWatchLater(): void {
 
 export function addEpisodeWatchLater(showId: string | number, season: number, episode: number, showTitle: string): void {
   const key = `${EP_WL_PREFIX}${showId}-S${season}E${episode}`;
-  safeWrite(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }));
-  addToIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  if (safeWrite(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }))) {
+    addToIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
+  }
   pruneEpisodeWatchLater();
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(showId)) {
     watchLaterRepository.add({
       user_id: currentUserId,
       media_type: 'tv',
@@ -555,7 +582,7 @@ export function removeEpisodeWatchLater(showId: string | number, season: number,
   localStorage.removeItem(key);
   removeFromIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
 
-  if (currentUserId) {
+  if (currentUserId && isSyncableId(showId)) {
     watchLaterRepository.removeEpisode(currentUserId, Number(showId), season, episode);
   }
 }
@@ -586,9 +613,11 @@ export function markSeasonWatched(showId: string | number, seasonNumber: number,
   for (let i = 1; i <= episodeCount; i++) {
     const key = watchedKey('tv', showId, seasonNumber, i);
     if (localStorage.getItem(key)) continue;
+    if (!safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, season: seasonNumber, episode: i, watchedAt: Date.now(), meta }))) {
+      continue;
+    }
     newKeys.push(key);
-    safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, season: seasonNumber, episode: i, watchedAt: Date.now(), meta }));
-    if (currentUserId) {
+    if (currentUserId && isSyncableId(showId)) {
       batch.push({
         user_id: currentUserId,
         media_type: 'tv',
@@ -742,6 +771,62 @@ function rebuildIndices(): void {
   saveIndex(EP_WL_INDEX_KEY, epwlIndex);
 }
 
+// Union a backed-up watch-later list into the current one. Returns the
+// number of entries actually added.
+function mergeWatchLaterList(raw: string): number {
+  let incoming: unknown;
+  try {
+    incoming = JSON.parse(raw);
+  } catch {
+    return 0;
+  }
+  if (!Array.isArray(incoming)) return 0;
+  const merged = [...getWatchLater()];
+  let added = 0;
+  for (const item of incoming as WatchLaterItem[]) {
+    if (!item || item.type == null || item.id == null) continue;
+    if (merged.some((m) => m.type === item.type && String(m.id) === String(item.id))) continue;
+    merged.push({ ...item, addedAt: typeof item.addedAt === 'number' ? item.addedAt : Date.now() });
+    added++;
+  }
+  if (added === 0) return 0;
+  try {
+    localStorage.setItem(WL_KEY, JSON.stringify(merged));
+  } catch (err) {
+    logError('storage.importData', err);
+    return 0;
+  }
+  return added;
+}
+
+// Union backed-up search history into the current one (most recent first,
+// capped). Returns the number of queries actually added.
+function mergeSearchHistoryList(raw: string): number {
+  let incoming: unknown;
+  try {
+    incoming = JSON.parse(raw);
+  } catch {
+    return 0;
+  }
+  if (!Array.isArray(incoming)) return 0;
+  const merged = [...getSearchHistory()];
+  let added = 0;
+  for (const q of incoming as unknown[]) {
+    if (typeof q !== 'string' || !q.trim()) continue;
+    if (merged.some((m) => m.toLowerCase() === q.toLowerCase())) continue;
+    merged.push(q);
+    added++;
+  }
+  if (added === 0) return 0;
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(merged.slice(0, SEARCH_HISTORY_MAX)));
+  } catch (err) {
+    logError('storage.importData', err);
+    return 0;
+  }
+  return added;
+}
+
 export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): number {
   let imported = 0;
   if (mode === 'replace') {
@@ -751,11 +836,35 @@ export function importData(data: Record<string, unknown>, mode: 'merge' | 'repla
       if (k && isExportKey(k)) keys.push(k);
     }
     keys.forEach((k) => localStorage.removeItem(k));
+  } else {
+    // List-valued keys union with the existing entries so importing a partial
+    // backup can't wipe the rest of the local lists.
+    const rest: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (!isExportKey(k)) continue;
+      if (k === WL_KEY && v != null) {
+        imported += mergeWatchLaterList(String(v));
+      } else if (k === SEARCH_HISTORY_KEY && v != null) {
+        imported += mergeSearchHistoryList(String(v));
+      } else {
+        rest[k] = v;
+      }
+    }
+    data = rest;
   }
   Object.entries(data).forEach(([k, v]) => {
-    if (isExportKey(k)) {
-      localStorage.setItem(k, String(v));
+    if (!isExportKey(k)) return;
+    try {
+      // Exported null means "key absent" - remove instead of storing the
+      // literal string "null".
+      if (v == null) {
+        localStorage.removeItem(k);
+      } else {
+        localStorage.setItem(k, String(v));
+      }
       imported++;
+    } catch (err) {
+      logError('storage.importData', err);
     }
   });
   // Imported watched/progress/epwl keys must be reflected in the indices or
