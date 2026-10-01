@@ -133,4 +133,38 @@ describe('detail pages render', () => {
     });
     expect(consoleErrorCaptured.filter((m) => m.includes('Objects are not valid as a React child'))).toHaveLength(0);
   });
+
+  it('MovieDetail rejects a non-numeric id without fetching', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => mockFetchImpl(String(input)));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter initialEntries={['/movie/550%22%20onload%3Dalert(1)']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('Movie not found')).toBeInTheDocument());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('TVDetail rejects a non-numeric id without fetching', async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => mockFetchImpl(String(input)));
+    vi.stubGlobal('fetch', fetchMock);
+    render(
+      <MemoryRouter initialEntries={['/tv/1399abc']}>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('Show not found')).toBeInTheDocument());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

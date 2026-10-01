@@ -156,6 +156,17 @@ button.date-picker-month:hover {
   font-weight: 800;
 }
 
+.date-picker-cell.adjacentMonth {
+  opacity: 0.5;
+  color: var(--text-muted);
+}
+
+.date-picker-cell.adjacentMonth:hover:not(.empty) {
+  opacity: 0.8;
+  background: rgba(125, 211, 252, 0.08);
+  border-color: rgba(125, 211, 252, 0.12);
+}
+
 .date-picker-grid.months,
 .date-picker-grid.years {
   grid-template-columns: repeat(4, 1fr);

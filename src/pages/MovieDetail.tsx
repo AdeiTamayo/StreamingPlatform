@@ -18,7 +18,10 @@ import styles from './MovieDetail.module.css';
 const AUTO_WATCH_REMAINING_SECONDS = 120;
 
 export default function MovieDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id: rawId } = useParams<{ id: string }>();
+  // TMDB ids are numeric - reject anything else up front so a crafted URL
+  // can never reach API paths, storage keys, or the embed iframe src.
+  const id = rawId && /^\d+$/.test(rawId) ? rawId : undefined;
   const toast = useToast();
   const [movie, setMovie] = useState<TMDBMovie | null>(null);
   const [loading, setLoading] = useState(true);

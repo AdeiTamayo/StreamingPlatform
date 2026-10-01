@@ -32,9 +32,9 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
-    // Abort any still-in-flight request immediately so a slow old-filter
-    // response can never overwrite the newer results.
-    getSignal();
+    // The getSignal() call below aborts any still-in-flight request, so a
+    // slow old-filter response can never overwrite the newer results
+    // (backed up by the requestId guard on resolve).
     fetchRef.current = setTimeout(() => {
       fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount }, getSignal())
         .then((data) => {

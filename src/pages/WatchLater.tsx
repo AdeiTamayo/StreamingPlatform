@@ -22,6 +22,7 @@ import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
 import { useAbortController } from "../hooks/useAbortController";
+import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, formatISODate, isValidDate } from "../utils/calendar";
 import type {
   WatchLaterItem,
   EpisodeWatchLaterItem,
@@ -132,39 +133,67 @@ function formatDate(dateStr: string) {
   });
 }
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+function calendarKey(item: CalendarItem) {
+  return `${item.type}-${item.id}-${item.date}-S${item.season ?? 0}E${item.episode ?? 0}`;
+}
 
-function getMonthDays(year: number, month: number) {
-  const firstDay = new Date(year, month, 1).getDay();
-  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const grid: (number | null)[] = [];
-  for (let i = 0; i < startOffset; i++) grid.push(null);
-  for (let d = 1; d <= daysInMonth; d++) grid.push(d);
-  return grid;
+// Persisted release-calendar cache so a return visit paints instantly from
+// the previous load while fresh data is fetched in the background.
+export const CALENDAR_CACHE_KEY = "streamflow:calendar-cache:v1";
+const CALENDAR_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function readCalendarCache(): CalendarItem[] {
+  try {
+    const raw = localStorage.getItem(CALENDAR_CACHE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { savedAt?: number; items?: CalendarItem[] };
+    if (!parsed || !Array.isArray(parsed.items)) return [];
+    if (typeof parsed.savedAt !== "number" || Date.now() - parsed.savedAt > CALENDAR_CACHE_MAX_AGE_MS) {
+      return [];
+    }
+    return parsed.items.filter(
+      (i) => i && typeof i.date === "string" && typeof i.title === "string" && isValidDate(i.date),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeCalendarCache(items: CalendarItem[]) {
+  try {
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({ savedAt: Date.now(), items }),
+    );
+  } catch {
+    // Best-effort: quota or private mode must never break the calendar.
+  }
+}
+
+// Drop cached entries whose title is no longer in Watch Later, so removed
+// titles don't linger after a fresh visit.
+function pruneCalendarCache(
+  cached: CalendarItem[],
+  wlItems: WatchLaterItem[],
+  epItems: EpisodeWatchLaterItem[],
+): CalendarItem[] {
+  const keep = new Set<string>();
+  for (const w of wlItems) keep.add(`${w.type}-${String(w.id)}`);
+  for (const e of epItems) keep.add(`tv-${String(e.showId)}`);
+  return cached.filter((c) =>
+    keep.has(c.type === "episode" ? `tv-${String(c.id)}` : `${c.type}-${String(c.id)}`),
+  );
 }
 
 export default function WatchLater() {
   const [items, setItems] = useState<WatchLaterItem[]>([]);
   const [epItems, setEpItems] = useState<EpisodeWatchLaterItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingCalendar, setLoadingCalendar] = useState(true);
+  const [loadingCalendar, setLoadingCalendar] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [calendarHasLoaded, setCalendarHasLoaded] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => todayLocal());
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [sortBy, setSortBy] = useState("recent");
@@ -175,6 +204,8 @@ export default function WatchLater() {
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
   const calendarInitedRef = useRef(false);
+  const loadingCalendarRef = useRef(false);
+  const calendarItemsRef = useRef<CalendarItem[]>([]);
   const ITEMS_PER_PAGE = 20;
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
@@ -247,7 +278,10 @@ export default function WatchLater() {
                 }
               }
             }
-          } catch {}
+          } catch {
+            // Per-season failure: skip season, keep other results.
+            continue;
+          }
         }
 
         if (nextEp?.air_date && isCalendarRelevant(nextEp.air_date)) {
@@ -273,7 +307,12 @@ export default function WatchLater() {
             });
           }
         }
-      } catch {}
+      } catch (err) {
+        // Aborted: swallow. Real failure: propagate so the caller can
+        // record a partial/complete failure (successful items are kept).
+        if (signal?.aborted) return results;
+        throw err;
+      }
       return results;
     },
     [],
@@ -299,51 +338,116 @@ export default function WatchLater() {
             poster: detail.poster_path || undefined,
           };
         }
-      } catch {}
+      } catch (err) {
+        if (signal?.aborted) return null;
+        throw err;
+      }
       return null;
     },
     [],
   );
 
   const loadCalendarItems = useCallback(async () => {
+    if (loadingCalendarRef.current) return;
+    loadingCalendarRef.current = true;
     setLoadingCalendar(true);
+    setCalendarError(null);
     const signal = getSignal();
     const wlItems = getWatchLater();
     const epwlItems = getEpisodeWatchLater();
-    const results: CalendarItem[] = [];
     const CONCURRENCY = 3;
+    let hasErrors = false;
+    // Progressive rendering: flush each resolved batch into state so the
+    // grid fills in as fetches resolve instead of waiting for everything.
+    // Seed with whatever is already on screen (e.g. hydrated cache) so a
+    // background refresh never duplicates it.
+    const seenKeys = new Set<string>();
+    for (const item of calendarItemsRef.current) seenKeys.add(calendarKey(item));
+    let freshCount = 0;
+    const flushBatch = (incoming: CalendarItem[]) => {
+      if (signal.aborted || incoming.length === 0) return;
+      const fresh: CalendarItem[] = [];
+      for (const item of incoming) {
+        const key = calendarKey(item);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        fresh.push(item);
+      }
+      if (fresh.length === 0) return;
+      freshCount += fresh.length;
+      setCalendarItems((prev) =>
+        [...prev, ...fresh].sort((a, b) => a.date.localeCompare(b.date)),
+      );
+    };
 
     const wlPosterMap = new Map<string, string | undefined>();
     for (const wl of wlItems) {
       if (wl.poster) wlPosterMap.set(String(wl.id), wl.poster);
     }
 
-    for (let i = 0; i < wlItems.length; i += CONCURRENCY) {
-      const batch = wlItems.slice(i, i + CONCURRENCY);
+    // Dedupe: same show/season may appear as both a show-level entry and
+    // one or more episode entries. Fetch each unique show/season once.
+    const seenShowIds = new Set<string>();
+    const uniqueWlItems: WatchLaterItem[] = [];
+    for (const item of wlItems) {
+      const key = `${item.type}-${String(item.id)}`;
+      if (seenShowIds.has(key)) continue;
+      seenShowIds.add(key);
+      uniqueWlItems.push(item);
+    }
+
+    for (let i = 0; i < uniqueWlItems.length; i += CONCURRENCY) {
+      if (signal.aborted) break;
+      const batch = uniqueWlItems.slice(i, i + CONCURRENCY);
       const batchResults = await Promise.allSettled(
         batch.map(async (item: WatchLaterItem) => {
           if (item.type === "movie") return fetchMovieRelease(item, signal);
           return fetchTVFutureEpisodes(item.id, signal);
         }),
       );
+      const batchVals: CalendarItem[] = [];
       for (const r of batchResults) {
         if (r.status === "fulfilled") {
           const val = r.value;
-          if (val && Array.isArray(val)) results.push(...val);
-          else if (val) results.push(val);
+          if (val && Array.isArray(val)) batchVals.push(...val);
+          else if (val) batchVals.push(val);
+        } else {
+          hasErrors = true;
         }
       }
+      flushBatch(batchVals);
     }
 
-    for (let i = 0; i < epwlItems.length; i += CONCURRENCY) {
-      const batch = epwlItems.slice(i, i + CONCURRENCY);
+    // Share in-flight season requests so the same (show, season) is only
+    // fetched once even if referenced by multiple episode entries.
+    const seasonCache = new Map<string, Promise<unknown>>();
+    const getSeasonOnce = (showId: string | number, season: number) => {
+      const key = `${String(showId)}-S${season}`;
+      const cached = seasonCache.get(key);
+      if (cached) return cached;
+      const p = getSeasonDetails(showId, season, signal);
+      seasonCache.set(key, p);
+      return p;
+    };
+
+    const seenEpKeys = new Set<string>();
+    const uniqueEpItems: EpisodeWatchLaterItem[] = [];
+    for (const epwl of epwlItems) {
+      const key = `${String(epwl.showId)}-S${epwl.season}E${epwl.episode}`;
+      if (seenEpKeys.has(key)) continue;
+      seenEpKeys.add(key);
+      uniqueEpItems.push(epwl);
+    }
+
+    for (let i = 0; i < uniqueEpItems.length; i += CONCURRENCY) {
+      if (signal.aborted) break;
+      const batch = uniqueEpItems.slice(i, i + CONCURRENCY);
       const batchResults = await Promise.allSettled(
         batch.map(async (epwl: EpisodeWatchLaterItem) => {
           try {
-            const seasonDetail = (await getSeasonDetails(
+            const seasonDetail = (await getSeasonOnce(
               epwl.showId,
               epwl.season,
-              signal,
             )) as {
               episodes?: {
                 episode_number: number;
@@ -366,69 +470,89 @@ export default function WatchLater() {
                 episodeTitle: ep.name,
               };
             }
-          } catch {}
+          } catch (err) {
+            if (signal?.aborted) return null;
+            throw err;
+          }
           return null;
         }),
       );
+      const batchVals: CalendarItem[] = [];
       for (const r of batchResults) {
-        if (r.status === "fulfilled" && r.value) results.push(r.value);
+        if (r.status === "fulfilled" && r.value) batchVals.push(r.value);
+        else if (r.status === "rejected") hasErrors = true;
       }
+      flushBatch(batchVals);
     }
 
-    const seen = new Set<string>();
-    const deduped: CalendarItem[] = [];
-    for (const item of results) {
-      const key = `${item.type}-${item.id}-${item.date}-S${item.season ?? 0}E${item.episode ?? 0}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      deduped.push(item);
-    }
-
-    deduped.sort((a, b) => a.date.localeCompare(b.date));
     if (signal.aborted) {
+      loadingCalendarRef.current = false;
       setLoadingCalendar(false);
       return;
     }
-    setCalendarItems(deduped);
+    setCalendarHasLoaded(true);
+    // seenKeys holds cached + freshly loaded entries, so it reflects what
+    // is (or is about to be) on screen even if the last flush hasn't
+    // re-rendered yet.
+    if (hasErrors && seenKeys.size > 0) {
+      setCalendarError("Some releases could not be loaded. Displaying available data.");
+    } else if (hasErrors && seenKeys.size === 0) {
+      setCalendarError("Failed to load releases. Please try again.");
+    }
+    loadingCalendarRef.current = false;
     setLoadingCalendar(false);
   }, [fetchTVFutureEpisodes, fetchMovieRelease, getSignal]);
 
   useEffect(() => {
     document.title = "Watch Later - StreamFlow";
-    setItems(getWatchLater());
-    setEpItems(getEpisodeWatchLater());
+    const wl = getWatchLater();
+    const epwl = getEpisodeWatchLater();
+    setItems(wl);
+    setEpItems(epwl);
     setLoading(false);
-    loadCalendarItems();
-  }, [loadCalendarItems]);
+    // Paint instantly from the previous visit's cache (pruned to the
+    // current library). Fresh data is fetched in the background once the
+    // calendar or upcoming list is actually opened.
+    const pruned = pruneCalendarCache(readCalendarCache(), wl, epwl);
+    if (pruned.length > 0) setCalendarItems(pruned);
+    // Defer heavy release fetching until the user actually opens the
+    // calendar or the upcoming list, so the list + calendar button render
+    // instantly.
+  }, []);
+
+  useEffect(() => {
+    calendarItemsRef.current = calendarItems;
+  }, [calendarItems]);
+
+  // Persist freshly loaded releases so the next visit renders instantly.
+  // Only after a real API load, so a bare cache hydrate never overwrites
+  // the stored snapshot with itself; removals stay in sync afterwards.
+  useEffect(() => {
+    if (calendarHasLoaded) writeCalendarCache(calendarItems);
+  }, [calendarItems, calendarHasLoaded]);
+
+  // Load releases on demand: first time the calendar view or the upcoming
+  // list is requested. The calendar grid itself renders immediately.
+  useEffect(() => {
+    if ((view === "calendar" || showUpcoming) && !calendarHasLoaded && !loadingCalendar) {
+      loadCalendarItems();
+    }
+  }, [view, showUpcoming, calendarHasLoaded, loadingCalendar, loadCalendarItems]);
 
   useEffect(() => {
     if (view === "calendar") {
-      if (
-        !calendarInitedRef.current &&
-        calendarItems.length > 0 &&
-        calendarItems[0]?.date
-      ) {
+      if (!calendarInitedRef.current) {
+        // Default to today when opening the calendar.
         const now = new Date();
-        const currentMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-        // Jump to the next release at/after this month when one exists,
-        // otherwise stay on the current month (whose earlier days may still
-        // have releases) with today selected.
-        const firstRelevant = calendarItems.find((c) => c.date >= currentMonthStart);
-        if (firstRelevant) {
-          const d = parseLocalDate(firstRelevant.date);
-          setCalYear(d.getFullYear());
-          setCalMonth(d.getMonth());
-          setSelectedDate(firstRelevant.date);
-        } else {
-          const latest = calendarItems[calendarItems.length - 1];
-          setSelectedDate(latest?.date || todayLocal());
-        }
+        setCalYear(now.getFullYear());
+        setCalMonth(now.getMonth());
+        setSelectedDate(todayLocal());
         calendarInitedRef.current = true;
       }
     } else {
       calendarInitedRef.current = false;
     }
-  }, [view, calendarItems]);
+  }, [view]);
 
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
@@ -473,14 +597,44 @@ export default function WatchLater() {
     return map;
   }, [calendarItems]);
 
-  // Items with a future-dated release (from the calendar data) are
-  // "unreleased" - their cards can be hidden while they stay in the
-  // calendar. Keyed by `type-id` to match the WatchLaterItem grid.
-  // Calendar items use type "episode" for TV shows, map it back to "tv".
-  // A TV show is only considered unreleased if ALL its episodes are future-dated
-  // (meaning the show hasn't premiered yet).
+  const today = useMemo(() => new Date(), []);
+
+  const calendarGrid = useMemo(
+    () => generateCalendarGrid(calYear, calMonth, selectedDate ?? undefined, today),
+    [calYear, calMonth, selectedDate, today],
+  );
+
+  function prevMonth() {
+    const { year, month } = navigateMonth(calYear, calMonth, 'prev');
+    setCalYear(year);
+    setCalMonth(month);
+  }
+
+  function nextMonth() {
+    const { year, month } = navigateMonth(calYear, calMonth, 'next');
+    setCalYear(year);
+    setCalMonth(month);
+  }
+
+  const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
+
+  const groupedUpcomingList = useMemo(() => {
+    const sorted = Object.keys(itemsByDate)
+      .filter((date) => isFuture(date))
+      .sort();
+    return sorted.map((date) => ({ date, items: itemsByDate[date] }));
+  }, [itemsByDate]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(groupedUpcomingList.length / DAYS_PER_PAGE),
+  );
+  const paginatedGroups = useMemo(() => {
+    const start = upcomingPage * DAYS_PER_PAGE;
+    return groupedUpcomingList.slice(start, start + DAYS_PER_PAGE);
+  }, [groupedUpcomingList, upcomingPage, DAYS_PER_PAGE]);
+
   const unreleasedKeys = useMemo(() => {
-    // Group calendar items by (type, id)
     const grouped = new Map<string, CalendarItem[]>();
     for (const c of calendarItems) {
       const key = `${c.type === "episode" ? "tv" : c.type}-${String(c.id)}`;
@@ -492,8 +646,6 @@ export default function WatchLater() {
 
     const keys = new Set<string>();
     for (const [key, items] of grouped.entries()) {
-      // A group is "unreleased" only if ALL items are future-dated
-      // (i.e., no episodes have aired yet)
       if (items.every(item => isFuture(item.date))) {
         keys.add(key);
       }
@@ -520,49 +672,6 @@ export default function WatchLater() {
     return list;
   }, [items, sortBy, filterType, hideUnreleasedPosters, unreleasedKeys]);
 
-  const daysGrid = useMemo(
-    () => getMonthDays(calYear, calMonth),
-    [calYear, calMonth],
-  );
-  const todayStr = todayLocal();
-
-  function dateStr(y: number, m: number, d: number | null) {
-    if (d === null) return "";
-    return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  }
-
-  function prevMonth() {
-    if (calMonth === 0) {
-      setCalYear((y) => y - 1);
-      setCalMonth(11);
-    } else setCalMonth((m) => m - 1);
-  }
-
-  function nextMonth() {
-    if (calMonth === 11) {
-      setCalYear((y) => y + 1);
-      setCalMonth(0);
-    } else setCalMonth((m) => m + 1);
-  }
-
-  const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
-
-  const groupedUpcomingList = useMemo(() => {
-    const sorted = Object.keys(itemsByDate)
-      .filter((date) => isFuture(date))
-      .sort();
-    return sorted.map((date) => ({ date, items: itemsByDate[date] }));
-  }, [itemsByDate]);
-
-  const totalPages = Math.max(
-    1,
-    Math.ceil(groupedUpcomingList.length / DAYS_PER_PAGE),
-  );
-  const paginatedGroups = useMemo(() => {
-    const start = upcomingPage * DAYS_PER_PAGE;
-    return groupedUpcomingList.slice(start, start + DAYS_PER_PAGE);
-  }, [groupedUpcomingList, upcomingPage, DAYS_PER_PAGE]);
-
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
   const upcomingCalendarCount = calendarItems.filter((c) => isFuture(c.date)).length;
 
@@ -578,7 +687,9 @@ export default function WatchLater() {
   if (view === "calendar") {
     const maxPosters = 1;
 
-    if (loadingCalendar) {
+    // Show full skeleton only on first load with no data yet. Once we have
+    // (or had) data, render the grid immediately and stream releases in.
+    if (loadingCalendar && calendarItems.length === 0 && !calendarHasLoaded) {
       return (
         <div className="page">
           <section className="section">
@@ -607,7 +718,7 @@ export default function WatchLater() {
               </div>
 
               <div className={styles.calSkeletonGrid}>
-                {Array.from({ length: 35 }).map((_, i) => (
+                {Array.from({ length: calendarGrid.cells.length || 35 }).map((_, i) => (
                   <div key={i} className={styles.calSkeletonCell} />
                 ))}
               </div>
@@ -636,6 +747,7 @@ export default function WatchLater() {
 
               <span className={styles.calSubtitle}>
                 Upcoming releases from your Watch Later library
+                {loadingCalendar && calendarHasLoaded ? " · Updating…" : loadingCalendar ? " · Loading…" : ""}
               </span>
             </div>
 
@@ -648,7 +760,7 @@ export default function WatchLater() {
                   setCalYear(now.getFullYear());
                   setCalMonth(now.getMonth());
 
-                  setSelectedDate(todayLocal());
+                  setSelectedDate(formatISODate(now));
                 }}
               >
                 Today
@@ -668,99 +780,103 @@ export default function WatchLater() {
               <button
                 className={styles.calNav}
                 onClick={prevMonth}
-                aria-label="Previous month"
+                aria-label={`Previous month, ${getMonthName(calMonth === 0 ? 11 : calMonth - 1)} ${calMonth === 0 ? calYear - 1 : calYear}`}
               >
                 ←
               </button>
 
               <div className={styles.monthTitle}>
-                {MONTHS[calMonth]} {calYear}
+                {calendarGrid.monthName} {calendarGrid.year}
               </div>
 
               <button
                 className={styles.calNav}
                 onClick={nextMonth}
-                aria-label="Next month"
+                aria-label={`Next month, ${getMonthName(calMonth === 11 ? 0 : calMonth + 1)} ${calMonth === 11 ? calYear + 1 : calYear}`}
               >
                 →
               </button>
             </div>
 
             <div className={styles.calGrid}>
-              {WEEKDAYS.map((day, dayIndex) => (
-                <div
-                  key={day}
-                  className={styles.calWeekday}
-                  style={{ animationDelay: `${dayIndex * 30}ms` }}
-                >
+              {getWeekdays().map((day) => (
+                <div key={day} className={styles.calWeekday}>
                   {day}
                 </div>
               ))}
 
-              {daysGrid.map((day, index) => {
-                const ds = dateStr(calYear, calMonth, day);
-
-                const releases = day ? itemsByDate[ds] || [] : [];
+              {calendarGrid.cells.map((cell) => {
+                const releases = itemsByDate[cell.isoString] || [];
 
                 const heat = Math.min(3, releases.length);
 
-                const today = ds === todayStr;
+                const today = cell.isToday;
 
-                const past = day !== null && ds < todayStr;
+                const past = cell.isPast;
 
-                const selected = selectedDate === ds;
+                const selected = cell.isSelected;
 
+                const cellLabel = `${cell.accessibleLabel}, ${releases.length} release${releases.length === 1 ? "" : "s"}${selected ? ", selected" : ""}`;
                 return (
                   <button
-                    key={index}
-                    disabled={day === null}
+                    key={cell.isoString}
+                    disabled={false}
                     onClick={() => {
-                      if (day !== null) setSelectedDate(ds);
+                      // Selecting an adjacent-month day only selects it;
+                      // the visible month never changes on its own.
+                      setSelectedDate(cell.isoString);
                     }}
-                    style={{
-                      animationDelay: `${Math.min((WEEKDAYS.length + index) * 25, 650)}ms`,
-                    }}
+                    aria-pressed={selected}
+                    aria-label={cellLabel}
                     className={`
                     ${styles.calCell}
                     ${today ? styles.today : ""}
                     ${past ? styles.past : ""}
                     ${selected ? styles.selected : ""}
-                    ${day === null ? styles.empty : ""}
                     ${heat > 0 ? styles[`heat-${heat}`] : ""}
                   `}
                   >
-                    {day !== null && (
-                      <>
-                        <div className={styles.dayNumber}>{day}</div>
+                    <div className={styles.dayNumber}>{cell.dayNumber}</div>
 
-                        {releases.length > 0 && (
-                          <div
-                            className={`${styles.posterRow} ${styles[`pcount-${Math.min(releases.length, 2)}`]}`}
-                          >
-                            {releases.slice(0, maxPosters).map((item, i) => (
-                              <img
-                                key={i}
-                                src={imageUrl(item.poster ?? null, "w92")}
-                                alt=""
-                                loading="lazy"
-                                className={styles.posterThumb}
-                              />
-                            ))}
+                    {releases.length > 0 && (
+                      <div
+                        className={`${styles.posterRow} ${styles[`pcount-${Math.min(releases.length, 2)}`]}`}
+                      >
+                        {releases.slice(0, maxPosters).map((item, i) => (
+                          <img
+                            key={i}
+                            src={imageUrl(item.poster ?? null, "w92")}
+                            alt=""
+                            loading="lazy"
+                            className={styles.posterThumb}
+                          />
+                        ))}
 
-                            {releases.length > maxPosters && (
-                              <div className={styles.posterMore}>
-                                +{releases.length - maxPosters}
-                              </div>
-                            )}
+                        {releases.length > maxPosters && (
+                          <div className={styles.posterMore}>
+                            +{releases.length - maxPosters}
                           </div>
                         )}
-                      </>
+                      </div>
                     )}
                   </button>
                 );
               })}
             </div>
           </div>
+
+          {calendarError && (
+            <div className={styles.calendarError} role="alert">
+              <span>{calendarError}</span>
+              <button
+                className={styles.retryBtn}
+                onClick={loadCalendarItems}
+                disabled={loadingCalendar}
+              >
+                {loadingCalendar ? "Retrying..." : "Retry"}
+              </button>
+            </div>
+          )}
 
           <div className={styles.dayPanel}>
             {selectedDate ? (
@@ -779,47 +895,47 @@ export default function WatchLater() {
                     Nothing releases on this day.
                   </div>
                 ) : (
-                  <div
-                    className={`${styles.releaseGrid} ${styles[`count-${Math.min(selectedItems.length, 3)}`]}`}
-                  >
-                    {selectedItems.map((item) => (
-                      <div
-                        key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
-                        className={styles.releaseCard}
+<div
+                        className={`${styles.releaseGrid} ${styles[`count-${Math.min(selectedItems.length, 3)}`]}`}
                       >
-                        <img
-                          src={imageUrl(item.poster ?? null, "w185")}
-                          alt=""
-                          loading="lazy"
-                          className={styles.releasePoster}
-                        />
+                        {selectedItems.map((item) => (
+                          <div
+                            key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
+                            className={styles.releaseCard}
+                          >
+                            <img
+                              src={imageUrl(item.poster ?? null, "w185")}
+                              alt={`${item.title} poster`}
+                              loading="lazy"
+                              className={styles.releasePoster}
+                            />
 
-                        <div className={styles.releaseInfo}>
-                          <h4>{item.title}</h4>
+                            <div className={styles.releaseInfo}>
+                              <h4>{item.title}</h4>
 
-                          <span>
-                            {item.type === "movie"
-                              ? "Movie"
-                              : `Season ${item.season}
-                               Episode ${item.episode}`}
-                          </span>
+                              <span>
+                                {item.type === "movie"
+                                  ? "Movie"
+                                  : `Season ${item.season}
+                                   Episode ${item.episode}`}
+                              </span>
 
-                          {item.episodeTitle && <p>{item.episodeTitle}</p>}
-                        </div>
+                              {item.episodeTitle && <p>{item.episodeTitle}</p>}
+                            </div>
 
-                        <Link
-                          className={styles.openBtn}
-                          to={
-                            item.type === "movie"
-                              ? `/movie/${item.id}`
-                              : `/tv/${item.id}?season=${item.season}&episode=${item.episode}`
-                          }
-                        >
-                          Open
-                        </Link>
+                            <Link
+                              className={styles.openBtn}
+                              to={
+                                item.type === "movie"
+                                  ? `/movie/${item.id}`
+                                  : `/tv/${item.id}?season=${item.season}&episode=${item.episode}`
+                              }
+                            >
+                              Open
+                            </Link>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
                 )}
               </>
             ) : (
@@ -1039,9 +1155,13 @@ export default function WatchLater() {
           </>
         )}
 
-        {!loadingCalendar && (items.length > 0 || epItems.length > 0) && (
+        {(items.length > 0 || epItems.length > 0) && (
           <div className={styles.upcomingBanner}>
-            {upcomingCalendarCount > 0 ? (
+            {loadingCalendar && calendarItems.length === 0 ? (
+              <span className={styles.upcomingToggleLabel}>
+                Loading releases…
+              </span>
+            ) : upcomingCalendarCount > 0 ? (
               <button
                 className={styles.upcomingToggle}
                 onClick={() => setShowUpcoming((v) => !v)}
@@ -1062,7 +1182,7 @@ export default function WatchLater() {
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span className={styles.upcomingToggleLabel}>
-                  {upcomingCalendarCount} upcoming
+                  {upcomingCalendarCount} upcoming{loadingCalendar ? " ···" : ""}
                 </span>
                 <span className={styles.upcomingToggleArrow}>
                   {showUpcoming ? "\u25B2" : "\u25BC"}
@@ -1099,6 +1219,7 @@ export default function WatchLater() {
 
         {showUpcoming &&
           loadingCalendar &&
+          calendarItems.length === 0 &&
           (items.length > 0 || epItems.length > 0) && (
             <div className={styles.upcomingList}>
               <div
@@ -1124,7 +1245,7 @@ export default function WatchLater() {
             </div>
           )}
 
-        {showUpcoming && !loadingCalendar && calendarItems.length > 0 && (
+        {showUpcoming && calendarItems.length > 0 && (
           <div className={styles.upcomingList}>
             {paginatedGroups.map((group) => (
               <div key={group.date} className={styles.upcomingDateGroup}>

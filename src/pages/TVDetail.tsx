@@ -41,7 +41,10 @@ const EpisodeDot = memo(function EpisodeDot({ ep, name, current, done, onClick }
 });
 
 export default function TVDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { id: rawId } = useParams<{ id: string }>();
+  // TMDB ids are numeric - reject anything else up front so a crafted URL
+  // can never reach API paths, storage keys, or the embed iframe src.
+  const id = rawId && /^\d+$/.test(rawId) ? rawId : undefined;
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const urlSeason = searchParams.get('season');
@@ -113,7 +116,10 @@ export default function TVDetail() {
     setEpisodes([]);
     setEpImdbId(null);
     setEpImdbRating(null);
-    getTVDetail(id, getSignal())
+    // One signal for every fetch in this run: calling getSignal() twice
+    // would abort the first controller, so capture it once.
+    const signal = getSignal();
+    getTVDetail(id, signal)
       .then((data) => {
         const showData = data as TMDBSeries;
         setShow(showData);
@@ -122,7 +128,7 @@ export default function TVDetail() {
         // /tv/{id} does not include imdb_id; it lives in external_ids.
         setImdbId(showData.imdb_id || null);
         if (!showData.imdb_id) {
-          getTVExternalIds(id, getSignal())
+          getTVExternalIds(id, signal)
             .then((ext) => {
               setImdbId(((ext as { imdb_id?: string })?.imdb_id) || null);
             })
@@ -314,6 +320,8 @@ export default function TVDetail() {
                 added++;
               }
             }
+            // Best-effort notification prefetch: a failed season must not
+            // break the page or block the remaining seasons.
           } catch {}
         }
       }
@@ -338,6 +346,7 @@ export default function TVDetail() {
               addNotification(id, show.name, seasonNum, epwl.episode, ep.name || `Episode ${epwl.episode}`, 'new_episode', ep.air_date);
               added++;
             }
+            // Best-effort, same as above: skip the season on failure.
           } catch {}
         }
       }
@@ -396,6 +405,7 @@ export default function TVDetail() {
           const ext = (await getEpisodeExternalIds(show.id, season, ep.episode_number)) as { imdb_id?: string };
           if (cancelled) return;
           if (ext?.imdb_id) rating = await getImdbRating(ext.imdb_id, 'episode', undefined, season, ep.episode_number);
+          // Best-effort rating enrichment: leave the badge empty on failure.
         } catch {}
         if (cancelled) return;
         setEpImdbRatings((prev) => ({ ...prev, [ep.episode_number]: rating }));

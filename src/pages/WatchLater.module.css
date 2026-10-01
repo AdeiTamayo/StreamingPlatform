@@ -369,8 +369,6 @@
   font-weight: 700;
 
   letter-spacing: 0.06em;
-
-  animation: fadeUp 0.3s ease backwards;
 }
 
 .calCell {
@@ -395,8 +393,6 @@
   background: rgba(255, 255, 255, 0.025);
 
   cursor: pointer;
-
-  animation: fadeUp 0.3s ease backwards;
 
   transition:
     background 0.2s,
@@ -640,17 +636,32 @@
 }
 
 .emptyDay {
-  padding: 1.25rem;
+  padding: 1.25rem 0.5rem;
 
   text-align: center;
 
   color: var(--text-dim);
 
   font-size: 0.85rem;
+}
 
-  border: 1px dashed rgba(167, 189, 219, 0.2);
+@media (prefers-reduced-motion: reduce) {
+  .calCell,
+  .calWeekday,
+  .calendarCard,
+  .dayPanel,
+  .posterThumb,
+  .releaseCard,
+  .releasePoster {
+    animation: none;
 
-  border-radius: 12px;
+    transition: none;
+  }
+
+  .calCell:hover,
+  .releaseCard:hover {
+    transform: none;
+  }
 }
 
 /* ── Release cards (Netflix / Plex style) ── */
@@ -857,6 +868,45 @@
 
   transform: translateY(-1px);
 }
+
+/* ── Calendar error & retry ── */
+
+.calendarError {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 12px;
+  color: #ff8888;
+  font-size: 0.85rem;
+}
+
+.retryBtn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.retryBtn:hover:not(:disabled) {
+  background: rgba(125, 211, 252, 0.2);
+  border-color: rgba(125, 211, 252, 0.5);
+}
+
+.retryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Pagination ── */
 
 .upcomingPagination {
