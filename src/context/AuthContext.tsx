@@ -5,7 +5,7 @@ import { authService } from '../services/auth/authService';
 import { dataMigration } from '../utils/dataMigration';
 import { setCurrentUserId } from '../api/storage';
 import { logError } from '../utils/logger';
-import { AuthContext, type AuthState } from './authContext';
+import { AuthContext, type AuthState } from './auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({

@@ -49,6 +49,17 @@ export function enqueueWrite(table: string, method: QueuedOperation['method'], d
 // succeed - drop them immediately instead of burning retry attempts.
 const DROPPED_TABLES = new Set(['progress', 'settings', 'notifications']);
 
+// Minimal contract of the Supabase filter-builder chains used below. The
+// table name is dynamic (a queued string), so the call site is asserted
+// once at the boundary - everything downstream of that stays typed instead
+// of `any`.
+interface FilterChain extends Promise<{ data: unknown; error: { code?: string } | null }> {
+  eq(column: string, value: unknown): FilterChain;
+  is(column: string, value: unknown): FilterChain;
+  ilike(column: string, value: unknown): FilterChain;
+  in(column: string, value: unknown[]): FilterChain;
+}
+
 async function processOperation(op: QueuedOperation): Promise<boolean> {
   try {
     if (DROPPED_TABLES.has(op.table)) return true;
@@ -62,7 +73,7 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
       case 'update': {
         const { id, userId, ...rest } = op.data as Record<string, unknown>;
         if (id == null && userId == null) return false;
-        let query: any = requireSupabase().from(op.table as never).update(rest as never);
+        let query = requireSupabase().from(op.table as never).update(rest as never) as unknown as FilterChain;
         if (id != null) {
           query = query.eq('id', id as string);
         } else if (userId != null) {
@@ -75,7 +86,7 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
       case 'delete': {
         const d = op.data as Record<string, unknown>;
         if (d.id == null && d.userId == null) return false;
-        let query: any = requireSupabase().from(op.table as never).delete();
+        let query = requireSupabase().from(op.table as never).delete() as unknown as FilterChain;
         if (d.id != null) {
           query = query.eq('id', d.id as string);
         } else {
@@ -172,7 +183,7 @@ async function runSyncPass(): Promise<void> {
       if (next > MAX_OP_ATTEMPTS) {
         // Permanently dropping - log it so local/remote divergence is
         // visible instead of silent.
-        logError('offlineQueue.drop', { table: op.table, method: op.method, attempts: next } as unknown as Error);
+        logError('offlineQueue.drop', { table: op.table, method: op.method, attempts: next });
         resolved.add(op.id);
       } else {
         attempts.set(op.id, next);

@@ -24,3 +24,14 @@ export function requireSupabase() {
   }
   return supabase;
 }
+
+// Postgres unique-violation (duplicate row). Repositories use it to tell
+// "already exists" apart from real failures without resorting to `any`.
+export function isUniqueViolation(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    (err as { code?: unknown }).code === '23505'
+  );
+}

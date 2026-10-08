@@ -1,4 +1,4 @@
-import { requireSupabase } from '../lib/supabase';
+import { requireSupabase, isUniqueViolation } from '../lib/supabase';
 import { withRetry } from '../utils/retry';
 import { enqueueWrite } from '../utils/offlineQueue';
 import type { WatchedRow, WatchedInsert } from '../types/database';
@@ -7,26 +7,26 @@ import type { MediaType } from '../types';
 export const watchedRepository = {
   async mark(data: WatchedInsert): Promise<WatchedRow | null> {
     try {
-      const { data: result, error }: any = await withRetry(async () =>
-        requireSupabase().from('watched').insert(data as any).select().single(),
+      const { data: result, error } = await withRetry(async () =>
+        requireSupabase().from('watched').insert(data).select().single(),
       );
       if (error) throw error;
-      return result as WatchedRow | null;
-    } catch (err: any) {
-      if (err?.code === '23505') return null;
-      enqueueWrite('watched', 'insert', data as any);
+      return result;
+    } catch (err: unknown) {
+      if (isUniqueViolation(err)) return null;
+      enqueueWrite('watched', 'insert', data);
       return null;
     }
   },
 
   async markBatch(items: WatchedInsert[]): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () =>
-        requireSupabase().from('watched').insert(items as any),
+      const { error } = await withRetry(async () =>
+        requireSupabase().from('watched').insert(items),
       );
       if (error) throw error;
-    } catch (err: any) {
-      if (err?.code === '23505') {
+    } catch (err: unknown) {
+      if (isUniqueViolation(err)) {
         // Some (or all) rows already exist - fall back to per-item writes so
         // the non-conflicting rows are still inserted.
         for (const item of items) {
@@ -35,26 +35,47 @@ export const watchedRepository = {
         return;
       }
       for (const item of items) {
-        enqueueWrite('watched', 'insert', item as any);
+        enqueueWrite('watched', 'insert', item);
       }
     }
   },
 
   async unmark(userId: string, mediaType: MediaType, tmdbId: number, season?: number | null, episode?: number | null): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () => {
+      const { error } = await withRetry(async () => {
         // Build a fresh query per attempt - builders are single-use thenables.
-        let query: any = requireSupabase().from('watched')
+        // The conditional filters change the builder's generic, so each
+        // branch awaits its own fully-typed chain instead of reassigning.
+        if (mediaType === 'tv' && season != null && episode != null) {
+          return requireSupabase().from('watched')
+            .delete()
+            .eq('user_id', userId)
+            .eq('media_type', mediaType)
+            .eq('tmdb_id', tmdbId)
+            .eq('season', season)
+            .eq('episode', episode);
+        }
+        if (mediaType === 'tv' && season != null) {
+          return requireSupabase().from('watched')
+            .delete()
+            .eq('user_id', userId)
+            .eq('media_type', mediaType)
+            .eq('tmdb_id', tmdbId)
+            .eq('season', season);
+        }
+        if (mediaType === 'tv' && episode != null) {
+          return requireSupabase().from('watched')
+            .delete()
+            .eq('user_id', userId)
+            .eq('media_type', mediaType)
+            .eq('tmdb_id', tmdbId)
+            .eq('episode', episode);
+        }
+        return requireSupabase().from('watched')
           .delete()
           .eq('user_id', userId)
           .eq('media_type', mediaType)
           .eq('tmdb_id', tmdbId);
-
-        if (mediaType === 'tv') {
-          if (season != null) query = query.eq('season', season);
-          if (episode != null) query = query.eq('episode', episode);
-        }
-        return query;
       });
       if (error) throw error;
     } catch {
@@ -66,7 +87,7 @@ export const watchedRepository = {
   // the per-episode rows of the show.
   async unmarkSeries(userId: string, tmdbId: number): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () =>
+      const { error } = await withRetry(async () =>
         requireSupabase().from('watched')
           .delete()
           .eq('user_id', userId)
@@ -83,14 +104,14 @@ export const watchedRepository = {
 
   async getAll(userId: string): Promise<WatchedRow[]> {
     try {
-      const { data, error }: any = await withRetry(async () =>
+      const { data, error } = await withRetry(async () =>
         requireSupabase().from('watched')
           .select('*')
           .eq('user_id', userId)
           .order('watched_at', { ascending: false }),
       );
       if (error) throw error;
-      return (data ?? []) as WatchedRow[];
+      return data ?? [];
     } catch {
       return [];
     }
@@ -98,7 +119,7 @@ export const watchedRepository = {
 
   async clearShowHistory(userId: string, tmdbId: number): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () =>
+      const { error } = await withRetry(async () =>
         requireSupabase().from('watched')
           .delete()
           .eq('user_id', userId)
@@ -113,7 +134,7 @@ export const watchedRepository = {
 
   async clearAllMovies(userId: string): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () =>
+      const { error } = await withRetry(async () =>
         requireSupabase().from('watched')
           .delete()
           .eq('user_id', userId)

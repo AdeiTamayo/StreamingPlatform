@@ -8,12 +8,12 @@ const MAX_HISTORY = 15;
 export const searchHistoryRepository = {
   async add(data: SearchHistoryInsert): Promise<void> {
     try {
-      const { error }: any = await withRetry(async () =>
-        requireSupabase().from('search_history').insert(data as any),
+      const { error } = await withRetry(async () =>
+        requireSupabase().from('search_history').insert(data),
       );
       if (error) throw error;
     } catch {
-      enqueueWrite('search_history', 'insert', data as any);
+      enqueueWrite('search_history', 'insert', data);
     }
     await this.prune(data.user_id);
   },
@@ -23,7 +23,7 @@ export const searchHistoryRepository = {
   async remove(userId: string, query: string): Promise<void> {
     try {
       const escaped = query.replace(/[\\%_]/g, (m) => `\\${m}`);
-      const { error }: any = await withRetry(async () =>
+      const { error } = await withRetry(async () =>
         requireSupabase().from('search_history')
           .delete()
           .eq('user_id', userId)
@@ -37,15 +37,15 @@ export const searchHistoryRepository = {
 
   async getAll(userId: string): Promise<SearchHistoryRow[]> {
     try {
-      const { data, error }: any = await withRetry(async () =>
-requireSupabase().from('search_history')
+      const { data, error } = await withRetry(async () =>
+        requireSupabase().from('search_history')
           .select('*')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(MAX_HISTORY),
       );
       if (error) throw error;
-      return (data ?? []) as SearchHistoryRow[];
+      return data ?? [];
     } catch {
       return [];
     }
@@ -53,15 +53,15 @@ requireSupabase().from('search_history')
 
   async prune(userId: string): Promise<void> {
     try {
-      const { data, error: selectError }: any = await withRetry(async () =>
-requireSupabase().from('search_history')
+      const { data, error: selectError } = await withRetry(async () =>
+        requireSupabase().from('search_history')
           .select('id, created_at')
           .eq('user_id', userId)
           .order('created_at', { ascending: false }),
       );
       if (selectError || !data) return;
 
-      const rows = data as { id: string; created_at: string }[];
+      const rows = data;
       if (rows.length > MAX_HISTORY) {
         const toDelete = rows.slice(MAX_HISTORY).map((r) => r.id);
         if (toDelete.length > 0) {
