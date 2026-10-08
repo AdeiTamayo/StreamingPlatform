@@ -1,8 +1,9 @@
 import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import TVDetail from '../pages/TVDetail';
 import MovieDetail from '../pages/MovieDetail';
+import { saveProgress, getProgress } from '../api/storage';
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({
@@ -132,6 +133,75 @@ describe('detail pages render', () => {
       await Promise.resolve();
     });
     expect(consoleErrorCaptured.filter((m) => m.includes('Objects are not valid as a React child'))).toHaveLength(0);
+  });
+
+  it('TVDetail player controls live in one icon bar below the video', async () => {
+    render(
+      <MemoryRouter initialEntries={['/tv/1399']}>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText(/Winter Is Coming/)).toBeInTheDocument(), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('link', { name: /E1\. Winter Is Coming/ }));
+    // Centered Prev / label / Next menu survives below the player.
+    await waitFor(() => expect(screen.getByText('S1 E1')).toBeInTheDocument(), { timeout: 5000 });
+    // Back to episodes is an icon link now, not text.
+    expect(screen.getByRole('link', { name: 'Back to episodes' })).toBeInTheDocument();
+    expect(screen.queryByText('Back to episodes')).not.toBeInTheDocument();
+    // The old text buttons and the ✓ tick below the video are gone...
+    expect(screen.queryByTitle('Mark as watched')).not.toBeInTheDocument();
+    expect(screen.queryByText('Season:')).not.toBeInTheDocument();
+    // ...replaced by episode-list-style icon buttons.
+    expect(screen.getByTitle('Mark episode as watched')).toBeInTheDocument();
+    expect(screen.getByTitle('Save episode to Watch Later')).toBeInTheDocument();
+    // Episode IMDb badge sits beside the Watch Now heading, not in the bar.
+    const watchHeader = screen.getByText('Watch Now').parentElement;
+    expect(watchHeader?.textContent).toMatch(/IMDb/);
+    // Series header actions are icon buttons too (no text pills left).
+    expect(screen.getByTitle('Save series to Watch Later')).toBeInTheDocument();
+    expect(screen.getByTitle('Mark series as watched')).toBeInTheDocument();
+    expect(screen.queryByText('Saved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Watch Later')).not.toBeInTheDocument();
+  });
+
+  it('MovieDetail player actions are icon buttons below the video', async () => {
+    render(
+      <MemoryRouter initialEntries={['/movie/550']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('Fight Club')).toBeInTheDocument(), { timeout: 5000 });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTitle('Mark as watched')).toBeInTheDocument();
+    expect(screen.getByTitle('Save to Watch Later')).toBeInTheDocument();
+    expect(screen.queryByText('Mark as watched')).not.toBeInTheDocument();
+    expect(screen.queryByText('Watch Later')).not.toBeInTheDocument();
+  });
+
+  it('TVDetail episode restart button clears the saved position', async () => {
+    saveProgress('tv', 1399, 120, 1, 1, { title: 'Game of Thrones' }, 3600);
+    render(
+      <MemoryRouter initialEntries={['/tv/1399']}>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText(/Winter Is Coming/)).toBeInTheDocument(), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('link', { name: /E1\. Winter Is Coming/ }));
+    const restart = await screen.findByTitle('Restart episode from the beginning', {}, { timeout: 5000 });
+    expect(restart).toBeInTheDocument();
+    fireEvent.click(restart);
+    await waitFor(() => expect(getProgress('tv', 1399, 1, 1)).toBeNull());
+    // The button stays visible - restart always restarts, even with no
+    // saved position.
+    expect(screen.getByTitle('Restart episode from the beginning')).toBeInTheDocument();
   });
 
   it('MovieDetail rejects a non-numeric id without fetching', async () => {

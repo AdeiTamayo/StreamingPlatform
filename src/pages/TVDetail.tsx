@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag, saveProgress, getProgress, clearProgress } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -72,6 +72,10 @@ export default function TVDetail() {
   const [epImdbRatings, setEpImdbRatings] = useState<Record<number, ImdbRating | null>>({});
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [startAt, setStartAt] = useState<number | null>(null);
+  // Bumped on every Restart click so the player remounts from 0:00 even
+  // when there was no saved position (key would otherwise be unchanged).
+  const [restartTick, setRestartTick] = useState(0);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
@@ -503,12 +507,15 @@ export default function TVDetail() {
     if (!show || !id || watchedRef.current || autoWatchedRef.current === episodeKey) return;
     autoWatchedRef.current = episodeKey;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
+    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
+    setStartAt(null);
   }
 
   function handleProgress(currentTime: number, duration: number) {
     if (watchedRef.current || !show || !id) return;
+    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path }, duration || undefined);
 
     // Runtime estimate: real duration when the embed reports one, else TMDB
     // metadata for the current episode/series.
@@ -535,10 +542,12 @@ export default function TVDetail() {
     if (!show || !id) return;
     if (watched) {
       markUnwatched('tv', id, season, episode);
+      clearProgress('tv', id, season, episode);
       setWatched(false);
       toast?.('Removed from watched');
     } else {
       markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
+      clearProgress('tv', id, season, episode);
       setWatched(true);
       toast?.('Marked as watched');
     }
@@ -601,6 +610,13 @@ export default function TVDetail() {
     }
   }
 
+  // Resume position is per episode: reload it whenever the episode
+  // changes (Prev/Next, dropdowns, dots, deep links, shortcuts).
+  useEffect(() => {
+    if (!id) { setStartAt(null); return; }
+    setStartAt(getProgress('tv', id, season, episode)?.currentTime || null);
+  }, [id, season, episode]);
+
   function goPrev() {
     if (episode > 1) {
       setEpisode(episode - 1);
@@ -614,8 +630,10 @@ export default function TVDetail() {
   function markCurrentWatched() {
     if (watchedRef.current || !show || !id) return;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
+    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
+    setStartAt(null);
   }
 
   function goNext() {
@@ -648,7 +666,7 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
+  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource, startAt ?? undefined);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const ended = show.status === 'Ended';
@@ -684,14 +702,39 @@ export default function TVDetail() {
               ) : null}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
-              <button className={`badge-btn ${inWL ? 'in-wl' : ''}`} onClick={() => {
-                if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
-                else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
-              }} title={inWL ? 'Remove from Watch Later' : 'Add to Watch Later'}>{inWL ? 'Saved' : 'Watch Later'}</button>
-              <button className={`badge-btn ${seriesWatched ? 'in-watched' : ''}`} onClick={toggleSeriesWatched} title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}>{seriesWatched ? '\u2713 Watched' : 'Watched'}</button>
+              <button
+                type="button"
+                className={`${styles.epActionBtn} ${inWL ? styles.activeWatchLater : ''}`}
+                onClick={() => {
+                  if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
+                  else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
+                }}
+                title={inWL ? 'Remove series from Watch Later' : 'Save series to Watch Later'}
+                aria-label={inWL ? 'Remove series from Watch Later' : 'Save series to Watch Later'}
+                aria-pressed={inWL}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
+              </button>
+              <button
+                type="button"
+                className={`${styles.epActionBtn} ${seriesWatched ? styles.activeWatched : ''}`}
+                onClick={toggleSeriesWatched}
+                title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}
+                aria-label={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}
+                aria-pressed={seriesWatched}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
+              </button>
               {trailerKey && (
-                <button className="badge-btn" onClick={() => { setShowTrailer((s: boolean) => !s); }} title={showTrailer ? 'Hide trailer' : 'Play trailer'}>
-                  {showTrailer ? 'Hide Trailer' : 'Trailer'}
+                <button
+                  type="button"
+                  className={styles.epActionBtn}
+                  onClick={() => { setShowTrailer((s: boolean) => !s); }}
+                  title={showTrailer ? 'Hide trailer' : 'Play trailer'}
+                  aria-label={showTrailer ? 'Hide trailer' : 'Play trailer'}
+                  aria-pressed={showTrailer}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg>
                 </button>
               )}
             </div>
@@ -713,35 +756,6 @@ export default function TVDetail() {
         <section className="section" aria-labelledby="watch-heading-tv">
           <div className={styles.watchHeader}>
             <h2 id="watch-heading-tv" className="section-title">Watch Now</h2>
-            <Link className="watch-toggle" to={`/tv/${safeId}`} onClick={(e) => { if (isPlainLeftClick(e)) setPlayerOpen(false); }} style={{ textDecoration: 'none', display: 'inline-block' }}>
-              Back to episodes
-            </Link>
-          </div>
-          <div className="episode-selector">
-            <label>
-              Season:
-              <SeasonDropdown
-                seasons={seasons}
-                value={season}
-                onSelect={(s: number) => { setSeason(s); setEpisode(lastWatchedInSeason(safeId, s)); }}
-              />
-            </label>
-            <label>
-              <EpisodeDropdown
-                showId={safeId}
-                season={season}
-                episode={episode}
-                episodes={episodes}
-                onSelect={(ep: number) => { setEpisode(ep); }}
-              />
-            </label>
-            <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
-              Watched
-            </button>
-            <button className={`watch-toggle ${inEpWL ? 'in-wl' : ''}`} onClick={() => {
-              if (inEpWL) { removeEpisodeWatchLater(safeId, season, episode); setInEpWL(false); toast?.('Removed from Watch Later'); }
-              else { addEpisodeWatchLater(safeId, season, episode, show.name); setInEpWL(true); toast?.('Added to Watch Later'); }
-            }}>{inEpWL ? 'Saved' : 'Watch Later'}</button>
             {epImdbId ? (
               <a
                 className="badge rating"
@@ -769,29 +783,86 @@ export default function TVDetail() {
           ) : (
             <div ref={playerWrapRef} className="player-fs-wrap">
               <Player
-                key={`${season}-${episode}`}
+                key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}-${restartTick}`}
                 src={embedUrl}
                 title={`${show.name} S${season}E${episode}`}
                 onProgress={handleProgress}
                 onEnded={handleEnded}
                 runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
+                startAt={startAt ?? undefined}
               />
             </div>
           )}
           <div className={styles.epNav}>
+            <div className={styles.epNavStart}>
+              <Link
+                className={styles.epActionBtn}
+                to={`/tv/${safeId}`}
+                onClick={(e) => { if (isPlainLeftClick(e)) setPlayerOpen(false); }}
+                title="Back to episodes"
+                aria-label="Back to episodes"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="17" x2="20" y2="17" /></svg>
+              </Link>
+              <SeasonDropdown
+                seasons={seasons}
+                value={season}
+                onSelect={(s: number) => { setSeason(s); setEpisode(lastWatchedInSeason(safeId, s)); }}
+              />
+              <EpisodeDropdown
+                showId={safeId}
+                season={season}
+                episode={episode}
+                episodes={episodes}
+                onSelect={(ep: number) => { setEpisode(ep); }}
+              />
+              <button
+                type="button"
+                className={`${styles.epActionBtn} ${watched ? styles.activeWatched : ''}`}
+                onClick={toggleWatched}
+                title={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
+                aria-label={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
+                aria-pressed={watched}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
+              </button>
+              <button
+                type="button"
+                className={`${styles.epActionBtn} ${inEpWL ? styles.activeWatchLater : ''}`}
+                onClick={() => {
+                  if (inEpWL) { removeEpisodeWatchLater(safeId, season, episode); setInEpWL(false); toast?.('Removed from Watch Later'); }
+                  else { addEpisodeWatchLater(safeId, season, episode, show.name); setInEpWL(true); toast?.('Added to Watch Later'); }
+                }}
+                title={inEpWL ? 'Remove episode from Watch Later' : 'Save episode to Watch Later'}
+                aria-label={inEpWL ? 'Remove episode from Watch Later' : 'Save episode to Watch Later'}
+                aria-pressed={inEpWL}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
+              </button>
+              <button
+                type="button"
+                className={styles.epActionBtn}
+                onClick={() => { setStartAt(null); clearProgress('tv', safeId, season, episode); setRestartTick((t) => t + 1); }}
+                title="Restart episode from the beginning"
+                aria-label="Restart episode from the beginning"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+              </button>
+            </div>
             <div className={styles.epNavCenter}>
               <button className={styles.epNavBtn} disabled={!hasPrev} onClick={goPrev}>&#9664; Prev</button>
               <span className={styles.epNavLabel}>S{season} E{episode}</span>
               <button className={styles.epNavBtn} disabled={!hasNext} onClick={goNext}>Next &#9654;</button>
-              <button className={`${styles.epNavWatch} ${watched ? styles.watched : ''}`} onClick={toggleWatched} title={watched ? 'Unmark watched' : 'Mark as watched'}>&#10003;</button>
             </div>
-            <FilterDropdown
-              value={videoSource}
-              options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
-              placeholder="Source"
-              onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
-              className="source-dropdown"
-            />
+            <div className={styles.epNavEnd}>
+              <FilterDropdown
+                value={videoSource}
+                options={SOURCE_KEYS.map((key) => ({ value: key, label: getSourceLabel(key) }))}
+                placeholder="Source"
+                onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
+                className="source-dropdown"
+              />
+            </div>
           </div>
           <div className={`${styles.seasonProgress} ${styles.hidden}`}>
             <div className={styles.spBar} role="list" aria-label="Episode progress">

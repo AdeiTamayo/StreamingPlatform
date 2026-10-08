@@ -1,24 +1,55 @@
-/* Episode nav */
+/* Episode nav: controls left, Prev/Next centered, source right */
 .ep-nav {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ep-nav-start {
+  flex: 1 1 0;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.75rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.ep-nav-start a.ep-action-btn {
+  text-decoration: none;
+}
+
+/* Every control in the player bar shares one 42px height */
+.ep-nav-start .ep-action-btn {
+  width: 42px;
+  height: 42px;
+}
+
+.ep-nav-start .ep-action-btn svg {
+  width: 16px;
+  height: 16px;
 }
 
 .ep-nav-center {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex: 0 0 auto;
 }
 
-.ep-nav :global(.source-dropdown) {
-  margin-left: auto;
+.ep-nav-end {
+  flex: 1 1 0;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .ep-nav-btn {
   padding: 0.5rem 1rem;
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   background: var(--bg-card);
   color: var(--text);
@@ -43,33 +74,13 @@
   font-weight: 500;
 }
 
-.ep-nav-watch {
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-  padding: 0;
-}
-
-.ep-nav-watch:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .watched {
   background: var(--green);
   border-color: var(--green);
   color: #fff;
 }
 
-/* Watch Now header (title left, Back to episodes right) */
+/* Watch Now header */
 .watch-header {
   display: flex;
   align-items: center;

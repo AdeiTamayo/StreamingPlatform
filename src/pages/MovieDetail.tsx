@@ -28,6 +28,9 @@ export default function MovieDetail() {
   const [error, setError] = useState(false);
   const [watched, setWatched] = useState(false);
   const [startAt, setStartAt] = useState<number | null>(null);
+  // Bumped on every Restart click so the player remounts from 0:00 even
+  // when there was no saved position (key would otherwise be unchanged).
+  const [restartTick, setRestartTick] = useState(0);
   const [inWL, setInWL] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
@@ -281,22 +284,6 @@ export default function MovieDetail() {
 
       <section className="section" aria-labelledby="watch-heading">
         <h2 id="watch-heading" className="section-title">Watch Now</h2>
-        <div className="detail-actions">
-          <button className={`watch-toggle ${watched ? 'watched' : ''}`} onClick={toggleWatched}>
-            {watched ? 'Watched' : 'Mark as watched'}
-          </button>
-          <button className={`watch-toggle ${inWL ? 'in-wl' : ''}`} onClick={toggleWatchLater}>{inWL ? 'In Watch Later' : 'Watch Later'}</button>
-          {trailerKey && (
-            <button className="watch-toggle" onClick={() => setShowTrailer((s) => !s)}>
-              {showTrailer ? 'Hide Trailer' : 'Trailer'}
-            </button>
-          )}
-          {startAt && (
-            <button className="watch-toggle restart-btn" onClick={() => { setStartAt(null); clearProgress('movie', safeId); }}>
-              Restart
-            </button>
-          )}
-        </div>
         {showTrailer && trailerKey ? (
           <div className="trailer-wrapper">
             <iframe
@@ -311,8 +298,8 @@ export default function MovieDetail() {
           // startAt restores the last known position when returning from the
           // trailer, instead of restarting the film at 0:00 mid-watch.
           <div ref={playerWrapRef} className="player-fs-wrap">
-            <Player
-              key={startAt !== null ? 'resume' : 'fresh'}
+              <Player
+                key={`${startAt !== null ? 'resume' : 'fresh'}-${restartTick}`}
               src={embedUrl}
               title={movie.title}
               onProgress={handleProgress}
@@ -322,14 +309,59 @@ export default function MovieDetail() {
             />
           </div>
         )}
-        <div className={styles.sourceSelector}>
-          <FilterDropdown
-            value={videoSource}
-            options={SOURCE_KEYS.map((key: string) => ({ value: key, label: getSourceLabel(key) }))}
-            placeholder="Source"
-            onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
-            className="source-dropdown"
-          />
+        <div className={styles.playerBar}>
+          <div className={styles.playerBarStart}>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${watched ? styles.activeWatched : ''}`}
+              onClick={toggleWatched}
+              title={watched ? 'Unmark as watched' : 'Mark as watched'}
+              aria-label={watched ? 'Unmark as watched' : 'Mark as watched'}
+              aria-pressed={watched}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
+            </button>
+            <button
+              type="button"
+              className={`${styles.iconBtn} ${inWL ? styles.activeWatchLater : ''}`}
+              onClick={toggleWatchLater}
+              title={inWL ? 'Remove from Watch Later' : 'Save to Watch Later'}
+              aria-label={inWL ? 'Remove from Watch Later' : 'Save to Watch Later'}
+              aria-pressed={inWL}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
+            </button>
+            {trailerKey && (
+              <button
+                type="button"
+                className={styles.iconBtn}
+                onClick={() => setShowTrailer((s) => !s)}
+                title={showTrailer ? 'Hide trailer' : 'Play trailer'}
+                aria-label={showTrailer ? 'Hide trailer' : 'Play trailer'}
+                aria-pressed={showTrailer}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg>
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.iconBtn}
+              onClick={() => { setStartAt(null); clearProgress('movie', safeId); setRestartTick((t) => t + 1); }}
+              title="Restart from the beginning"
+              aria-label="Restart from the beginning"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+            </button>
+          </div>
+          <div className={styles.playerBarEnd}>
+            <FilterDropdown
+              value={videoSource}
+              options={SOURCE_KEYS.map((key: string) => ({ value: key, label: getSourceLabel(key) }))}
+              placeholder="Source"
+              onSelect={(val: string) => { setVideoSource(val); persistVideoSource(val); }}
+              className="source-dropdown"
+            />
+          </div>
         </div>
       </section>
 
