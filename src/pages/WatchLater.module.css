@@ -63,6 +63,125 @@
   border-color: rgba(125, 211, 252, 0.35);
 }
 
+.wlClearBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Bulk selection bar: deliberately chrome-free. The selected-card checkboxes
+   already carry the state, so the bar is only a count plus its actions - a
+   bordered box here just competes with the cards. */
+.selectBar {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0 0.15rem;
+}
+
+.selectCount {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-right: auto;
+  padding-left: 0.15rem;
+}
+
+.selectAction {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 0.4rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+.selectAction:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.selectAction:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* The one filled control in the bar, so the destructive action is the only
+   thing that reads as a button. */
+.selectRemove {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(239, 68, 68, 0.82);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+}
+
+.selectRemove:hover:not(:disabled) {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.selectRemove:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Checkbox sits top-right, taking over the spot the per-card remove button
+   vacates in selection mode. */
+.wlSelectBox {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 5;
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(8, 12, 22, 0.6);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.wlSelectBox:hover {
+  border-color: var(--accent);
+  transform: scale(1.1);
+}
+
+.wlSelectBox:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.wlSelectBox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.wlSelectBox:checked::after {
+  content: "";
+  width: 0.36rem;
+  height: 0.66rem;
+  border: solid #0b1120;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
 .epWlCard {
   display: flex;
   flex-direction: column;

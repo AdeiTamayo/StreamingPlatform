@@ -254,6 +254,11 @@ export default function WatchLater() {
   const [sortBy, setSortBy] = useState("added");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterType, setFilterType] = useState("all");
+  // Bulk selection (list view): keys are `type-id`. Selection survives
+  // paging and filtering; removal is a two-step inline confirm.
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set());
+  const [confirmingBulkRemove, setConfirmingBulkRemove] = useState(false);
   const [view, setView] = useState<"list" | "calendar">("list");
   // Expanded by default; the toggle persists locally.
   const [showUpcoming, setShowUpcoming] = useState(() => getUpcomingOpen());
@@ -736,6 +741,131 @@ export default function WatchLater() {
     toast?.("Removed from Watch Later");
   }
 
+  function wlKey(type: string, id: string | number) {
+    return `${type}-${String(id)}`;
+  }
+
+  // Episode entries live in their own Watch Later store, so they get their
+  // own key space ("episode-<showId>-S<season>E<episode>") that can never
+  // collide with a movie/tv key.
+  function epKey(
+    showId: string | number,
+    season: number,
+    episode: number,
+  ) {
+    return `episode-${String(showId)}-S${season}E${episode}`;
+  }
+
+  function parseEpKey(key: string) {
+    const m = /^episode-(.+)-S(\d+)E(\d+)$/.exec(key);
+    if (!m) return null;
+    return { showId: m[1], season: Number(m[2]), episode: Number(m[3]) };
+  }
+
+  function toggleSelectMode() {
+    if (selectMode) {
+      setSelectMode(false);
+      setSelectedKeys(new Set());
+      setConfirmingBulkRemove(false);
+    } else {
+      setSelectMode(true);
+    }
+  }
+
+  // Escape leaves selection mode, same as the Done button. Self-contained so
+  // it doesn't need toggleSelectMode in the deps.
+  useEffect(() => {
+    if (!selectMode) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setSelectMode(false);
+      setSelectedKeys(new Set());
+      setConfirmingBulkRemove(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectMode]);
+
+  function toggleSelected(type: string, id: string | number) {
+    const key = wlKey(type, id);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setConfirmingBulkRemove(false);
+  }
+
+  function toggleSelectedEp(
+    showId: string | number,
+    season: number,
+    episode: number,
+  ) {
+    const key = epKey(showId, season, episode);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setConfirmingBulkRemove(false);
+  }
+
+  function selectPage() {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const item of pageSlice) next.add(wlKey(item.type, item.id));
+      for (const ep of epItems) next.add(epKey(ep.showId, ep.season, ep.episode));
+      return next;
+    });
+  }
+
+  function handleRemoveSelected() {
+    const keys = [...selectedKeys];
+    if (keys.length === 0) return;
+    const removedEpKeys = new Set<string>();
+    for (const key of keys) {
+      const ep = parseEpKey(key);
+      if (ep) {
+        removedEpKeys.add(key);
+        removeEpisodeWatchLater(ep.showId, ep.season, ep.episode);
+        continue;
+      }
+      const sep = key.indexOf("-");
+      const type = key.slice(0, sep) as MediaType;
+      const id = key.slice(sep + 1);
+      removeWatchLater(type, id);
+    }
+    setItems(getWatchLater());
+    if (removedEpKeys.size > 0) setEpItems(getEpisodeWatchLater());
+    const removed = new Set(keys);
+    // Same type mapping as handleRemove: calendar rows use "episode" for TV.
+    setCalendarItems((prev) =>
+      prev.filter((c) => {
+        const k = c.type === "movie" ? `movie-${String(c.id)}` : `tv-${String(c.id)}`;
+        if (removed.has(k)) return false;
+        // Drop the calendar row of a removed episode entry too.
+        if (
+          c.type === "episode" &&
+          c.season != null &&
+          c.episode != null &&
+          removedEpKeys.has(epKey(c.id, c.season, c.episode))
+        ) {
+          return false;
+        }
+        return true;
+      }),
+    );
+    setSelectedKeys(new Set());
+    setConfirmingBulkRemove(false);
+    toast?.(
+      keys.length === 1
+        ? "Removed from Watch Later"
+        : `Removed ${keys.length} titles from Watch Later`,
+    );
+  }
+
   // Single choke point for everything rendered: state is deduped here so
   // a duplicate can never reach the grid, the upcoming list, or the counts.
   const visibleItems = useMemo(() => dedupeCalendarItems(calendarItems), [calendarItems]);
@@ -858,6 +988,11 @@ export default function WatchLater() {
   ]);
 
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
+
+  const pageSlice = useMemo(
+    () => sortedItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
+    [sortedItems, page],
+  );
   const upcomingCalendarCount = displayItems.filter((c) =>
     isUpcomingRelease(c),
   ).length;
@@ -1161,12 +1296,20 @@ export default function WatchLater() {
           <div className="empty-state">
             <h3>Nothing saved yet</h3>
             <p>
-              Add movies, shows, or individual episodes to watch later and
-              they'll show up here.
+              Save movies, shows, or individual episodes to build your
+              personal watchlist and release calendar.
             </p>
-            <Link to="/movies" className="empty-state-action">
-              Start browsing
-            </Link>
+            <div className="empty-state-actions">
+              <Link to="/movies" className="empty-state-action">
+                Browse Movies
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                Explore TV Shows
+              </Link>
+              <Link to="/" className="empty-state-action">
+                Browse Trending
+              </Link>
+            </div>
           </div>
         ) : (
           <>
@@ -1269,15 +1412,96 @@ export default function WatchLater() {
                       Clear filters
                     </button>
                   )}
+                  <button
+                    className={`${styles.wlClearBtn} ${selectMode ? styles.active : ""}`}
+                    onClick={toggleSelectMode}
+                    aria-pressed={selectMode}
+                    title={selectMode ? "Exit selection" : "Select multiple titles"}
+                  >
+                    {selectMode ? "Done" : "Select"}
+                  </button>
                 </div>
+                {selectMode && (
+                  <div className={styles.selectBar} role="toolbar" aria-label="Bulk selection">
+                    <span className={styles.selectCount} role="status">
+                      {selectedKeys.size === 0
+                        ? "No titles selected"
+                        : `${selectedKeys.size} selected`}
+                    </span>
+                    <button
+                      className={styles.selectAction}
+                      onClick={selectPage}
+                      title="Select every title on this page"
+                    >
+                      Select page
+                    </button>
+                    <button
+                      className={styles.selectAction}
+                      onClick={() => {
+                        setSelectedKeys(new Set());
+                        setConfirmingBulkRemove(false);
+                      }}
+                      disabled={selectedKeys.size === 0}
+                      title="Clear the current selection"
+                    >
+                      Clear
+                    </button>
+                    {confirmingBulkRemove ? (
+                      <>
+                        <button
+                          className={styles.selectRemove}
+                          onClick={handleRemoveSelected}
+                          title={`Remove ${selectedKeys.size} selected ${selectedKeys.size === 1 ? "title" : "titles"}`}
+                        >
+                          Confirm remove ({selectedKeys.size})
+                        </button>
+                        <button
+                          className={styles.selectAction}
+                          onClick={() => setConfirmingBulkRemove(false)}
+                          title="Keep the selected titles"
+                        >
+                          Keep
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className={styles.selectRemove}
+                        onClick={() => setConfirmingBulkRemove(true)}
+                        disabled={selectedKeys.size === 0}
+                        title="Remove the selected titles"
+                      >
+                        Remove selected
+                        {selectedKeys.size > 0 ? ` (${selectedKeys.size})` : ""}
+                      </button>
+                    )}
+                  </div>
+                )}
                 <div className="media-grid">
-                  {sortedItems
-                    .slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+                  {pageSlice
                     .map((item) => (
                       <div
                         key={`${(item as WatchLaterItem).type}-${(item as WatchLaterItem).id}`}
                         className="media-card"
                       >
+                        {selectMode && (
+                          <input
+                            type="checkbox"
+                            className={styles.wlSelectBox}
+                            checked={selectedKeys.has(
+                              wlKey(
+                                (item as WatchLaterItem).type,
+                                (item as WatchLaterItem).id,
+                              ),
+                            )}
+                            onChange={() =>
+                              toggleSelected(
+                                (item as WatchLaterItem).type,
+                                (item as WatchLaterItem).id,
+                              )
+                            }
+                            aria-label={`Select ${(item as WatchLaterItem).title}`}
+                          />
+                        )}
                         <Link
                           to={`/${(item as WatchLaterItem).type === "tv" ? "tv" : "movie"}/${(item as WatchLaterItem).id}`}
                         >
@@ -1313,18 +1537,20 @@ export default function WatchLater() {
                             )}
                           </div>
                         </Link>
-                        <button
-                          className="wl-remove"
-                          onClick={() =>
-                            handleRemove(
-                              (item as WatchLaterItem).type,
-                              (item as WatchLaterItem).id,
-                            )
-                          }
-                          title="Remove"
-                        >
-                          &times;
-                        </button>
+                        {!selectMode && (
+                          <button
+                            className="wl-remove"
+                            onClick={() =>
+                              handleRemove(
+                                (item as WatchLaterItem).type,
+                                (item as WatchLaterItem).id,
+                              )
+                            }
+                            title="Remove"
+                          >
+                            &times;
+                          </button>
+                        )}
                       </div>
                     ))}
                 </div>
@@ -1346,6 +1572,27 @@ export default function WatchLater() {
                       key={`${(item as EpisodeWatchLaterItem).showId}-S${(item as EpisodeWatchLaterItem).season}E${(item as EpisodeWatchLaterItem).episode}`}
                       className={`media-card ${styles.epWlCard}`}
                     >
+                      {selectMode && (
+                        <input
+                          type="checkbox"
+                          className={styles.wlSelectBox}
+                          checked={selectedKeys.has(
+                            epKey(
+                              (item as EpisodeWatchLaterItem).showId,
+                              (item as EpisodeWatchLaterItem).season,
+                              (item as EpisodeWatchLaterItem).episode,
+                            ),
+                          )}
+                          onChange={() =>
+                            toggleSelectedEp(
+                              (item as EpisodeWatchLaterItem).showId,
+                              (item as EpisodeWatchLaterItem).season,
+                              (item as EpisodeWatchLaterItem).episode,
+                            )
+                          }
+                          aria-label={`Select ${(item as EpisodeWatchLaterItem).showTitle} S${(item as EpisodeWatchLaterItem).season} E${(item as EpisodeWatchLaterItem).episode}`}
+                        />
+                      )}
                       <Link
                         to={`/tv/${(item as EpisodeWatchLaterItem).showId}?season=${(item as EpisodeWatchLaterItem).season}&episode=${(item as EpisodeWatchLaterItem).episode}`}
                       >
@@ -1357,19 +1604,21 @@ export default function WatchLater() {
                           </span>
                         </div>
                       </Link>
-                      <button
-                        className="wl-remove"
-                        onClick={() =>
-                          handleRemoveEp(
-                            (item as EpisodeWatchLaterItem).showId,
-                            (item as EpisodeWatchLaterItem).season,
-                            (item as EpisodeWatchLaterItem).episode,
-                          )
-                        }
-                        title="Remove"
-                      >
-                        &times;
-                      </button>
+                      {!selectMode && (
+                        <button
+                          className="wl-remove"
+                          onClick={() =>
+                            handleRemoveEp(
+                              (item as EpisodeWatchLaterItem).showId,
+                              (item as EpisodeWatchLaterItem).season,
+                              (item as EpisodeWatchLaterItem).episode,
+                            )
+                          }
+                          title="Remove"
+                        >
+                          &times;
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
