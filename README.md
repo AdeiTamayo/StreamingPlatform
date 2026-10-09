@@ -47,6 +47,7 @@ flowchart TD
     E --> J[TMDB API<br>metadata + images]
     E --> K[VidSrc Embed<br>video player]
     E --> O[OMDb API<br>IMDb ratings]
+    E --> V[TVMaze API<br>exact air instants]
     E --> L[storage.ts<br>localStorage adapter]
 
     G --> L
@@ -69,6 +70,7 @@ flowchart TD
         J
         K
         O
+        V
     end
 
     subgraph Storage [Storage]
@@ -87,17 +89,35 @@ flowchart TD
 - **Search** across movies, TV shows, and people
 - **Watch** content via embedded video player with resume playback
 - **IMDb ratings** (OMDb) shown on cards, detail pages, and per episode; falls back to TMDB ratings where unavailable
-- **Continue Watching** tracks progress and shows unfinished content on the home page
+- **Continue Watching** tracks progress and shows unfinished content on the home page, each card with two actions:
+  - **Restart** (↺) clears the saved position and reopens the same episode/movie from 0:00
+  - **Remove** (×) drops it from Continue Watching without touching the watched mark
+- **Decision badges** on detail pages so you can tell what to do next without reading:
+  - Series status — `Ended` or `Ongoing`
+  - New episodes — `N new`, unwatched episodes of the current season that aired in the last 7 days
+  - Season progress — `X/Y watched`
+  - Movies show a `✓ Watched` badge
 - **Auto-detect watched** episodes are marked automatically when you click Next or reach the end
 - **Episode navigation** season/episode dropdowns with keyboard search, prev/next buttons
-- **Keyboard shortcuts** while watching: N = next episode, P = previous episode, W = toggle watched
+- **Keyboard shortcuts** while watching: N = next episode, P = previous episode, W = toggle watched, F = toggle fullscreen
 - **Trailers** YouTube trailers on detail pages when available
 - **Recommendations** "You might also like" section on movie and show detail pages
 - **Background new-episode scan** detects fresh releases for your Watch Later series and marks "series watched" shows with new episodes, showing them in the notification bell (throttled to once/hour)
 - **Request cancellation** in-flight API requests are cancelled on navigation to prevent stale data
 
+### Search
+- Type-ahead suggestions from your recent searches, with per-item removal
+- **No-results recovery** — instead of a dead end, the empty state offers Trending / Movies / TV links plus a labelled, vertical list of your recent searches (current query excluded), each row one click to re-run and removable with `×`
+
 ### Watch Later
 - Save movies, shows, or individual episodes to Watch Later
+- **Sortable, filterable list** — sort by date added, title, or year (each direction), filter to movies or TV, with a Clear filters reset
+- **Bulk selection** — `Select` enters a selection mode with a checkbox on every title *and* individual episode:
+  - `Select page` selects everything visible, `Clear` empties the selection
+  - `Remove selected (N)` turns into an inline `Confirm remove (N)` / `Keep` step — no modal
+  - Per-card `×` buttons hide while selecting so the checkbox isn't competing for the same corner
+  - `Escape` exits selection mode and discards the selection
+- **Upcoming releases** panel, open by default, grouped by broadcast day
 - **Release Calendar** shows upcoming releases from your library:
   - Month grid with poster thumbnails on release days
   - **Heatmap effect** — busier days glow progressively brighter
@@ -105,6 +125,8 @@ flowchart TD
   - **Adaptive posters** — posters scale up when a day has few releases and shrink to fit when it's busy
   - Day panel with modern release cards (poster + title + episode info + Open)
   - Entrance animations, staggered grid cascade, and loading skeletons
+- **Calendar timezone** — releases are bucketed on the day they land on *where you are*, not in UTC; set it in Settings. Episodes with a known exact broadcast instant (via TVMaze) use that instant, so a 00:30 UK premiere shows on the correct date
+- **Duplicate guarantee** — every rendered list (grid, upcoming, calendar, counts) is deduped from a single source, so the same title can't appear twice
 
 ### Accounts & Sync (optional)
 - **Guest mode** — browse, search, and watch everything with no account; personal features (Watch Later, Last Seen, Notifications, Settings) prompt a sign-in
@@ -117,9 +139,12 @@ flowchart TD
 
 ### Polish
 - **Last Seen** view your watch history grouped by series
+- **Actionable empty states** — Watch Later, Last Seen, and Search all explain what the screen is for and link somewhere useful (Browse Movies, Explore TV Shows, Browse Trending) instead of showing a dead end
+- **Unified player controls** — movie and episode players use the same icon bar, with a Restart control that remounts the player from 0:00
+- **Settings** — card-based sections for account, default video source, calendar timezone, storage (clear history / progress / watch later / TMDB cache / offline queue), statistics, backup, and a danger zone
 - **Error boundary** catches render crashes with retry button and error logging
 - **Back to top** floating button appears after scrolling down
-- **Accessibility** ARIA roles, labels, skip-to-content link, keyboard navigation, screen reader announcements
+- **Accessibility** ARIA roles, labels, skip-to-content link, keyboard navigation, screen reader announcements, tooltips on every decision badge
 - **Dark theme** with responsive layout
 - **Loading skeletons** with shimmer animations across grids, history, and the release calendar
 
@@ -129,12 +154,14 @@ flowchart TD
 - [React Router](https://reactrouter.com) for client-side routing
 - [TMDB API](https://developer.themoviedb.org) for metadata, images, and search
 - [OMDb API](https://www.omdbapi.com) for IMDb ratings (cards, detail pages, episodes)
+- [TVMaze API](https://www.tvmaze.com/api) for exact episode air instants (no key required)
 - [VidSrc](https://vidsrc.fyi) for video embeds
 - [Supabase](https://supabase.com) for optional authentication and cloud sync (Postgres + RLS)
 - CSS Modules for scoped styling
 - localStorage for local user data (watched marks, progress, watch later lists)
 - IndexedDB for TMDB API response cache (larger quota than localStorage)
-- [Vitest](https://vitest.dev) for unit tests
+- [Vitest](https://vitest.dev) for unit and component tests
+- [oxlint](https://oxc.rs) for linting
 
 ## Getting Started
 
@@ -194,6 +221,13 @@ Output goes to the `dist/` directory.
 npm run test
 ```
 
+239 tests across 18 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze calls are mocked, so the suite never touches the network.
+
+```bash
+npx tsc --noEmit   # typecheck
+npm run lint       # oxlint
+```
+
 ## Deploying to Vercel
 
 This project is ready for Vercel deployment. The `vercel.json` configures SPA routing (all routes redirect to `index.html`).
@@ -215,6 +249,7 @@ src/
     vidsrc.ts           # Embed URL builders
     storage.ts          # Local-first data adapter (localStorage + Supabase dual writes)
     storageBackup.ts    # Export/import Supabase data as JSON
+    tvmaze.ts           # Exact episode air instants + "is it released yet" checks
     tmdbCache.ts        # IndexedDB cache for TMDB API responses
     tvStatusCache.ts    # Cache for TV airing status
     newEpisodeScan.ts   # Background new-episode detection for Watch Later series
@@ -238,12 +273,12 @@ src/
     Notifications.tsx   # In-app notification bell
     SeasonDropdown.tsx / EpisodeDropdown.tsx / FilterDropdown.tsx / FilterBar.tsx / DatePickerField.tsx / CollectionSkeleton.tsx
   pages/
-    Home.tsx            # Hero carousel + Continue Watching + Trending
-    MovieDetail.tsx     # Movie detail with player, trailer, recommendations
-    TVDetail.tsx        # TV detail with season/episode navigation
+    Home.tsx            # Hero carousel + Continue Watching (restart/remove) + Trending
+    MovieDetail.tsx     # Movie detail with badges, player, trailer, recommendations
+    TVDetail.tsx        # TV detail with status/new-episode/progress badges, season/episode nav
     MediaBrowse.tsx     # Unified browse for movies and TV shows
-    Search.tsx          # Multi-search with pagination
-    WatchLater.tsx      # Saved items + release calendar view
+    Search.tsx          # Multi-search, suggestions, and no-results recovery
+    WatchLater.tsx      # Saved items, bulk selection, upcoming list + release calendar
     LastSeen.tsx        # Watch history grouped by series
     Settings.tsx        # Card-based settings: account, video, storage, backup, stats
     NotFound.tsx        # 404 page
@@ -255,6 +290,10 @@ src/
     useDropdownSearch.ts # Keyboard-driven type-to-search
     useDropdownKeys.ts  # Arrow-key + Enter navigation for dropdowns
     useTVStatus.ts      # TV airing status logic
+  pages/__tests__/   # Watch Later sorting/selection, calendar, Home, Search, empty states
+  test/
+    setup.ts          # jsdom setup + TMDB fetch mock
+    detailPages.test.tsx # Detail page render, player controls, badges, restart
   utils/
     retry.ts            # Exponential backoff retry helper
     offlineQueue.ts     # Queues failed sync writes for later retry
@@ -273,12 +312,16 @@ scripts/
   transfer-localstorage-to-supabase.ts  # One-time data transfer helper
 ```
 
+Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvmaze.test.ts`, `api/omdb.test.ts`, `api/vidsrc.test.ts`, `api/newEpisodeScan.test.ts`); page and component tests live in `__tests__/` folders.
+
 ## Notes
 
 - All data is stored locally in your browser — accounts and a Supabase server are optional
 - Without Supabase configured, the app works exactly as before: no accounts, no server
 - Supabase data is protected by Row Level Security — each user can only read/write their own rows
 - TMDB API responses are cached in IndexedDB for 24 hours (max 100 entries, virtually unlimited space)
+- Playback position isn't always persisted by the embed player, so no resume percentage is advertised on detail pages — the Restart control is the reliable way to start over
+- The `N new` badge uses TMDB's date-only `air_date`, while the calendar uses TVMaze's exact air instant; near midnight they can occasionally disagree
 - The app uses a privacy-conscious setup: noindex tags, no analytics, no tracking
 - Video playback quality and availability depend on the embed source
 - Errors are logged to localStorage under `app_errors` for debugging
