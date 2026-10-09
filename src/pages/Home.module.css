@@ -278,6 +278,30 @@
   border-color: rgba(239, 68, 68, 0.4);
 }
 
+.cw-restart {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 5;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  transition: background 0.18s, color 0.18s;
+}
+
+.cw-restart:hover {
+  background: rgba(125, 211, 252, 0.7);
+  color: #fff;
+  border-color: rgba(125, 211, 252, 0.4);
+}
+
 .cw-card-poster {
   position: relative;
   aspect-ratio: 2 / 3;

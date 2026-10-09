@@ -10,17 +10,18 @@ import { useAuth } from '../hooks/useAuth';
 import type { TMDBMovie, TMDBSeries, ContinueWatchingItem } from '../types';
 import styles from './Home.module.css';
 
-function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void }) {
+function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void; onRestart: (item: ContinueWatchingItem) => void }) {
   const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
   const poster = item.meta?.poster as string | undefined;
   const metaRuntime = (item.meta?.runtime as number) || null;
   const defaultRuntime = item.type === 'movie' ? 7200 : 2700;
   const runtimeSeconds = metaRuntime ? metaRuntime * 60 : defaultRuntime;
   const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / runtimeSeconds) * 100)) : null;
+  const playTo = `/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`;
   return (
     <div className={styles.cwCard}>
       <Link
-        to={`/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`}
+        to={playTo}
         className={styles.cwCardLink}
       >
         <div className={styles.cwCardPoster}>
@@ -40,7 +41,16 @@ function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (ite
           {item.season && <span className={styles.cwCardMeta}>S{item.season}E{item.episode}</span>}
         </div>
       </Link>
-      <button className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove">&times;</button>
+      <Link
+        to={playTo}
+        className={styles.cwRestart}
+        onClick={() => onRestart(item)}
+        title="Restart from the beginning"
+        aria-label={`Restart ${label} from the beginning`}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+      </Link>
+      <button className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove from Continue Watching" aria-label={`Remove ${label} from Continue Watching`}>&times;</button>
     </div>
   );
 }
@@ -120,6 +130,14 @@ export default function Home() {
     clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
     toast?.('Removed from Continue Watching');
+  }
+
+  // Restart clears the saved position without removing anything else; the
+  // card links to the same play URL, which now opens fresh from 0:00.
+  function handleRestartCW(item: ContinueWatchingItem) {
+    clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
+    setContinueWatching(getContinueWatching());
+    toast?.('Restarting from the beginning');
   }
 
   const filteredCW = continueWatching.filter((item: ContinueWatchingItem) => {
@@ -229,7 +247,7 @@ export default function Home() {
           {filteredCW.length > 0 ? (
             <div className={styles.cwGrid}>
               {filteredCW.map((item, i) => (
-                <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} />
+                <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} onRestart={handleRestartCW} />
               ))}
             </div>
           ) : (
