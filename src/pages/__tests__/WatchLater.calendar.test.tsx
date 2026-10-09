@@ -3,7 +3,9 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import WatchLater, { CALENDAR_CACHE_KEY } from '../WatchLater';
 import { addWatchLater } from '../../api/storage';
-import { getMovieDetail, getTVDetail, getSeasonDetails } from '../../api/tmdb';
+import { getMovieDetail, getTVDetail, getSeasonDetails, getTVExternalIds } from '../../api/tmdb';
+import { getEpisodeAirInstant } from '../../api/tvmaze';
+import { setTimezone } from '../../api/storage';
 import { generateCalendarGrid, formatISODate } from '../../utils/calendar';
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -27,10 +29,15 @@ vi.mock('../../api/tmdb', () => ({
   getMovieDetail: vi.fn(),
   getTVDetail: vi.fn(),
   getSeasonDetails: vi.fn(),
+  getTVExternalIds: vi.fn(),
   imageUrl: (path: string | null, size = 'w500') => {
     if (!path) return 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
     return `https://image.tmdb.org/t/p/${size}${path}`;
   },
+}));
+
+vi.mock('../../api/tvmaze', () => ({
+  getEpisodeAirInstant: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../../api/omdb', () => ({
@@ -52,6 +59,8 @@ vi.mock('../../hooks/useAbortController', () => ({
 const mockGetMovieDetail = vi.mocked(getMovieDetail);
 const mockGetTVDetail = vi.mocked(getTVDetail);
 const mockGetSeasonDetails = vi.mocked(getSeasonDetails);
+const mockGetTVExternalIds = vi.mocked(getTVExternalIds);
+const mockGetEpisodeAirInstant = vi.mocked(getEpisodeAirInstant);
 
 function iso(y: number, m: number, d: number) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -267,6 +276,29 @@ describe('WatchLater calendar integration', () => {
     const dayButtons = screen.getAllByRole('button', { name: /\d+, \d{4}/ });
     expect([28, 35, 42]).toContain(dayButtons.length);
     expect(dayButtons.length % 7).toBe(0);
+  });
+
+  it('buckets episodes on the day they air in the calendar timezone', async () => {
+    const { year, month, movieDate } = currentMonthDates();
+    // 15:00 UTC on the 15th is the 16th in Auckland (UTC+12/+13).
+    const instant = Date.UTC(year, month, 15, 15);
+    setTimezone('Pacific/Auckland');
+    setupSuccessMocks(movieDate, movieDate);
+    mockGetTVExternalIds.mockResolvedValue({ imdb_id: 'tt9999999' });
+    mockGetEpisodeAirInstant.mockResolvedValue(instant);
+    addWatchLater('tv', 1399, 'Game of Thrones', '2011', '/y.png');
+
+    renderWatchLater();
+    await switchToCalendarView();
+
+    const monthName = generateCalendarGrid(year, month).monthName;
+    // Both mocked season episodes land on the 16th in Auckland time.
+    expect(
+      screen.getByRole('button', { name: new RegExp(`${monthName} 16,.*2 releases`) }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: new RegExp(`${monthName} 15,.*0 releases`) }),
+    ).toBeInTheDocument();
   });
 
   it('weekdays are in Monday through Sunday order', async () => {

@@ -6,8 +6,11 @@ import {
   getStats,
   getVideoSource,
   setVideoSource,
+  getTimezone,
+  setTimezone,
   clearAllData,
 } from "../api/storage";
+import { TIMEZONE_OPTIONS, getSystemTimezone } from "../utils/calendar";
 import { clearTMDBCache } from "../api/tmdbCache";
 import { getSourceLabel, SOURCE_KEYS } from "../api/vidsrc";
 import { exportSupabaseData, importSupabaseData, isSupabaseBackupEmpty } from "../api/storageBackup";
@@ -77,6 +80,8 @@ export default function Settings() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [queueSize, setQueueSize] = useState(getQueueSize());
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
+  const [timeZone, setTimeZoneState] = useState(getTimezone());
+  const systemTimeZone = getSystemTimezone();
 
   const [confirm, setConfirm] = useState(false);
 
@@ -283,6 +288,20 @@ export default function Settings() {
                   onSelect={(value: string) => {
                     setVideoSourceState(value);
                     setVideoSource(value);
+                  }}
+                />
+              </Row>
+              <Row label="Calendar Timezone">
+                <FilterDropdown
+                  value={timeZone}
+                  options={[
+                    { value: "", label: `System (${systemTimeZone})` },
+                    ...TIMEZONE_OPTIONS,
+                  ]}
+                  placeholder="Select timezone"
+                  onSelect={(value: string) => {
+                    setTimeZoneState(value);
+                    setTimezone(value);
                   }}
                 />
               </Row>

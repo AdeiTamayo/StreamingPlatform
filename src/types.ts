@@ -273,6 +273,9 @@ export interface CalendarItem {
   episode?: number;
   episodeTitle?: string;
   poster?: string;
+  // Exact broadcast instant (epoch ms, e.g. from TVMaze) when known.
+  // Upcoming checks prefer it over the day-granularity `date`.
+  airTimestamp?: number;
 }
 
 export interface NotificationItem {

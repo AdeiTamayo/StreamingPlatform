@@ -7,6 +7,10 @@ import {
   navigateMonth,
   getWeekdays,
   getMonthName,
+  toZonedDateString,
+  isValidTimezone,
+  getSystemTimezone,
+  TIMEZONE_OPTIONS,
 } from '../calendar';
 
 describe('calendar utility', () => {
@@ -221,6 +225,32 @@ describe('calendar utility', () => {
     it('returns correct month name', () => {
       expect(getMonthName(0)).toBe('January');
       expect(getMonthName(11)).toBe('December');
+    });
+  });
+
+  describe('timezones', () => {
+    // 21:00 Sunday in New York = 03:00 Monday UTC = Monday afternoon Auckland.
+    const instant = Date.parse('2025-01-20T01:00:00+00:00');
+
+    it('places the same instant on different days per zone', () => {
+      expect(toZonedDateString(instant, 'America/New_York')).toBe('2025-01-19');
+      expect(toZonedDateString(instant, 'UTC')).toBe('2025-01-20');
+      expect(toZonedDateString(instant, 'Pacific/Auckland')).toBe('2025-01-20');
+    });
+
+    it('validates IANA zones', () => {
+      expect(isValidTimezone('Europe/Madrid')).toBe(true);
+      expect(isValidTimezone('Not/AZone')).toBe(false);
+      expect(isValidTimezone('')).toBe(false);
+    });
+
+    it('resolves the system zone', () => {
+      expect(getSystemTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    });
+
+    it('ships a curated non-empty option list', () => {
+      expect(TIMEZONE_OPTIONS.length).toBeGreaterThan(20);
+      expect(TIMEZONE_OPTIONS.every((o) => isValidTimezone(o.value))).toBe(true);
     });
   });
 });

@@ -5,6 +5,7 @@ import {
   getLastWatchedEpisode, getStats, getWatchedCount, getWatchedEpisodeSet,
   clearShowHistory, markSeasonWatched,
   getVideoSource, setVideoSource,
+  getTimezone, setTimezone, getEffectiveTimezone,
   getSearchHistory, addSearchHistory, removeSearchHistory,
   getEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, isInEpisodeWatchLater,
   saveProgress, getProgress, clearProgress,
@@ -613,6 +614,24 @@ describe('video source', () => {
   it('persists the selected source', () => {
     setVideoSource('2embed');
     expect(getVideoSource()).toBe('2embed');
+  });
+});
+
+describe('calendar timezone', () => {
+  it('defaults to the system zone', () => {
+    expect(getTimezone()).toBe('');
+    expect(getEffectiveTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  });
+
+  it('persists the selected zone', () => {
+    setTimezone('Pacific/Auckland');
+    expect(getTimezone()).toBe('Pacific/Auckland');
+    expect(getEffectiveTimezone()).toBe('Pacific/Auckland');
+  });
+
+  it('falls back to the system zone for unknown values', () => {
+    localStorage.setItem('display_timezone', 'Not/AZone');
+    expect(getEffectiveTimezone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone);
   });
 });
 

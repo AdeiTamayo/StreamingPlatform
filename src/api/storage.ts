@@ -4,6 +4,7 @@ import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
 import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, setSyncUserId, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
+import { isValidTimezone, getSystemTimezone } from '../utils/calendar';
 import type { WatchedInsert } from '../types/database';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
 
@@ -930,6 +931,26 @@ export function getVideoSource(): string {
 // The preferred video source is local-only (no Supabase table).
 export function setVideoSource(source: string): void {
   safeWrite(VIDEO_SOURCE_KEY, source);
+}
+
+export const TIMEZONE_KEY = 'display_timezone';
+
+// Stored calendar timezone (IANA name), or '' for the system zone.
+export function getTimezone(): string {
+  return localStorage.getItem(TIMEZONE_KEY) || '';
+}
+
+// The calendar timezone is local-only (no Supabase table), like the
+// video source, so it survives data wipes that clear watch state.
+export function setTimezone(timeZone: string): void {
+  safeWrite(TIMEZONE_KEY, timeZone);
+}
+
+export function getEffectiveTimezone(): string {
+  const stored = getTimezone();
+  // Corrupt/unknown zone - fall through to the system zone.
+  if (isValidTimezone(stored)) return stored;
+  return getSystemTimezone();
 }
 
 export function getNotifications(): NotificationItem[] {

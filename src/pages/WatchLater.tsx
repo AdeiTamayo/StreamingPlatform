@@ -11,7 +11,9 @@ import {
   getMovieDetail,
   getTVDetail,
   getSeasonDetails,
+  getTVExternalIds,
 } from "../api/tmdb";
+import { getEpisodeAirInstant } from "../api/tvmaze";
 import {
   getOmdbRatingByTitle,
   peekOmdbRatingByTmdb,
@@ -22,7 +24,8 @@ import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
 import { useAbortController } from "../hooks/useAbortController";
-import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, formatISODate, isValidDate } from "../utils/calendar";
+import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, isValidDate, toZonedDateString } from "../utils/calendar";
+import { getEffectiveTimezone } from "../api/storage";
 import type {
   WatchLaterItem,
   EpisodeWatchLaterItem,
@@ -42,6 +45,13 @@ function isFuture(dateStr: string) {
   const d = parseLocalDate(dateStr);
   d.setHours(23, 59, 59, 999);
   return d >= new Date();
+}
+
+// A release counts as upcoming by its exact broadcast instant when known
+// (US evening = next morning in Spain), falling back to day granularity.
+function isUpcomingRelease(item: CalendarItem, now: number = Date.now()) {
+  if (item.airTimestamp != null) return item.airTimestamp > now;
+  return isFuture(item.date);
 }
 
 // The calendar only covers the current month and later months; past days of
@@ -119,17 +129,16 @@ function WlRatingBadge({
   );
 }
 
-function todayLocal() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-}
-
-function formatDate(dateStr: string) {
+function formatDate(dateStr: string, timeZone?: string) {
   const d = parseLocalDate(dateStr);
+  // Noon avoids the day shifting when the label is rendered in a zone
+  // other than the device default.
+  d.setHours(12, 0, 0, 0);
   return d.toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   });
 }
 
@@ -193,7 +202,10 @@ export default function WatchLater() {
   const [calendarError, setCalendarError] = useState<string | null>(null);
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
   const [calendarHasLoaded, setCalendarHasLoaded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => todayLocal());
+  // Read once per mount; navigating back from Settings remounts the page.
+  const [timeZone] = useState(getEffectiveTimezone);
+  const todayStr = useMemo(() => toZonedDateString(Date.now(), timeZone), [timeZone]);
+  const [selectedDate, setSelectedDate] = useState<string | null>(() => toZonedDateString(Date.now(), getEffectiveTimezone()));
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [sortBy, setSortBy] = useState("recent");
@@ -364,6 +376,8 @@ export default function WatchLater() {
     const seenKeys = new Set<string>();
     for (const item of calendarItemsRef.current) seenKeys.add(calendarKey(item));
     let freshCount = 0;
+    // Mirror of everything known (cached + flushed) for the airtime pass.
+    const allItems: CalendarItem[] = [...calendarItemsRef.current];
     const flushBatch = (incoming: CalendarItem[]) => {
       if (signal.aborted || incoming.length === 0) return;
       const fresh: CalendarItem[] = [];
@@ -375,8 +389,64 @@ export default function WatchLater() {
       }
       if (fresh.length === 0) return;
       freshCount += fresh.length;
+      allItems.push(...fresh);
       setCalendarItems((prev) =>
         [...prev, ...fresh].sort((a, b) => a.date.localeCompare(b.date)),
+      );
+    };
+
+    // Second pass: exact broadcast instants for every episode in the
+    // calendar, so each lands on the day it airs in the viewer's timezone.
+    // Cached afterwards, so repeat visits resolve (almost) everything
+    // without network.
+    const enrichAirTimes = async () => {
+      const candidates = allItems.filter(
+        (c) =>
+          c.type === "episode" &&
+          c.airTimestamp == null &&
+          c.season != null &&
+          c.episode != null,
+      );
+      if (candidates.length === 0 || signal.aborted) return;
+      const showIds = [...new Set(candidates.map((c) => String(c.id)))];
+      const imdbByShow = new Map<string, string | null>();
+      await Promise.all(
+        showIds.map(async (sid) => {
+          const sample = candidates.find((c) => String(c.id) === sid);
+          if (!sample) return;
+          try {
+            const ext = (await getTVExternalIds(sample.id, signal)) as {
+              imdb_id?: string | null;
+            };
+            imdbByShow.set(sid, ext?.imdb_id || null);
+          } catch {
+            imdbByShow.set(sid, null);
+          }
+        }),
+      );
+      if (signal.aborted) return;
+      const updates = new Map<string, number>();
+      for (let i = 0; i < candidates.length; i += CONCURRENCY) {
+        if (signal.aborted) return;
+        await Promise.all(
+          candidates.slice(i, i + CONCURRENCY).map(async (c) => {
+            const imdb = imdbByShow.get(String(c.id));
+            if (!imdb || c.season == null || c.episode == null) return;
+            try {
+              const ts = await getEpisodeAirInstant(imdb, c.season, c.episode, signal);
+              if (ts != null) updates.set(calendarKey(c), ts);
+            } catch {
+              // Keep date logic for this episode.
+            }
+          }),
+        );
+      }
+      if (signal.aborted || updates.size === 0) return;
+      setCalendarItems((prev) =>
+        prev.map((c) => {
+          const ts = updates.get(calendarKey(c));
+          return ts != null ? { ...c, airTimestamp: ts } : c;
+        }),
       );
     };
 
@@ -490,6 +560,14 @@ export default function WatchLater() {
       setLoadingCalendar(false);
       return;
     }
+    // Resolve exact air times while the loading indicator is still up; the
+    // grid already streams progressively, so this only refines it.
+    await enrichAirTimes();
+    if (signal.aborted) {
+      loadingCalendarRef.current = false;
+      setLoadingCalendar(false);
+      return;
+    }
     setCalendarHasLoaded(true);
     // seenKeys holds cached + freshly loaded entries, so it reflects what
     // is (or is about to be) on screen even if the last flush hasn't
@@ -542,17 +620,17 @@ export default function WatchLater() {
   useEffect(() => {
     if (view === "calendar") {
       if (!calendarInitedRef.current) {
-        // Default to today when opening the calendar.
-        const now = new Date();
-        setCalYear(now.getFullYear());
-        setCalMonth(now.getMonth());
-        setSelectedDate(todayLocal());
+        // Default to today (in the calendar timezone) when opening.
+        const d = parseLocalDate(todayStr);
+        setCalYear(d.getFullYear());
+        setCalMonth(d.getMonth());
+        setSelectedDate(todayStr);
         calendarInitedRef.current = true;
       }
     } else {
       calendarInitedRef.current = false;
     }
-  }, [view]);
+  }, [view, todayStr]);
 
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
@@ -588,20 +666,33 @@ export default function WatchLater() {
     toast?.("Removed from Watch Later");
   }
 
+  // Display view of the releases: episodes with a known broadcast instant
+  // are bucketed on the day they land on in the calendar timezone (US
+  // Sunday primetime = Monday in Spain). Raw state keeps the TMDB date so
+  // the stored cache stays zone-independent and switching zones recomputes
+  // without refetching.
+  const displayItems = useMemo(
+    () =>
+      calendarItems.map((c) =>
+        c.airTimestamp != null ? { ...c, date: toZonedDateString(c.airTimestamp, timeZone) } : c,
+      ),
+    [calendarItems, timeZone],
+  );
+
   const itemsByDate = useMemo(() => {
     const map: Record<string, CalendarItem[]> = {};
-    for (const item of calendarItems) {
+    for (const item of displayItems) {
       if (!map[item.date]) map[item.date] = [];
       map[item.date].push(item);
     }
     return map;
-  }, [calendarItems]);
-
-  const today = useMemo(() => new Date(), []);
+  }, [displayItems]);
 
   const calendarGrid = useMemo(
-    () => generateCalendarGrid(calYear, calMonth, selectedDate ?? undefined, today),
-    [calYear, calMonth, selectedDate, today],
+    // User-timezone midnight: "today" highlighting and past/future shading
+    // follow the selected zone, not necessarily the device zone.
+    () => generateCalendarGrid(calYear, calMonth, selectedDate ?? undefined, parseLocalDate(todayStr)),
+    [calYear, calMonth, selectedDate, todayStr],
   );
 
   function prevMonth() {
@@ -619,11 +710,16 @@ export default function WatchLater() {
   const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
 
   const groupedUpcomingList = useMemo(() => {
-    const sorted = Object.keys(itemsByDate)
-      .filter((date) => isFuture(date))
-      .sort();
-    return sorted.map((date) => ({ date, items: itemsByDate[date] }));
-  }, [itemsByDate]);
+    const byDate: Record<string, CalendarItem[]> = {};
+    for (const item of displayItems) {
+      if (!isUpcomingRelease(item)) continue;
+      if (!byDate[item.date]) byDate[item.date] = [];
+      byDate[item.date].push(item);
+    }
+    return Object.keys(byDate)
+      .sort()
+      .map((date) => ({ date, items: byDate[date] }));
+  }, [displayItems]);
 
   const totalPages = Math.max(
     1,
@@ -636,7 +732,7 @@ export default function WatchLater() {
 
   const unreleasedKeys = useMemo(() => {
     const grouped = new Map<string, CalendarItem[]>();
-    for (const c of calendarItems) {
+    for (const c of displayItems) {
       const key = `${c.type === "episode" ? "tv" : c.type}-${String(c.id)}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -646,12 +742,12 @@ export default function WatchLater() {
 
     const keys = new Set<string>();
     for (const [key, items] of grouped.entries()) {
-      if (items.every(item => isFuture(item.date))) {
+      if (items.every((item) => isUpcomingRelease(item))) {
         keys.add(key);
       }
     }
     return keys;
-  }, [calendarItems]);
+  }, [displayItems]);
 
   const sortedItems = useMemo(() => {
     let list = [...items];
@@ -673,7 +769,7 @@ export default function WatchLater() {
   }, [items, sortBy, filterType, hideUnreleasedPosters, unreleasedKeys]);
 
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
-  const upcomingCalendarCount = calendarItems.filter((c) => isFuture(c.date)).length;
+  const upcomingCalendarCount = displayItems.filter((c) => isUpcomingRelease(c)).length;
 
   useEffect(() => {
     if (upcomingPage >= totalPages)
@@ -755,12 +851,12 @@ export default function WatchLater() {
               <button
                 className={styles.todayBtn}
                 onClick={() => {
-                  const now = new Date();
+                  const d = parseLocalDate(todayStr);
 
-                  setCalYear(now.getFullYear());
-                  setCalMonth(now.getMonth());
+                  setCalYear(d.getFullYear());
+                  setCalMonth(d.getMonth());
 
-                  setSelectedDate(formatISODate(now));
+                  setSelectedDate(todayStr);
                 }}
               >
                 Today
@@ -882,7 +978,7 @@ export default function WatchLater() {
             {selectedDate ? (
               <>
                 <div className={styles.dayPanelHeader}>
-                  <h3>{formatDate(selectedDate)}</h3>
+                  <h3>{formatDate(selectedDate, timeZone)}</h3>
 
                   <span>
                     {selectedItems.length} release
@@ -918,6 +1014,16 @@ export default function WatchLater() {
                                   ? "Movie"
                                   : `Season ${item.season}
                                    Episode ${item.episode}`}
+                                {item.airTimestamp != null && (
+                                  <>
+                                    {" · "}
+                                    {new Date(item.airTimestamp).toLocaleTimeString(undefined, {
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                      timeZone,
+                                    })}
+                                  </>
+                                )}
                               </span>
 
                               {item.episodeTitle && <p>{item.episodeTitle}</p>}
@@ -1250,7 +1356,7 @@ export default function WatchLater() {
             {paginatedGroups.map((group) => (
               <div key={group.date} className={styles.upcomingDateGroup}>
                 <div className={styles.upcomingDateLabel}>
-                  {formatDate(group.date)}
+                  {formatDate(group.date, timeZone)}
                 </div>
                 {group.items.map((item, idx) => (
                   <div

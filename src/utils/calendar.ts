@@ -190,3 +190,78 @@ export function isValidDate(dateStr: string): boolean {
 export function formatISODate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
+
+export function getSystemTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+export function isValidTimezone(timeZone: string): boolean {
+  if (!timeZone) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// YYYY-MM-DD of an instant in the given IANA zone - the day a release
+// lands on for a viewer there (US Sunday primetime = Monday in Spain).
+export function toZonedDateString(timestamp: number, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(timestamp);
+}
+
+export interface TimezoneOption {
+  value: string;
+  label: string;
+}
+
+// Curated IANA zones for the timezone setting (plus a System default).
+export const TIMEZONE_OPTIONS: TimezoneOption[] = [
+  { value: 'Europe/Madrid', label: 'Madrid' },
+  { value: 'Europe/London', label: 'London' },
+  { value: 'Europe/Paris', label: 'Paris' },
+  { value: 'Europe/Berlin', label: 'Berlin' },
+  { value: 'Europe/Rome', label: 'Rome' },
+  { value: 'Europe/Lisbon', label: 'Lisbon' },
+  { value: 'Europe/Athens', label: 'Athens' },
+  { value: 'Europe/Helsinki', label: 'Helsinki' },
+  { value: 'Europe/Moscow', label: 'Moscow' },
+  { value: 'Europe/Istanbul', label: 'Istanbul' },
+  { value: 'Africa/Cairo', label: 'Cairo' },
+  { value: 'Africa/Lagos', label: 'Lagos' },
+  { value: 'Africa/Johannesburg', label: 'Johannesburg' },
+  { value: 'America/New_York', label: 'New York' },
+  { value: 'America/Chicago', label: 'Chicago' },
+  { value: 'America/Denver', label: 'Denver' },
+  { value: 'America/Los_Angeles', label: 'Los Angeles' },
+  { value: 'America/Anchorage', label: 'Anchorage' },
+  { value: 'Pacific/Honolulu', label: 'Honolulu' },
+  { value: 'America/Toronto', label: 'Toronto' },
+  { value: 'America/Mexico_City', label: 'Mexico City' },
+  { value: 'America/Sao_Paulo', label: 'São Paulo' },
+  { value: 'America/Buenos_Aires', label: 'Buenos Aires' },
+  { value: 'America/Santiago', label: 'Santiago' },
+  { value: 'Asia/Dubai', label: 'Dubai' },
+  { value: 'Asia/Karachi', label: 'Karachi' },
+  { value: 'Asia/Kolkata', label: 'Kolkata' },
+  { value: 'Asia/Bangkok', label: 'Bangkok' },
+  { value: 'Asia/Singapore', label: 'Singapore' },
+  { value: 'Asia/Shanghai', label: 'Shanghai' },
+  { value: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { value: 'Asia/Tokyo', label: 'Tokyo' },
+  { value: 'Asia/Seoul', label: 'Seoul' },
+  { value: 'Australia/Perth', label: 'Perth' },
+  { value: 'Australia/Sydney', label: 'Sydney' },
+  { value: 'Pacific/Auckland', label: 'Auckland' },
+  { value: 'UTC', label: 'UTC' },
+];
