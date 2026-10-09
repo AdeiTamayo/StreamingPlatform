@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV, getPersonCredits } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
@@ -142,6 +142,11 @@ export default function Search() {
     setActiveSugg(-1);
   }, [input, searchFocused, history]);
 
+  // Recent searches worth retrying when the current query finds nothing.
+  const recoverySearches = history
+    .filter((q) => q.toLowerCase() !== query.trim().toLowerCase())
+    .slice(0, 5);
+
   function handleSuggestKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       (e.target as HTMLInputElement).blur();
@@ -273,7 +278,70 @@ export default function Search() {
         ) : !personId && !query.trim() ? (
           <div className="loading" role="status">Type above to search movies and TV shows</div>
         ) : filtered.length === 0 ? (
-          <div className="loading" role="status">No results found</div>
+          <div className="empty-state">
+            <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
+            <p>
+              Check the spelling, try fewer words, or start from one of these
+              instead.
+            </p>
+            <div className="empty-state-actions">
+              <Link to="/" className="empty-state-action">
+                Browse Trending
+              </Link>
+              <Link to="/movies" className="empty-state-action">
+                Movies
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                TV Shows
+              </Link>
+            </div>
+{recoverySearches.length > 0 && (
+              <div className={styles.searchRecovery}>
+                <div className={styles.searchRecoveryTitle}>
+                  Or try one of your recent searches
+                </div>
+                <ul className={styles.searchRecoveryList}>
+                  {recoverySearches.map((q) => (
+                    <li key={q} className={styles.searchRecoveryRow}>
+                      <button
+                        className={styles.searchRecoveryLabel}
+                        onClick={() => handleHistoryClick(q)}
+                        title={`Search again for "${q}"`}
+                      >
+                        <svg
+                          className={styles.searchRecoveryIcon}
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <span>{q}</span>
+                      </button>
+                      <button
+                        className={styles.searchRecoveryRemove}
+                        aria-label={`Remove "${q}" from search history`}
+                        title="Remove from history"
+                        onClick={() => handleRemoveHistory(q)}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         ) : (
           <>
             <div className="media-grid">

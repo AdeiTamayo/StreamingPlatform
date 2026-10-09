@@ -170,6 +170,112 @@
   border-color: transparent;
 }
 
+/* Recent-search recovery inside the no-results state. A vertical list of
+   full-width rows, not chips: chips sat next to the browse links and read as
+   a fourth filter, and a chip without its "x" button is lopsided. */
+.search-recovery {
+  width: 100%;
+  margin-top: 1.15rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  text-align: left;
+}
+
+.search-recovery-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.search-recovery-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.search-recovery-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.search-recovery-row:hover,
+.search-recovery-row:focus-within {
+  background: rgba(125, 211, 252, 0.1);
+  border-color: rgba(125, 211, 252, 0.2);
+}
+
+.search-recovery-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.6rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.search-recovery-row:hover .search-recovery-label,
+.search-recovery-row:focus-within .search-recovery-label {
+  color: var(--text);
+}
+
+.search-recovery-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-recovery-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.search-recovery-row:hover .search-recovery-icon {
+  color: var(--accent);
+}
+
+.search-recovery-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-right: 0.35rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-recovery-remove:hover,
+.search-recovery-remove:focus-visible {
+  background: rgba(248, 113, 113, 0.2);
+  color: var(--danger);
+}
+
+/* The recent-searches block shown on an empty search page. */
 .search-history {
   margin-bottom: 1rem;
 }
