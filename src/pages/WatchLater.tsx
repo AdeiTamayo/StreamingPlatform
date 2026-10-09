@@ -24,8 +24,15 @@ import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
 import { useAbortController } from "../hooks/useAbortController";
-import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, isValidDate, toZonedDateString } from "../utils/calendar";
-import { getEffectiveTimezone } from "../api/storage";
+import {
+  generateCalendarGrid,
+  getWeekdays,
+  getMonthName,
+  navigateMonth,
+  isValidDate,
+  toZonedDateString,
+} from "../utils/calendar";
+import { getEffectiveTimezone, getUpcomingOpen, setUpcomingOpen } from "../api/storage";
 import type {
   WatchLaterItem,
   EpisodeWatchLaterItem,
@@ -146,6 +153,25 @@ function calendarKey(item: CalendarItem) {
   return `${item.type}-${item.id}-${item.date}-S${item.season ?? 0}E${item.episode ?? 0}`;
 }
 
+// Structural guarantee: the UI can never render the same release twice,
+// no matter how duplicates entered state (stale hydrate racing a load,
+// an old poisoned cache, StrictMode double-mounts in dev). Prefers the
+// copy carrying the exact broadcast instant so timezone bucketing survives.
+function dedupeCalendarItems(items: CalendarItem[]): CalendarItem[] {
+  const seen = new Set<string>();
+  const out: CalendarItem[] = [];
+  const ranked = [...items].sort(
+    (a, b) => Number(b.airTimestamp != null) - Number(a.airTimestamp != null),
+  );
+  for (const item of ranked) {
+    const key = calendarKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // Persisted release-calendar cache so a return visit paints instantly from
 // the previous load while fresh data is fetched in the background.
 export const CALENDAR_CACHE_KEY = "streamflow:calendar-cache:v1";
@@ -155,13 +181,23 @@ function readCalendarCache(): CalendarItem[] {
   try {
     const raw = localStorage.getItem(CALENDAR_CACHE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as { savedAt?: number; items?: CalendarItem[] };
+    const parsed = JSON.parse(raw) as {
+      savedAt?: number;
+      items?: CalendarItem[];
+    };
     if (!parsed || !Array.isArray(parsed.items)) return [];
-    if (typeof parsed.savedAt !== "number" || Date.now() - parsed.savedAt > CALENDAR_CACHE_MAX_AGE_MS) {
+    if (
+      typeof parsed.savedAt !== "number" ||
+      Date.now() - parsed.savedAt > CALENDAR_CACHE_MAX_AGE_MS
+    ) {
       return [];
     }
     return parsed.items.filter(
-      (i) => i && typeof i.date === "string" && typeof i.title === "string" && isValidDate(i.date),
+      (i) =>
+        i &&
+        typeof i.date === "string" &&
+        typeof i.title === "string" &&
+        isValidDate(i.date),
     );
   } catch {
     return [];
@@ -190,7 +226,9 @@ function pruneCalendarCache(
   for (const w of wlItems) keep.add(`${w.type}-${String(w.id)}`);
   for (const e of epItems) keep.add(`tv-${String(e.showId)}`);
   return cached.filter((c) =>
-    keep.has(c.type === "episode" ? `tv-${String(c.id)}` : `${c.type}-${String(c.id)}`),
+    keep.has(
+      c.type === "episode" ? `tv-${String(c.id)}` : `${c.type}-${String(c.id)}`,
+    ),
   );
 }
 
@@ -204,20 +242,32 @@ export default function WatchLater() {
   const [calendarHasLoaded, setCalendarHasLoaded] = useState(false);
   // Read once per mount; navigating back from Settings remounts the page.
   const [timeZone] = useState(getEffectiveTimezone);
-  const todayStr = useMemo(() => toZonedDateString(Date.now(), timeZone), [timeZone]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(() => toZonedDateString(Date.now(), getEffectiveTimezone()));
+  const todayStr = useMemo(
+    () => toZonedDateString(Date.now(), timeZone),
+    [timeZone],
+  );
+  const [selectedDate, setSelectedDate] = useState<string | null>(() =>
+    toZonedDateString(Date.now(), getEffectiveTimezone()),
+  );
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(new Date().getMonth());
-  const [sortBy, setSortBy] = useState("recent");
+  const [sortBy, setSortBy] = useState("added");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [filterType, setFilterType] = useState("all");
   const [view, setView] = useState<"list" | "calendar">("list");
-  const [showUpcoming, setShowUpcoming] = useState(false);
+  // Expanded by default; the toggle persists locally.
+  const [showUpcoming, setShowUpcoming] = useState(() => getUpcomingOpen());
+
+  function toggleUpcoming() {
+    const next = !showUpcoming;
+    setShowUpcoming(next);
+    setUpcomingOpen(next);
+  }
   const [hideUnreleasedPosters, setHideUnreleasedPosters] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
   const calendarInitedRef = useRef(false);
   const loadingCalendarRef = useRef(false);
-  const calendarItemsRef = useRef<CalendarItem[]>([]);
   const ITEMS_PER_PAGE = 20;
   const DAYS_PER_PAGE = 3;
   const toast = useToast();
@@ -371,13 +421,16 @@ export default function WatchLater() {
     let hasErrors = false;
     // Progressive rendering: flush each resolved batch into state so the
     // grid fills in as fetches resolve instead of waiting for everything.
-    // Seed with whatever is already on screen (e.g. hydrated cache) so a
-    // background refresh never duplicates it.
+    // Seed from the same pruned cache the mount hydrate uses (read fresh
+    // from storage, not from the ref: on first open the load can start in
+    // the same commit as hydration, before the ref has caught up - seeding
+    // from a stale ref duplicates every cached entry).
+    const hydratedSeed = pruneCalendarCache(readCalendarCache(), wlItems, epwlItems);
     const seenKeys = new Set<string>();
-    for (const item of calendarItemsRef.current) seenKeys.add(calendarKey(item));
+    for (const item of hydratedSeed) seenKeys.add(calendarKey(item));
     let freshCount = 0;
     // Mirror of everything known (cached + flushed) for the airtime pass.
-    const allItems: CalendarItem[] = [...calendarItemsRef.current];
+    const allItems: CalendarItem[] = [...hydratedSeed];
     const flushBatch = (incoming: CalendarItem[]) => {
       if (signal.aborted || incoming.length === 0) return;
       const fresh: CalendarItem[] = [];
@@ -433,7 +486,12 @@ export default function WatchLater() {
             const imdb = imdbByShow.get(String(c.id));
             if (!imdb || c.season == null || c.episode == null) return;
             try {
-              const ts = await getEpisodeAirInstant(imdb, c.season, c.episode, signal);
+              const ts = await getEpisodeAirInstant(
+                imdb,
+                c.season,
+                c.episode,
+                signal,
+              );
               if (ts != null) updates.set(calendarKey(c), ts);
             } catch {
               // Keep date logic for this episode.
@@ -573,7 +631,9 @@ export default function WatchLater() {
     // is (or is about to be) on screen even if the last flush hasn't
     // re-rendered yet.
     if (hasErrors && seenKeys.size > 0) {
-      setCalendarError("Some releases could not be loaded. Displaying available data.");
+      setCalendarError(
+        "Some releases could not be loaded. Displaying available data.",
+      );
     } else if (hasErrors && seenKeys.size === 0) {
       setCalendarError("Failed to load releases. Please try again.");
     }
@@ -592,30 +652,40 @@ export default function WatchLater() {
     // current library). Fresh data is fetched in the background once the
     // calendar or upcoming list is actually opened.
     const pruned = pruneCalendarCache(readCalendarCache(), wl, epwl);
-    if (pruned.length > 0) setCalendarItems(pruned);
+    // Dedupe on read: a cache written while duplicates were on screen
+    // would otherwise repaint them on every visit from now on.
+    if (pruned.length > 0) setCalendarItems(dedupeCalendarItems(pruned));
     // Defer heavy release fetching until the user actually opens the
     // calendar or the upcoming list, so the list + calendar button render
     // instantly.
   }, []);
 
-  useEffect(() => {
-    calendarItemsRef.current = calendarItems;
-  }, [calendarItems]);
-
   // Persist freshly loaded releases so the next visit renders instantly.
   // Only after a real API load, so a bare cache hydrate never overwrites
   // the stored snapshot with itself; removals stay in sync afterwards.
+  // Stored deduped (raw TMDB dates, never display buckets) so the snapshot
+  // self-heals instead of preserving duplicates.
   useEffect(() => {
-    if (calendarHasLoaded) writeCalendarCache(calendarItems);
+    if (calendarHasLoaded) writeCalendarCache(dedupeCalendarItems(calendarItems));
   }, [calendarItems, calendarHasLoaded]);
 
   // Load releases on demand: first time the calendar view or the upcoming
   // list is requested. The calendar grid itself renders immediately.
   useEffect(() => {
-    if ((view === "calendar" || showUpcoming) && !calendarHasLoaded && !loadingCalendar) {
+    if (
+      (view === "calendar" || showUpcoming) &&
+      !calendarHasLoaded &&
+      !loadingCalendar
+    ) {
       loadCalendarItems();
     }
-  }, [view, showUpcoming, calendarHasLoaded, loadingCalendar, loadCalendarItems]);
+  }, [
+    view,
+    showUpcoming,
+    calendarHasLoaded,
+    loadingCalendar,
+    loadCalendarItems,
+  ]);
 
   useEffect(() => {
     if (view === "calendar") {
@@ -666,6 +736,10 @@ export default function WatchLater() {
     toast?.("Removed from Watch Later");
   }
 
+  // Single choke point for everything rendered: state is deduped here so
+  // a duplicate can never reach the grid, the upcoming list, or the counts.
+  const visibleItems = useMemo(() => dedupeCalendarItems(calendarItems), [calendarItems]);
+
   // Display view of the releases: episodes with a known broadcast instant
   // are bucketed on the day they land on in the calendar timezone (US
   // Sunday primetime = Monday in Spain). Raw state keeps the TMDB date so
@@ -673,10 +747,10 @@ export default function WatchLater() {
   // without refetching.
   const displayItems = useMemo(
     () =>
-      calendarItems.map((c) =>
+      visibleItems.map((c) =>
         c.airTimestamp != null ? { ...c, date: toZonedDateString(c.airTimestamp, timeZone) } : c,
       ),
-    [calendarItems, timeZone],
+    [visibleItems, timeZone],
   );
 
   const itemsByDate = useMemo(() => {
@@ -691,18 +765,24 @@ export default function WatchLater() {
   const calendarGrid = useMemo(
     // User-timezone midnight: "today" highlighting and past/future shading
     // follow the selected zone, not necessarily the device zone.
-    () => generateCalendarGrid(calYear, calMonth, selectedDate ?? undefined, parseLocalDate(todayStr)),
+    () =>
+      generateCalendarGrid(
+        calYear,
+        calMonth,
+        selectedDate ?? undefined,
+        parseLocalDate(todayStr),
+      ),
     [calYear, calMonth, selectedDate, todayStr],
   );
 
   function prevMonth() {
-    const { year, month } = navigateMonth(calYear, calMonth, 'prev');
+    const { year, month } = navigateMonth(calYear, calMonth, "prev");
     setCalYear(year);
     setCalMonth(month);
   }
 
   function nextMonth() {
-    const { year, month } = navigateMonth(calYear, calMonth, 'next');
+    const { year, month } = navigateMonth(calYear, calMonth, "next");
     setCalYear(year);
     setCalMonth(month);
   }
@@ -753,23 +833,34 @@ export default function WatchLater() {
     let list = [...items];
     if (hideUnreleasedPosters)
       list = list.filter(
-        (i: WatchLaterItem) =>
-          !unreleasedKeys.has(`${i.type}-${String(i.id)}`),
+        (i: WatchLaterItem) => !unreleasedKeys.has(`${i.type}-${String(i.id)}`),
       );
     if (filterType === "movies")
       list = list.filter((i: WatchLaterItem) => i.type === "movie");
     else if (filterType === "tv")
       list = list.filter((i: WatchLaterItem) => i.type === "tv");
+    // Every field sorts both ways: descending is newest-first / Z-A /
+    // newest-year, ascending reverses it.
+    const dir = sortDir === "asc" ? 1 : -1;
     if (sortBy === "title")
-      list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+      list.sort((a, b) => dir * (a.title || "").localeCompare(b.title || ""));
     else if (sortBy === "year")
-      list.sort((a, b) => (b.year || "0").localeCompare(a.year || "0"));
-    else list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+      list.sort((a, b) => dir * (a.year || "0").localeCompare(b.year || "0"));
+    else list.sort((a, b) => dir * ((a.addedAt || 0) - (b.addedAt || 0)));
     return list;
-  }, [items, sortBy, filterType, hideUnreleasedPosters, unreleasedKeys]);
+  }, [
+    items,
+    sortBy,
+    sortDir,
+    filterType,
+    hideUnreleasedPosters,
+    unreleasedKeys,
+  ]);
 
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
-  const upcomingCalendarCount = displayItems.filter((c) => isUpcomingRelease(c)).length;
+  const upcomingCalendarCount = displayItems.filter((c) =>
+    isUpcomingRelease(c),
+  ).length;
 
   useEffect(() => {
     if (upcomingPage >= totalPages)
@@ -792,10 +883,6 @@ export default function WatchLater() {
             <div className={styles.calHeader}>
               <div>
                 <h2 className="section-title">Release Calendar</h2>
-
-                <span className={styles.calSubtitle}>
-                  Upcoming releases from your Watch Later library
-                </span>
               </div>
 
               <div className={styles.calHeaderActions}>
@@ -814,9 +901,11 @@ export default function WatchLater() {
               </div>
 
               <div className={styles.calSkeletonGrid}>
-                {Array.from({ length: calendarGrid.cells.length || 35 }).map((_, i) => (
-                  <div key={i} className={styles.calSkeletonCell} />
-                ))}
+                {Array.from({ length: calendarGrid.cells.length || 35 }).map(
+                  (_, i) => (
+                    <div key={i} className={styles.calSkeletonCell} />
+                  ),
+                )}
               </div>
             </div>
 
@@ -842,8 +931,11 @@ export default function WatchLater() {
               <h2 className="section-title">Release Calendar</h2>
 
               <span className={styles.calSubtitle}>
-                Upcoming releases from your Watch Later library
-                {loadingCalendar && calendarHasLoaded ? " · Updating…" : loadingCalendar ? " · Loading…" : ""}
+                {loadingCalendar && calendarHasLoaded
+                  ? " · Updating…"
+                  : loadingCalendar
+                    ? " · Loading…"
+                    : ""}
               </span>
             </div>
 
@@ -991,57 +1083,60 @@ export default function WatchLater() {
                     Nothing releases on this day.
                   </div>
                 ) : (
-<div
-                        className={`${styles.releaseGrid} ${styles[`count-${Math.min(selectedItems.length, 3)}`]}`}
+                  <div
+                    className={`${styles.releaseGrid} ${styles[`count-${Math.min(selectedItems.length, 3)}`]}`}
+                  >
+                    {selectedItems.map((item) => (
+                      <div
+                        key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
+                        className={styles.releaseCard}
                       >
-                        {selectedItems.map((item) => (
-                          <div
-                            key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
-                            className={styles.releaseCard}
-                          >
-                            <img
-                              src={imageUrl(item.poster ?? null, "w185")}
-                              alt={`${item.title} poster`}
-                              loading="lazy"
-                              className={styles.releasePoster}
-                            />
+                        <img
+                          src={imageUrl(item.poster ?? null, "w185")}
+                          alt={`${item.title} poster`}
+                          loading="lazy"
+                          className={styles.releasePoster}
+                        />
 
-                            <div className={styles.releaseInfo}>
-                              <h4>{item.title}</h4>
+                        <div className={styles.releaseInfo}>
+                          <h4>{item.title}</h4>
 
-                              <span>
-                                {item.type === "movie"
-                                  ? "Movie"
-                                  : `Season ${item.season}
+                          <span>
+                            {item.type === "movie"
+                              ? "Movie"
+                              : `Season ${item.season}
                                    Episode ${item.episode}`}
-                                {item.airTimestamp != null && (
-                                  <>
-                                    {" · "}
-                                    {new Date(item.airTimestamp).toLocaleTimeString(undefined, {
-                                      hour: "numeric",
-                                      minute: "2-digit",
-                                      timeZone,
-                                    })}
-                                  </>
+                            {item.airTimestamp != null && (
+                              <>
+                                {" · "}
+                                {new Date(item.airTimestamp).toLocaleTimeString(
+                                  undefined,
+                                  {
+                                    hour: "numeric",
+                                    minute: "2-digit",
+                                    timeZone,
+                                  },
                                 )}
-                              </span>
+                              </>
+                            )}
+                          </span>
 
-                              {item.episodeTitle && <p>{item.episodeTitle}</p>}
-                            </div>
+                          {item.episodeTitle && <p>{item.episodeTitle}</p>}
+                        </div>
 
-                            <Link
-                              className={styles.openBtn}
-                              to={
-                                item.type === "movie"
-                                  ? `/movie/${item.id}`
-                                  : `/tv/${item.id}?season=${item.season}&episode=${item.episode}`
-                              }
-                            >
-                              Open
-                            </Link>
-                          </div>
-                        ))}
+                        <Link
+                          className={styles.openBtn}
+                          to={
+                            item.type === "movie"
+                              ? `/movie/${item.id}`
+                              : `/tv/${item.id}?season=${item.season}&episode=${item.episode}`
+                          }
+                        >
+                          Open
+                        </Link>
                       </div>
+                    ))}
+                  </div>
                 )}
               </>
             ) : (
@@ -1094,16 +1189,31 @@ export default function WatchLater() {
                   <FilterDropdown
                     value={sortBy}
                     options={[
-                      { value: "recent", label: "Most recent" },
-                      { value: "title", label: "Title A-Z" },
+                      { value: "added", label: "Date added" },
+                      { value: "title", label: "Title" },
                       { value: "year", label: "Year" },
                     ]}
                     placeholder="Sort by"
                     onSelect={(v: string) => {
                       setSortBy(v);
+                      // Each field starts in its natural direction; the
+                      // toggle reverses from there.
+                      setSortDir(v === "title" ? "asc" : "desc");
                       setPage(1);
                     }}
                   />
+                  <button
+                    className={styles.wlClearBtn}
+                    onClick={() =>
+                      setSortDir((d) => (d === "desc" ? "asc" : "desc"))
+                    }
+                    title={`Sort ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
+                    aria-label={`Sort direction: ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
+                  >
+                    <span aria-hidden="true">
+                      {sortDir === "desc" ? "↓" : "↑"}
+                    </span>
+                  </button>
                   {unreleasedKeys.size > 0 && (
                     <button
                       className={`${styles.wlClearBtn} ${hideUnreleasedPosters ? styles.active : ""}`}
@@ -1144,12 +1254,15 @@ export default function WatchLater() {
                         : "Hide unreleased"}
                     </button>
                   )}
-                  {(filterType !== "all" || sortBy !== "recent") && (
+                  {(filterType !== "all" ||
+                    sortBy !== "added" ||
+                    sortDir !== "desc") && (
                     <button
                       className={styles.wlClearBtn}
                       onClick={() => {
                         setFilterType("all");
-                        setSortBy("recent");
+                        setSortBy("added");
+                        setSortDir("desc");
                         setPage(1);
                       }}
                     >
@@ -1216,7 +1329,11 @@ export default function WatchLater() {
                     ))}
                 </div>
                 {listPages > 1 && (
-                  <Pagination page={page} totalPages={listPages} onChange={setPage} />
+                  <Pagination
+                    page={page}
+                    totalPages={listPages}
+                    onChange={setPage}
+                  />
                 )}
               </>
             )}
@@ -1270,7 +1387,7 @@ export default function WatchLater() {
             ) : upcomingCalendarCount > 0 ? (
               <button
                 className={styles.upcomingToggle}
-                onClick={() => setShowUpcoming((v) => !v)}
+                onClick={toggleUpcoming}
               >
                 <svg
                   width="18"
@@ -1288,7 +1405,8 @@ export default function WatchLater() {
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span className={styles.upcomingToggleLabel}>
-                  {upcomingCalendarCount} upcoming{loadingCalendar ? " ···" : ""}
+                  {upcomingCalendarCount} upcoming
+                  {loadingCalendar ? " ···" : ""}
                 </span>
                 <span className={styles.upcomingToggleArrow}>
                   {showUpcoming ? "\u25B2" : "\u25BC"}
@@ -1373,6 +1491,17 @@ export default function WatchLater() {
                           : `S${item.season} E${item.episode ?? "\u2014"}`}
                         {item.episodeTitle && (
                           <span> &middot; {item.episodeTitle}</span>
+                        )}
+                        {item.airTimestamp != null && (
+                          <span>
+                            {" "}
+                            &middot;{" "}
+                            {new Date(item.airTimestamp).toLocaleTimeString(undefined, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                              timeZone,
+                            })}
+                          </span>
                         )}
                       </div>
                     </div>

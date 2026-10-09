@@ -934,6 +934,7 @@ export function setVideoSource(source: string): void {
 }
 
 export const TIMEZONE_KEY = 'display_timezone';
+export const UPCOMING_OPEN_KEY = 'upcoming_open';
 
 // Stored calendar timezone (IANA name), or '' for the system zone.
 export function getTimezone(): string {
@@ -951,6 +952,16 @@ export function getEffectiveTimezone(): string {
   // Corrupt/unknown zone - fall through to the system zone.
   if (isValidTimezone(stored)) return stored;
   return getSystemTimezone();
+}
+
+// Whether the Watch Later upcoming list starts expanded. Local-only UI
+// preference like the video source; defaults to open.
+export function getUpcomingOpen(): boolean {
+  return localStorage.getItem(UPCOMING_OPEN_KEY) !== '0';
+}
+
+export function setUpcomingOpen(open: boolean): void {
+  safeWrite(UPCOMING_OPEN_KEY, open ? '1' : '0');
 }
 
 export function getNotifications(): NotificationItem[] {

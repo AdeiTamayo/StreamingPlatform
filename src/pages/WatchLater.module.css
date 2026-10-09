@@ -6,6 +6,7 @@
   align-items: center;
 }
 
+/* Every control in this row shares one 42px height */
 .wlControls .custom-select-trigger {
   padding: 0.5rem 0.85rem;
   border-radius: 999px;
@@ -14,7 +15,7 @@
   color: var(--text);
   font-size: 0.8rem;
   font-weight: 500;
-  min-height: 0;
+  min-height: 42px;
   transition:
     border-color 0.18s ease,
     background 0.18s ease;
@@ -32,15 +33,18 @@
 
 .wlClearBtn {
   padding: 0.5rem 0.85rem;
+  min-height: 42px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
   font-size: 0.8rem;
   font-weight: 500;
+  line-height: 1;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   transition:
     background 0.18s ease,
