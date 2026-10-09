@@ -1,4 +1,5 @@
-import { getTVDetail, getSeasonDetails } from './tmdb';
+import { getTVDetail, getSeasonDetails, getTVExternalIds } from './tmdb';
+import { isEpisodeReleased } from './tvmaze';
 import {
   getWatchLater,
   getEpisodeWatchLater,
@@ -58,11 +59,33 @@ function collectCandidates(): ScanCandidate[] {
   return candidates.slice(0, MAX_SHOWS);
 }
 
-function addEpisodeNotification(showId: string | number, showTitle: string, season: number, episode: TMDBEpisode): boolean {
+async function resolveShowImdb(showId: string | number): Promise<string | null> {
+  try {
+    const ext = (await getTVExternalIds(showId)) as { imdb_id?: string | null };
+    return ext?.imdb_id || null;
+  } catch {
+    return null;
+  }
+}
+
+async function addEpisodeNotification(
+  showId: string | number,
+  showTitle: string,
+  season: number,
+  episode: TMDBEpisode,
+  imdbId: string | null,
+): Promise<boolean> {
   if (!episode.air_date) return false;
   const airDateMs = new Date(episode.air_date).getTime();
-  if (airDateMs > Date.now()) return false;
   if (airDateMs < Date.now() - WEEK_IN_MS) return false;
+  // Exact broadcast instant near the day boundary (US evening = next
+  // morning in Spain); each show follows its own clock, nothing is
+  // blanket-delayed. Falls back to date logic when unknown.
+  const released = await isEpisodeReleased(
+    { imdbId, season, episode: episode.episode_number, airDate: episode.air_date },
+    Date.now(),
+  );
+  if (!released) return false;
   if (isWatched('tv', showId, season, episode.episode_number)) return false;
   if (isAlreadyNotified(showId, season, episode.episode_number)) return false;
   addNotification(showId, showTitle, season, episode.episode_number, episode.name || null, 'new_episode', episode.air_date);
@@ -90,10 +113,11 @@ export async function scanForNewEpisodes(force = false): Promise<number> {
         const latest = seasons[seasons.length - 1];
         if (!latest) continue;
         const eps = ((await getSeasonDetails(show.id, latest.season_number)) as { episodes: TMDBEpisode[] }).episodes || [];
+        const showImdb = await resolveShowImdb(show.id);
 
         for (const ep of eps) {
           if (added >= MAX_NOTIFICATIONS) break;
-          if (addEpisodeNotification(show.id, detail.name || show.title, latest.season_number, ep)) added++;
+          if (await addEpisodeNotification(show.id, detail.name || show.title, latest.season_number, ep, showImdb)) added++;
         }
 
         if (show.watchedAt > 0) {
@@ -127,6 +151,7 @@ export async function scanForNewEpisodes(force = false): Promise<number> {
       for (const [showId, items] of byShow) {
         if (added >= MAX_NOTIFICATIONS) break;
         const seasonsToCheck = [...new Set(items.map((i) => i.season))];
+        const showImdb = await resolveShowImdb(showId);
         for (const seasonNum of seasonsToCheck) {
           if (added >= MAX_NOTIFICATIONS) break;
           try {
@@ -136,7 +161,7 @@ export async function scanForNewEpisodes(force = false): Promise<number> {
               if (item.season !== seasonNum) continue;
               const ep = eps.find((e) => e.episode_number === item.episode);
               if (!ep) continue;
-              if (addEpisodeNotification(showId, item.showTitle, seasonNum, ep)) added++;
+              if (await addEpisodeNotification(showId, item.showTitle, seasonNum, ep, showImdb)) added++;
             }
           } catch {
             // Skip on fetch errors

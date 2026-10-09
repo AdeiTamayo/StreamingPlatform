@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
+import { isEpisodeReleased } from '../api/tvmaze';
 import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag, saveProgress, getProgress, clearProgress } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
@@ -316,7 +317,13 @@ export default function TVDetail() {
               for (const ep of eps) {
                 if (added >= 5) break;
                 if (!ep.air_date) continue;
-                if (new Date(ep.air_date) > now) continue;
+                // Exact broadcast instant near the day boundary (US evening
+                // = next morning in Spain); date logic everywhere else.
+                if (!(await isEpisodeReleased(
+                  { imdbId, season: latestSeason.season_number, episode: ep.episode_number, airDate: ep.air_date },
+                  now.getTime(),
+                  controller.signal,
+                ))) continue;
                 if (new Date(ep.air_date).getTime() < now.getTime() - 7 * 24 * 60 * 60 * 1000) continue;
                 if (isWatched('tv', id, latestSeason.season_number, ep.episode_number)) continue;
                 if (isAlreadyNotified(id, latestSeason.season_number, ep.episode_number)) continue;
@@ -343,7 +350,11 @@ export default function TVDetail() {
               if (epwl.season !== seasonNum) continue;
               const ep = eps.find((e: TMDBEpisode) => e.episode_number === epwl.episode);
               if (!ep || !ep.air_date) continue;
-              if (new Date(ep.air_date) > now) continue;
+              if (!(await isEpisodeReleased(
+                { imdbId, season: seasonNum, episode: epwl.episode, airDate: ep.air_date },
+                now.getTime(),
+                controller.signal,
+              ))) continue;
               if (new Date(ep.air_date).getTime() < now.getTime() - 7 * 24 * 60 * 60 * 1000) continue;
               if (isWatched('tv', id, seasonNum, epwl.episode)) continue;
               if (isAlreadyNotified(id, seasonNum, epwl.episode)) continue;

@@ -3,10 +3,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('../api/tmdb', () => ({
   getTVDetail: vi.fn(),
   getSeasonDetails: vi.fn(),
+  getTVExternalIds: vi.fn(),
+}));
+
+vi.mock('./tvmaze', () => ({
+  // Default mirrors date logic; individual tests override per case.
+  isEpisodeReleased: vi.fn(async (input: { airDate: string }, now?: number) =>
+    new Date(input.airDate).getTime() <= (now ?? Date.now()),
+  ),
 }));
 
 import { scanForNewEpisodes, isNewEpisodeScanThrottled } from './newEpisodeScan';
-import { getTVDetail, getSeasonDetails } from './tmdb';
+import { getTVDetail, getSeasonDetails, getTVExternalIds } from './tmdb';
+import { isEpisodeReleased } from './tvmaze';
 import {
   markWatched,
   addWatchLater,
@@ -18,6 +27,8 @@ import {
 
 const mockedGetTVDetail = vi.mocked(getTVDetail);
 const mockedGetSeasonDetails = vi.mocked(getSeasonDetails);
+const mockedGetTVExternalIds = vi.mocked(getTVExternalIds);
+const mockedIsEpisodeReleased = vi.mocked(isEpisodeReleased);
 
 const DAY = 24 * 60 * 60 * 1000;
 const DAYS_AGO = (days: number) => new Date(Date.now() - days * DAY).toISOString().slice(0, 10);
@@ -139,5 +150,25 @@ describe('scanForNewEpisodes', () => {
     await scanForNewEpisodes(true);
     expect(mockedGetTVDetail).not.toHaveBeenCalled();
     expect(getWatchLater()).toHaveLength(1);
+  });
+
+  it('waits for the real broadcast instant instead of the calendar date', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    addWatchLater('tv', '3', 'US Show', '2024', 'p.jpg');
+    mockedGetTVDetail.mockResolvedValue({ name: 'US Show', seasons: [{ season_number: 1, episode_count: 1 }] });
+    mockedGetSeasonDetails.mockResolvedValue({
+      episodes: [{ episode_number: 1, air_date: today, name: 'Premiere' }],
+    });
+    mockedGetTVExternalIds.mockResolvedValue({ imdb_id: 'tt9999999' });
+
+    // 21:00 ET has not aired yet at noon UTC: no notification.
+    mockedIsEpisodeReleased.mockResolvedValueOnce(false);
+    expect(await scanForNewEpisodes(true)).toBe(0);
+    expect(getNotifications()).toHaveLength(0);
+
+    // Past the instant (03:00 next day in Spain): notify.
+    mockedIsEpisodeReleased.mockResolvedValueOnce(true);
+    expect(await scanForNewEpisodes(true)).toBe(1);
+    expect(getNotifications()).toHaveLength(1);
   });
 });
