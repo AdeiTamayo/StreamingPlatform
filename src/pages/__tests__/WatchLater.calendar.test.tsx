@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import WatchLater, { CALENDAR_CACHE_KEY } from '../WatchLater';
-import { addWatchLater } from '../../api/storage';
+import { addWatchLater, setUpcomingOpen, UPCOMING_OPEN_KEY } from '../../api/storage';
 import { getMovieDetail, getTVDetail, getSeasonDetails, getTVExternalIds } from '../../api/tmdb';
 import { getEpisodeAirInstant } from '../../api/tvmaze';
 import { setTimezone } from '../../api/storage';
@@ -298,6 +298,96 @@ describe('WatchLater calendar integration', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: new RegExp(`${monthName} 15,.*0 releases`) }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the upcoming list by default', async () => {
+    const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const futureIso = iso(future.getFullYear(), future.getMonth(), future.getDate());
+    const { movieDate } = currentMonthDates();
+    setupSuccessMocks(movieDate, movieDate);
+    addWatchLater('movie', 550, 'Fight Club', '1999', '/x.png');
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        items: [{ date: futureIso, title: 'Cached Future Show', type: 'movie', id: 550 }],
+      }),
+    );
+
+    renderWatchLater();
+    const toggle = await screen.findByRole('button', { name: /\d+ upcoming/i });
+    expect(toggle.textContent).toContain('▲');
+    expect(screen.getByText('Cached Future Show')).toBeInTheDocument();
+  });
+
+  it('shows the local air time in the upcoming list', async () => {
+    const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const futureIso = iso(future.getFullYear(), future.getMonth(), future.getDate());
+    const instant = future.getTime();
+    const { movieDate } = currentMonthDates();
+    setupSuccessMocks(movieDate, movieDate);
+    addWatchLater('movie', 550, 'Fight Club', '1999', '/x.png');
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        items: [{ date: futureIso, title: 'Timed Future Show', type: 'movie', id: 550, airTimestamp: instant }],
+      }),
+    );
+
+    renderWatchLater();
+    const expectedTime = new Date(instant).toLocaleTimeString(undefined, {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    const matches = await screen.findAllByText((_, el) => el?.textContent?.includes(expectedTime) ?? false);
+    expect(matches.length).toBeGreaterThan(0);
+    expect(screen.getByText('Timed Future Show')).toBeInTheDocument();
+  });
+
+  it('remembers the collapsed upcoming preference', async () => {
+    const future = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const futureIso = iso(future.getFullYear(), future.getMonth(), future.getDate());
+    const { movieDate } = currentMonthDates();
+    setupSuccessMocks(movieDate, movieDate);
+    setUpcomingOpen(false);
+    addWatchLater('movie', 550, 'Fight Club', '1999', '/x.png');
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        items: [{ date: futureIso, title: 'Cached Future Show', type: 'movie', id: 550 }],
+      }),
+    );
+
+    renderWatchLater();
+    const toggle = await screen.findByRole('button', { name: /\d+ upcoming/i });
+    expect(toggle.textContent).toContain('▼');
+    expect(screen.queryByText('Cached Future Show')).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(await screen.findByText('Cached Future Show')).toBeInTheDocument();
+    expect(toggle.textContent).toContain('▲');
+    expect(localStorage.getItem(UPCOMING_OPEN_KEY)).toBe('1');
+  });
+
+  it('heals a cache that already contains duplicates', async () => {
+    const { year, month } = currentMonthDates();
+    const keptDate = iso(year, month, 15);
+    setupSuccessMocks(keptDate, keptDate);
+    addWatchLater('movie', 550, 'Fight Club', '1999', '/x.png');
+    const entry = { date: keptDate, title: 'Fight Club', type: 'movie', id: 550 };
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({ savedAt: Date.now(), items: [entry, { ...entry }] }),
+    );
+
+    renderWatchLater();
+    await switchToCalendarView();
+
+    const monthName = generateCalendarGrid(year, month).monthName;
+    expect(
+      screen.getByRole('button', { name: new RegExp(`${monthName} 15,.*1 release`) }),
     ).toBeInTheDocument();
   });
 
