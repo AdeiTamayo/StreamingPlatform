@@ -225,12 +225,17 @@ export default function LastSeen() {
           <div className="empty-state">
             <h3>No history yet</h3>
             <p>
-              Your watched episodes and resume points will appear here as you
-              start playing something.
+              Everything you watch - and where you left off - will appear
+              here as you start playing something.
             </p>
-            <Link to="/tv" className="empty-state-action">
-              Browse TV shows
-            </Link>
+            <div className="empty-state-actions">
+              <Link to="/movies" className="empty-state-action">
+                Browse Movies
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                Explore TV Shows
+              </Link>
+            </div>
           </div>
         ) : (
           <>
