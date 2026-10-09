@@ -160,8 +160,8 @@ flowchart TD
 - CSS Modules for scoped styling
 - localStorage for local user data (watched marks, progress, watch later lists)
 - IndexedDB for TMDB API response cache (larger quota than localStorage)
-- [Vitest](https://vitest.dev) for unit and component tests
-- [oxlint](https://oxc.rs) for linting
+- [Vitest](https://vitest.dev) for unit and component tests (jsdom, mocked externals)
+- [oxlint](https://oxc.rs) for linting, with `react/rules-of-hooks` and `react/exhaustive-deps` enabled
 
 ## Getting Started
 
@@ -221,11 +221,12 @@ Output goes to the `dist/` directory.
 npm run test
 ```
 
-239 tests across 18 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze calls are mocked, so the suite never touches the network.
+259 tests across 19 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze calls are mocked, so the suite never touches the network.
 
 ```bash
 npx tsc --noEmit   # typecheck
 npm run lint       # oxlint
+npm audit          # dependency vulnerabilities (currently 0)
 ```
 
 ## Deploying to Vercel
@@ -238,6 +239,9 @@ This project is ready for Vercel deployment. The `vercel.json` configures SPA ro
 4. Deploy
 
 Vercel will auto-deploy on every push to `main`.
+
+Note: everything prefixed `VITE_` ships to the browser. Never put a server-side
+secret in this project — there is no server to keep it safe.
 
 ## Project Structure
 
@@ -268,6 +272,7 @@ src/
     AccountButton/      # "Sign In" CTA for guests
     Player.tsx          # Video player with progress tracking
     MediaCard.tsx       # Poster card with rating and action buttons
+    RatingBadge.tsx     # Shared IMDb-or-TMDB rating badge (MediaCard + Watch Later)
     ErrorBoundary.tsx   # Render crash catcher with retry
     Toast.tsx           # Toast notification system
     Notifications.tsx   # In-app notification bell
@@ -320,6 +325,7 @@ Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvma
 - Without Supabase configured, the app works exactly as before: no accounts, no server
 - Supabase data is protected by Row Level Security — each user can only read/write their own rows
 - TMDB API responses are cached in IndexedDB for 24 hours (max 100 entries, virtually unlimited space)
+- All `VITE_*` variables are inlined into the client bundle by design — there is no server-side secret. The Supabase key is `anon`-role and bounded by Row Level Security, and the TMDB token has no quota isolation, so it can be extracted and used to burn the account's rate limit
 - Playback position isn't always persisted by the embed player, so no resume percentage is advertised on detail pages — the Restart control is the reliable way to start over
 - The `N new` badge uses TMDB's date-only `air_date`, while the calendar uses TVMaze's exact air instant; near midnight they can occasionally disagree
 - The app uses a privacy-conscious setup: noindex tags, no analytics, no tracking
