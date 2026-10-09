@@ -252,30 +252,28 @@
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
-.cw-remove {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
-  z-index: 5;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.55);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1;
+.cw-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-  transition: background 0.18s, color 0.18s;
+  gap: 0.35rem;
+  padding: 0 0.55rem 0.55rem;
 }
 
-.cw-remove:hover {
-  background: rgba(239, 68, 68, 0.7);
-  color: #fff;
-  border-color: rgba(239, 68, 68, 0.4);
+.cw-action-btn {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.45rem;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+
+.cw-action-btn:hover {
+  color: var(--text);
+  background: rgba(125, 211, 252, 0.12);
+  border-color: rgba(125, 211, 252, 0.28);
 }
 
 .cw-card-poster {

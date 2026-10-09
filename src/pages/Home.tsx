@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getTrending, imageUrl } from '../api/tmdb';
 import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../api/omdb';
 import MediaCard from '../components/MediaCard';
@@ -10,7 +10,15 @@ import { useAuth } from '../hooks/useAuth';
 import type { TMDBMovie, TMDBSeries, ContinueWatchingItem } from '../types';
 import styles from './Home.module.css';
 
-function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void }) {
+function CwCard({
+  item,
+  onRemove,
+  onRestart,
+}: {
+  item: ContinueWatchingItem;
+  onRemove: (item: ContinueWatchingItem) => void;
+  onRestart: (item: ContinueWatchingItem) => void;
+}) {
   const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
   const poster = item.meta?.poster as string | undefined;
   const metaRuntime = (item.meta?.runtime as number) || null;
@@ -40,7 +48,14 @@ function CwCard({ item, onRemove }: { item: ContinueWatchingItem; onRemove: (ite
           {item.season && <span className={styles.cwCardMeta}>S{item.season}E{item.episode}</span>}
         </div>
       </Link>
-      <button className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove">&times;</button>
+      <div className={styles.cwActions}>
+        <button className={styles.cwActionBtn} onClick={() => onRestart(item)}>
+          Restart
+        </button>
+        <button className={styles.cwActionBtn} onClick={() => onRemove(item)}>
+          Remove
+        </button>
+      </div>
     </div>
   );
 }
@@ -54,6 +69,7 @@ export default function Home() {
   const [heroImdbRating, setHeroImdbRating] = useState<ImdbRating | null>(null);
   const [cwFilter, setCwFilter] = useState<string>('all');
   const [heroPaused, setHeroPaused] = useState(false);
+  const navigate = useNavigate();
   const toast = useToast();
   const { getSignal } = useAbortController();
   const { isAuthenticated, syncVersion } = useAuth();
@@ -120,6 +136,18 @@ export default function Home() {
     clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
     toast?.('Removed from Continue Watching');
+  }
+
+  function handleRestartCW(item: ContinueWatchingItem) {
+    clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
+    setContinueWatching(getContinueWatching());
+    if (item.type === 'tv') {
+      const season = item.season ?? 1;
+      const ep = item.episode ?? 1;
+      navigate(`/tv/${item.id}?season=${season}&episode=${ep}`);
+      return;
+    }
+    navigate(`/movie/${item.id}`);
   }
 
   const filteredCW = continueWatching.filter((item: ContinueWatchingItem) => {
@@ -229,7 +257,12 @@ export default function Home() {
           {filteredCW.length > 0 ? (
             <div className={styles.cwGrid}>
               {filteredCW.map((item, i) => (
-                <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} />
+                <CwCard
+                  key={`${item.type}-${item.id}-${item.episode || ''}-${i}`}
+                  item={item}
+                  onRemove={handleRemoveCW}
+                  onRestart={handleRestartCW}
+                />
               ))}
             </div>
           ) : (

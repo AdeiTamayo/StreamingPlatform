@@ -228,6 +228,7 @@ export default function MovieDetail() {
   const embedUrl = getMovieEmbedUrl(safeId, videoSource, startAt ?? undefined);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
+  const released = !!movie.release_date && new Date(movie.release_date).getTime() <= Date.now();
   const cast: TMDBCastMember[] = movie.credits?.cast?.slice(0, 8) || [];
   const crew: TMDBCrewMember[] = movie.credits?.crew || [];
   const director = crew.find((c) => c.job === 'Director');
@@ -262,6 +263,8 @@ export default function MovieDetail() {
               {movie.runtime != null && movie.runtime > 0 && (
                 <span className="badge">{movie.runtime} min</span>
               )}
+              <span className="badge">{released ? "Released" : "Upcoming"}</span>
+              <span className="badge">{watched ? "Watched" : "Not watched"}</span>
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (

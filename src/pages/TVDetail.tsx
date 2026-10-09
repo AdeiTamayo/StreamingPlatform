@@ -658,6 +658,25 @@ export default function TVDetail() {
   const networks = show.networks || [];
   const genres = show.genres?.map((g) => g.name).join(', ') || '';
   const recommendations = show.recommendations?.results?.slice(0, 10) || [];
+  const totalEpisodeCount = seasons.reduce((sum, s) => sum + (s.episode_count || 0), 0);
+  const watchedEpisodeTotal = id
+    ? seasons.reduce(
+      (sum, s) => sum + getWatchedCount(id, s.season_number, s.episode_count || 0),
+      0,
+    )
+    : 0;
+  const nextEpisode = show.next_episode_to_air as
+    | { air_date?: string; season_number?: number; episode_number?: number }
+    | undefined;
+  const nextEpisodeReleased = !!nextEpisode?.air_date && new Date(nextEpisode.air_date).getTime() <= Date.now();
+  const hasNewEpisodeAvailable = !!id
+    && nextEpisodeReleased
+    && typeof nextEpisode?.season_number === "number"
+    && typeof nextEpisode?.episode_number === "number"
+    && !isWatched("tv", id, nextEpisode.season_number, nextEpisode.episode_number);
+  const nextEpisodeDateText = nextEpisode?.air_date
+    ? new Date(nextEpisode.air_date).toLocaleDateString()
+    : null;
 
   return (
     <div className="page">
@@ -684,6 +703,16 @@ export default function TVDetail() {
               ) : null}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
+              <span className="badge">{ended ? "Completed series" : show.status || "In production"}</span>
+              {totalEpisodeCount > 0 && (
+                <span className="badge">{watchedEpisodeTotal}/{totalEpisodeCount} watched</span>
+              )}
+              {!ended && hasNewEpisodeAvailable && (
+                <span className="badge">New episode available</span>
+              )}
+              {!ended && !hasNewEpisodeAvailable && nextEpisodeDateText && (
+                <span className="badge">Next episode: {nextEpisodeDateText}</span>
+              )}
               <button className={`badge-btn ${inWL ? 'in-wl' : ''}`} onClick={() => {
                 if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
                 else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }

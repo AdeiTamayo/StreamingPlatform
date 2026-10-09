@@ -228,9 +228,17 @@ export default function LastSeen() {
               Your watched episodes and resume points will appear here as you
               start playing something.
             </p>
-            <Link to="/tv" className="empty-state-action">
-              Browse TV shows
-            </Link>
+            <div className="empty-state-actions">
+              <Link to="/" className="empty-state-action">
+                Browse trending
+              </Link>
+              <Link to="/movies" className="empty-state-action">
+                Pick genres
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                Explore TV
+              </Link>
+            </div>
           </div>
         ) : (
           <>

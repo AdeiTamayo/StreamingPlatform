@@ -233,3 +233,55 @@
   background: rgba(248, 113, 113, 0.2);
   color: var(--danger);
 }
+
+.no-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1rem 0;
+}
+
+.no-results h3 {
+  font-size: 1rem;
+}
+
+.no-results p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.no-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.no-results-recovery {
+  margin-top: 0.25rem;
+}
+
+.no-results-recovery-label {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  margin-bottom: 0.35rem;
+}
+
+.no-results-recovery-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.no-results-chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.3rem 0.65rem;
+}
+
+.no-results-chip:hover {
+  background: rgba(125, 211, 252, 0.12);
+  color: var(--text);
+}

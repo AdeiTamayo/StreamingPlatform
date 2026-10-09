@@ -271,9 +271,37 @@ export default function Search() {
         ) : loading ? (
           <div className="loading" role="status">Searching...</div>
         ) : !personId && !query.trim() ? (
-          <div className="loading" role="status">Type above to search movies and TV shows</div>
+          <div className="empty-state" role="status">
+            <h3>Start a search</h3>
+            <p>Search by title, then use your recent queries for quick access.</p>
+            <div className="empty-state-actions">
+              <Link to="/" className="empty-state-action">Browse trending</Link>
+              <Link to="/movies" className="empty-state-action">Pick genres</Link>
+              <Link to="/tv" className="empty-state-action">Explore TV</Link>
+            </div>
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="loading" role="status">No results found</div>
+          <div className={styles.noResults} role="status">
+            <h3>No results found for "{query}"</h3>
+            <p>Try a broader title or jump to one of these shortcuts.</p>
+            <div className={styles.noResultsActions}>
+              <Link to="/" className="empty-state-action">Browse trending</Link>
+              <button className="empty-state-action" onClick={() => setTab('movie')}>Movies only</button>
+              <button className="empty-state-action" onClick={() => setTab('tv')}>TV shows only</button>
+            </div>
+            {history.length > 0 && (
+              <div className={styles.noResultsRecovery}>
+                <div className={styles.noResultsRecoveryLabel}>Try recent:</div>
+                <div className={styles.noResultsRecoveryList}>
+                  {history.slice(0, 4).map((q) => (
+                    <button key={q} className={styles.noResultsChip} onClick={() => handleHistoryClick(q)}>
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         ) : (
           <>
             <div className="media-grid">

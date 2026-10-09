@@ -137,6 +137,10 @@ function calendarKey(item: CalendarItem) {
   return `${item.type}-${item.id}-${item.date}-S${item.season ?? 0}E${item.episode ?? 0}`;
 }
 
+function wlItemKey(item: Pick<WatchLaterItem, "type" | "id">): string {
+  return `${item.type}-${String(item.id)}`;
+}
+
 // Persisted release-calendar cache so a return visit paints instantly from
 // the previous load while fresh data is fetched in the background.
 export const CALENDAR_CACHE_KEY = "streamflow:calendar-cache:v1";
@@ -203,6 +207,7 @@ export default function WatchLater() {
   const [hideUnreleasedPosters, setHideUnreleasedPosters] = useState(false);
   const [upcomingPage, setUpcomingPage] = useState(0);
   const [page, setPage] = useState(1);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const calendarInitedRef = useRef(false);
   const loadingCalendarRef = useRef(false);
   const calendarItemsRef = useRef<CalendarItem[]>([]);
@@ -557,6 +562,11 @@ export default function WatchLater() {
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
     setItems(getWatchLater());
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      next.delete(`${type}-${String(id)}`);
+      return next;
+    });
     // TV calendar entries use type "episode", not "tv" - match by id so a
     // removed show doesn't linger in the calendar/upcoming list.
     setCalendarItems((prev) =>
@@ -672,6 +682,11 @@ export default function WatchLater() {
     return list;
   }, [items, sortBy, filterType, hideUnreleasedPosters, unreleasedKeys]);
 
+  const pagedItems = useMemo(
+    () => sortedItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
+    [sortedItems, page, ITEMS_PER_PAGE],
+  );
+
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
   const upcomingCalendarCount = calendarItems.filter((c) => isFuture(c.date)).length;
 
@@ -683,6 +698,62 @@ export default function WatchLater() {
   useEffect(() => {
     if (page > listPages) setPage(listPages);
   }, [listPages, page]);
+
+  useEffect(() => {
+    const valid = new Set(sortedItems.map((item) => wlItemKey(item)));
+    setSelectedKeys((prev) => {
+      const next = new Set<string>();
+      for (const key of prev) {
+        if (valid.has(key)) next.add(key);
+      }
+      return next;
+    });
+  }, [sortedItems]);
+
+  function toggleSelectItem(item: WatchLaterItem) {
+    const key = wlItemKey(item);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function selectCurrentPage() {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      for (const item of pagedItems) next.add(wlItemKey(item));
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedKeys(new Set());
+  }
+
+  function removeSelected() {
+    if (selectedKeys.size === 0) return;
+    if (!window.confirm(`Remove ${selectedKeys.size} selected item${selectedKeys.size === 1 ? "" : "s"} from Watch Later?`)) {
+      return;
+    }
+    const selected = new Set(selectedKeys);
+    const selectedItems = items.filter((item) => selected.has(wlItemKey(item)));
+    if (selectedItems.length === 0) return;
+    for (const item of selectedItems) {
+      removeWatchLater(item.type, item.id);
+    }
+    setItems((prev) => prev.filter((item) => !selected.has(wlItemKey(item))));
+    setCalendarItems((prev) =>
+      prev.filter((c) => {
+        if (c.type === "movie") return !selected.has(`movie-${String(c.id)}`);
+        if (c.type === "episode") return !selected.has(`tv-${String(c.id)}`);
+        return true;
+      }),
+    );
+    clearSelection();
+    toast?.(`${selectedItems.length} item${selectedItems.length === 1 ? "" : "s"} removed from Watch Later`);
+  }
 
   if (view === "calendar") {
     const maxPosters = 1;
@@ -963,9 +1034,17 @@ export default function WatchLater() {
               Add movies, shows, or individual episodes to watch later and
               they'll show up here.
             </p>
-            <Link to="/movies" className="empty-state-action">
-              Start browsing
-            </Link>
+            <div className="empty-state-actions">
+              <Link to="/" className="empty-state-action">
+                Browse trending
+              </Link>
+              <Link to="/movies" className="empty-state-action">
+                Pick genres
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                Explore TV
+              </Link>
+            </div>
           </div>
         ) : (
           <>
@@ -1050,15 +1129,44 @@ export default function WatchLater() {
                       Clear filters
                     </button>
                   )}
+                  {pagedItems.length > 0 && (
+                    <button
+                      className={styles.wlClearBtn}
+                      onClick={selectCurrentPage}
+                    >
+                      Select page
+                    </button>
+                  )}
+                  {selectedKeys.size > 0 && (
+                    <button className={styles.wlClearBtn} onClick={clearSelection}>
+                      Clear selection ({selectedKeys.size})
+                    </button>
+                  )}
+                  <button
+                    className={`${styles.wlClearBtn} ${styles.dangerBtn}`}
+                    onClick={removeSelected}
+                    disabled={selectedKeys.size === 0}
+                    title={selectedKeys.size === 0 ? "Select items to remove" : "Remove selected items"}
+                  >
+                    Remove selected{selectedKeys.size > 0 ? ` (${selectedKeys.size})` : ""}
+                  </button>
                 </div>
                 <div className="media-grid">
-                  {sortedItems
-                    .slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
-                    .map((item) => (
+                  {pagedItems.map((item) => {
+                    const selected = selectedKeys.has(wlItemKey(item));
+                    return (
                       <div
                         key={`${(item as WatchLaterItem).type}-${(item as WatchLaterItem).id}`}
-                        className="media-card"
+                        className={`media-card ${selected ? styles.selectedCard : ""}`}
                       >
+                        <button
+                          className={`${styles.selectBtn} ${selected ? styles.selectBtnActive : ""}`}
+                          onClick={() => toggleSelectItem(item)}
+                          aria-pressed={selected}
+                          title={selected ? "Unselect item" : "Select item"}
+                        >
+                          {selected ? "✓" : "+"}
+                        </button>
                         <Link
                           to={`/${(item as WatchLaterItem).type === "tv" ? "tv" : "movie"}/${(item as WatchLaterItem).id}`}
                         >
@@ -1107,7 +1215,8 @@ export default function WatchLater() {
                           &times;
                         </button>
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
                 {listPages > 1 && (
                   <Pagination page={page} totalPages={listPages} onChange={setPage} />
