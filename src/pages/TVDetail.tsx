@@ -713,6 +713,34 @@ export default function TVDetail() {
               ) : null}
               {genres && <span className="badge">{genres}</span>}
               <span className="badge">{seasons.length} Seasons</span>
+              {show.status === 'Ended' || show.status === 'Canceled' ? (
+                <span className="badge" title={`Series status: ${show.status}`}>Ended</span>
+              ) : show.status ? (
+                <span className="badge" title={`Series status: ${show.status}`}>Ongoing</span>
+              ) : null}
+              {(() => {
+                // Decision support from already-loaded data only (no extra
+                // requests): unwatched episodes of the viewed season that
+                // aired in the last 7 days.
+                const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                const fresh = episodes.filter(
+                  (ep) =>
+                    ep.air_date &&
+                    new Date(ep.air_date).getTime() >= weekAgo &&
+                    new Date(ep.air_date).getTime() <= Date.now() &&
+                    !watchedMap[ep.episode_number],
+                ).length;
+                return fresh > 0 ? (
+                  <span className="badge" title={`${fresh} unwatched ${fresh === 1 ? 'episode' : 'episodes'} aired in the last 7 days (season ${season})`}>
+                    {fresh} new
+                  </span>
+                ) : null;
+              })()}
+              {watchedCount > 0 && (
+                <span className="badge" title={`You have watched ${watchedCount} of ${episodeCount} episodes in season ${season}`}>
+                  {watchedCount}/{episodeCount} watched
+                </span>
+              )}
               <button
                 type="button"
                 className={`${styles.epActionBtn} ${inWL ? styles.activeWatchLater : ''}`}

@@ -3,6 +3,7 @@ import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import TVDetail from '../pages/TVDetail';
 import MovieDetail from '../pages/MovieDetail';
+import { markWatched } from '../api/storage';
 import { saveProgress, getProgress } from '../api/storage';
 
 vi.mock('../hooks/useAuth', () => ({
@@ -182,6 +183,82 @@ describe('detail pages render', () => {
     expect(screen.getByTitle('Save to Watch Later')).toBeInTheDocument();
     expect(screen.queryByText('Mark as watched')).not.toBeInTheDocument();
     expect(screen.queryByText('Watch Later')).not.toBeInTheDocument();
+  });
+
+  it('TVDetail shows decision badges for status, new episodes and progress', async () => {
+    // Fresh show id (1400): the TMDB IndexedDB cache persists across tests
+    // in this file, and 1399's season is already cached with 2011 air dates
+    // from the earlier tests - reusing it would never show "new" episodes.
+    const recent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    markWatched('tv', '1400', 'Test Show', 1, 1);
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('api.themoviedb.org/3/tv/1400?')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...SHOW, id: 1400, name: 'Test Show', status: 'Ended' }) });
+      }
+      if (url.includes('/tv/1400/season/1')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            id: 1,
+            season_number: 1,
+            episodes: [
+              { id: 1, episode_number: 1, name: 'Pilot', air_date: recent, runtime: 61, overview: 'x', still_path: '/s1.png', vote_average: 8.9 },
+              { id: 2, episode_number: 2, name: 'Second', air_date: recent, runtime: 56, overview: 'y', still_path: '/s2.png', vote_average: 8.7 },
+            ],
+          }),
+        });
+      }
+      if (url.includes('/tv/1400/external_ids')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ imdb_id: 'tt9999999' }) });
+      }
+      return mockFetchImpl(url);
+    }));
+    render(
+      <MemoryRouter initialEntries={['/tv/1400']}>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('Ended')).toBeInTheDocument(), { timeout: 5000 });
+    // One of the two recent episodes is already watched. Badges resolve
+    // asynchronously (season fetch, then watched-state recompute), and they
+    // are queried by tooltip so the match is unambiguous - getByText would
+    // also match the shared .detail-badges container.
+    await waitFor(
+      () => expect(screen.getByTitle(/1 unwatched episode aired in the last 7 days \(season 1\)/)).toBeInTheDocument(),
+      { timeout: 5000 },
+    );
+    expect(screen.getByTitle('You have watched 1 of 2 episodes in season 1')).toHaveTextContent('1/2 watched');
+  });
+
+  it('MovieDetail shows a watched badge', async () => {
+    markWatched('movie', '550', 'Fight Club');
+    render(
+      <MemoryRouter initialEntries={['/movie/550']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByText('✓ Watched')).toBeInTheDocument(), { timeout: 5000 });
+  });
+
+  // Saved progress deliberately shows no badge: the player does not always
+  // persist a position, so a resume percentage can promise something that
+  // does not happen. The Restart button is the reliable affordance.
+  it('MovieDetail shows no resume badge for saved progress', async () => {
+    saveProgress('movie', '550', 3000, null, null, { title: 'Fight Club' }, 139 * 60);
+    render(
+      <MemoryRouter initialEntries={['/movie/550']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument(), { timeout: 5000 });
+    expect(screen.queryByText(/Resume/)).not.toBeInTheDocument();
   });
 
   it('TVDetail episode restart button clears the saved position', async () => {

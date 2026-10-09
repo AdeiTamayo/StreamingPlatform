@@ -265,6 +265,9 @@ export default function MovieDetail() {
               {movie.runtime != null && movie.runtime > 0 && (
                 <span className="badge">{movie.runtime} min</span>
               )}
+              {watched && (
+                <span className="badge" title="You have marked this movie as watched">✓ Watched</span>
+              )}
             </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (
