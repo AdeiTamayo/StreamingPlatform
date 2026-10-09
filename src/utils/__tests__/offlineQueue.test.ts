@@ -12,8 +12,10 @@ vi.mock('../lib/supabase', () => ({
 
 import {
   clearOfflineQueue,
+  disposeOfflineQueueSync,
   enqueueWrite,
   getQueueSize,
+  initOfflineQueueSync,
   OFFLINE_QUEUE_KEY,
   setSyncUserId,
   syncOfflineQueue,
@@ -83,5 +85,51 @@ describe('offlineQueue', () => {
     }
     await syncOfflineQueue();
     expect(getQueueSize()).toBe(0);
+  });
+
+  describe('background sync lifecycle', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      disposeOfflineQueueSync();
+      vi.useRealTimers();
+    });
+
+    it('starts a retry timer and an online listener exactly once', () => {
+      const addSpy = vi.spyOn(window, 'addEventListener');
+      initOfflineQueueSync();
+      initOfflineQueueSync();
+      const onlineCalls = addSpy.mock.calls.filter(([type]) => type === 'online');
+      expect(onlineCalls).toHaveLength(1);
+      addSpy.mockRestore();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+    });
+
+    // The timer used to live for the lifetime of the tab with no way to stop
+    // it, which leaked a timer in every test that initialised sync.
+    it('stops the timer and detaches the listener on dispose', () => {
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      initOfflineQueueSync();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      disposeOfflineQueueSync();
+      expect(vi.getTimerCount()).toBe(0);
+      const onlineCalls = removeSpy.mock.calls.filter(([type]) => type === 'online');
+      expect(onlineCalls).toHaveLength(1);
+      removeSpy.mockRestore();
+    });
+
+    it('can be re-initialised after disposal', () => {
+      initOfflineQueueSync();
+      disposeOfflineQueueSync();
+      initOfflineQueueSync();
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+    });
+
+    it('is safe to dispose when never initialised', () => {
+      expect(() => disposeOfflineQueueSync()).not.toThrow();
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });

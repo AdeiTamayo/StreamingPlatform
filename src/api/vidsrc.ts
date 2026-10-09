@@ -22,12 +22,23 @@ const SOURCES: Record<string, SourceEntry> = {
   },
 };
 
-export function getMovieEmbedUrl(tmdbId: string | number, source: string = 'vidsrc', startAt?: number): string {
-  return SOURCES[source]?.movie(tmdbId, startAt) ?? SOURCES.vidsrc.movie(tmdbId, startAt);
+const DEFAULT_SOURCE = 'vidsrc';
+
+// `source` reaches here from localStorage and is user-writable via Settings ->
+// Import, so it must be validated as a key rather than trusted. Optional
+// chaining is not enough: indexing a plain object with "constructor",
+// "toString" or "__proto__" resolves an inherited function and then throws
+// when .movie / .tv is called.
+function resolveSource(source: string): SourceEntry {
+  return Object.hasOwn(SOURCES, source) ? SOURCES[source] : SOURCES[DEFAULT_SOURCE];
 }
 
-export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: number, source: string = 'vidsrc', startAt?: number): string {
-  return SOURCES[source]?.tv(tmdbId, season, episode, startAt) ?? SOURCES.vidsrc.tv(tmdbId, season, episode, startAt);
+export function getMovieEmbedUrl(tmdbId: string | number, source: string = DEFAULT_SOURCE, startAt?: number): string {
+  return resolveSource(source).movie(tmdbId, startAt);
+}
+
+export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: number, source: string = DEFAULT_SOURCE, startAt?: number): string {
+  return resolveSource(source).tv(tmdbId, season, episode, startAt);
 }
 
 export function getSourceLabel(source: string): string {
@@ -36,7 +47,7 @@ export function getSourceLabel(source: string): string {
     '2embed': '2Embed',
     embos: 'Embos',
   };
-  return labels[source] || source;
+  return Object.hasOwn(labels, source) ? labels[source] : source;
 }
 
 export const SOURCE_KEYS: string[] = Object.keys(SOURCES);

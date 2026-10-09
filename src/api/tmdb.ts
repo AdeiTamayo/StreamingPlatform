@@ -17,6 +17,9 @@ const options = {
   },
 };
 
+const PLACEHOLDER_POSTER =
+  'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
+
 function tmdbUrl(
   path: string,
   params: Record<string, string | number | undefined> = {},
@@ -193,6 +196,25 @@ export async function discover(type: string, filters: Record<string, string | un
 }
 
 export function imageUrl(path: string | null, size = 'w500') {
-  if (!path) return 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
+  if (!path) return PLACEHOLDER_POSTER;
   return `${CONFIG.TMDB_IMAGE_BASE}/${size}${path}`;
+}
+
+/**
+ * Accepts a value read back from localStorage (which may have been written by
+ * a previous version, or supplied by a user import) and returns it only if it
+ * is a plain TMDB image path or a URL already pointing at TMDB's image CDN.
+ *
+ * Anything else - most importantly an absolute URL to another host - falls back
+ * to the placeholder. This cannot stop XSS (an <img src> never executes
+ * script), but it does stop a crafted import from making the app phone home to
+ * an arbitrary server or injecting a value into a CSS url() context.
+ */
+export function safeImageUrl(value: unknown, size = 'w500'): string {
+  if (typeof value !== 'string' || value.length === 0) return PLACEHOLDER_POSTER;
+  // A TMDB-relative path such as "/abc123.jpg".
+  if (/^\/[A-Za-z0-9._-]+$/.test(value)) return imageUrl(value, size);
+  // A full URL we produced ourselves via imageUrl().
+  if (value.startsWith(`${CONFIG.TMDB_IMAGE_BASE}/`)) return value;
+  return PLACEHOLDER_POSTER;
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { getTrending, imageUrl } from '../api/tmdb';
+import { getTrending, imageUrl, safeImageUrl } from '../api/tmdb';
 import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../api/omdb';
 import MediaCard from '../components/MediaCard';
 import { getContinueWatching, clearProgress } from '../api/storage';
@@ -26,7 +26,8 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
       >
         <div className={styles.cwCardPoster}>
           {poster ? (
-            <img src={imageUrl(poster ?? null)} alt={label} loading="lazy" />
+            // Progress metadata comes from localStorage, so validate the path.
+            <img src={safeImageUrl(poster)} alt={label} loading="lazy" />
           ) : (
             <div className={styles.cwCardPlaceholder} />
           )}

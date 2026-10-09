@@ -67,7 +67,8 @@ create policy "Users can insert their own watched items"
 
 create policy "Users can update their own watched items"
   on public.watched for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 create policy "Users can delete their own watched items"
   on public.watched for delete
@@ -126,7 +127,8 @@ create policy "Users can insert their own watch later"
 
 create policy "Users can update their own watch later"
   on public.watch_later for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 create policy "Users can delete their own watch later"
   on public.watch_later for delete
@@ -162,7 +164,8 @@ create policy "Users can insert their own search history"
 
 create policy "Users can update their own search history"
   on public.search_history for update
-  using (auth.uid() = user_id);
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 create policy "Users can delete their own search history"
   on public.search_history for delete

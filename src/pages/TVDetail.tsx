@@ -97,10 +97,13 @@ export default function TVDetail() {
   const hasPrev = episode > 1 || seasonIdx > 0;
   const hasNext = episodeCount > 0 && (episode < episodeCount || seasonIdx < seasons.length - 1);
 
-  function allWatched(): boolean {
+  // Memoized because it is read during render (and this component re-renders
+  // on every player progress tick), while getWatchedCount re-parses the whole
+  // watched index from localStorage on each call.
+  const allWatched = useMemo((): boolean => {
     if (!id) return false;
     return seasons.length > 0 && seasons.every(s => getWatchedCount(id, s.season_number, s.episode_count) >= s.episode_count);
-  }
+  }, [id, seasons, watchedCount]); // eslint-disable-line react-hooks/exhaustive-deps -- watchedCount is the signal that a watched mark changed
 
   function lastWatchedInSeason(showId: string, seasonNum: number): number {
     const set = getWatchedEpisodeSet(showId, seasonNum);
@@ -307,7 +310,7 @@ export default function TVDetail() {
                 unmarkSeriesWatched(id);
                 if (!inWL) addWatchLater('tv', id, show.name, (show.first_air_date || '').slice(0, 4), imageUrl(show.poster_path));
                 setInWL(true);
-                setSeriesWatched(allWatched());
+                setSeriesWatched(allWatched);
                 toast?.('New episodes released - moved to Watch Later');
                 movedToWatchLater = true;
               }
@@ -376,7 +379,7 @@ export default function TVDetail() {
   useEffect(() => {
     if (!id || !show || seasons.length === 0) return;
     syncSeriesWatchedFlag(id, seasons, show.name, show?.poster_path ?? '');
-    setSeriesWatched(getSeriesWatchedFlag(id).watched || allWatched());
+    setSeriesWatched(getSeriesWatchedFlag(id).watched || allWatched);
   }, [id, seasons, show, watched, watchedCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Watched dots for the current season - recomputed whenever any bulk
@@ -924,7 +927,7 @@ export default function TVDetail() {
             )}
             {seasons.length > 0 && (
               <button className={styles.markSeasonBtn} onClick={() => {
-                if (allWatched()) {
+                if (allWatched) {
                   unmarkAllSeasonsWatched(safeId, seasons);
                   toast?.('All episodes unmarked');
                 } else {
@@ -933,7 +936,7 @@ export default function TVDetail() {
                 }
                 setWatchedCount(getWatchedCount(safeId, season, episodeCount));
                 setWatched(isWatched('tv', safeId, season, episode));
-              }}>{allWatched() ? 'Unmark all watched' : 'Mark all watched'}</button>
+              }}>{allWatched ? 'Unmark all watched' : 'Mark all watched'}</button>
             )}
           </div>
           {seasons.length === 0 ? (

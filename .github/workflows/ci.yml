@@ -21,11 +21,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `tsc -b` rather than `tsc --noEmit` so the referenced tsconfig.node.json
+      # is also built - that covers vite.config.ts and the scripts/ directory,
+      # which the plain --noEmit invocation does not typecheck.
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: npx tsc -b
 
       - name: Lint
         run: npm run lint
+
+      # Catches the class of problem where a dependency ships an advisory
+      # between releases and the lockfile is never refreshed.
+      - name: Dependency audit
+        run: npm audit --audit-level=high
 
       - name: Test
         run: npm test

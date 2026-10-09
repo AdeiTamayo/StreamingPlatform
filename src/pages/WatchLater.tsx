@@ -8,18 +8,15 @@ import {
 } from "../api/storage";
 import {
   imageUrl,
+  safeImageUrl,
   getMovieDetail,
   getTVDetail,
   getSeasonDetails,
   getTVExternalIds,
 } from "../api/tmdb";
 import { getEpisodeAirInstant } from "../api/tvmaze";
-import {
-  getOmdbRatingByTitle,
-  peekOmdbRatingByTmdb,
-  type ImdbRating,
-} from "../api/omdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
+import RatingBadge from "../components/RatingBadge";
 import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
 import { useToast } from "../components/useToast";
@@ -72,69 +69,7 @@ function isCalendarRelevant(dateStr: string) {
   return d >= monthStart;
 }
 
-// Rating badge for Watch Later cards, matching MediaCard (Home/Movies/TV):
-// IMDb rating via OMDb when available, falling back to the TMDB vote average.
-function WlRatingBadge({
-  type,
-  id,
-  title,
-  year,
-}: {
-  type: MediaType;
-  id: string | number;
-  title: string;
-  year: string;
-}) {
-  const [tmdbRating, setTmdbRating] = useState<string | null>(null);
-  const [imdbRating, setImdbRating] = useState<ImdbRating | null>(() => {
-    const peek = peekOmdbRatingByTmdb(id);
-    return peek.state === "cached" ? peek.rating : null;
-  });
 
-  useEffect(() => {
-    let cancelled = false;
-    const peek = peekOmdbRatingByTmdb(id);
-    if (peek.state !== "fresh") {
-      setImdbRating(peek.rating);
-    } else {
-      getOmdbRatingByTitle(
-        id,
-        title,
-        year || "",
-        type === "tv" ? "series" : "movie",
-      ).then((r) => {
-        if (!cancelled) setImdbRating(r);
-      });
-    }
-    (type === "movie" ? getMovieDetail(id) : getTVDetail(id))
-      .then((detail) => {
-        if (cancelled) return;
-        const v = (detail as { vote_average?: number })?.vote_average;
-        setTmdbRating(v ? v.toFixed(1) : "?");
-      })
-      .catch(() => {
-        if (!cancelled) setTmdbRating("?");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [type, id, title, year]);
-
-  const display = imdbRating ? imdbRating.rating : tmdbRating;
-  if (!display) return null;
-  return (
-    <span
-      className="media-card-rating"
-      title={
-        imdbRating
-          ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ""}`
-          : `TMDB rating ${tmdbRating}/10`
-      }
-    >
-      {display}
-    </span>
-  );
-}
 
 function formatDate(dateStr: string, timeZone?: string) {
   const d = parseLocalDate(dateStr);
@@ -917,7 +852,10 @@ export default function WatchLater() {
     setCalMonth(month);
   }
 
-  const selectedItems = selectedDate ? itemsByDate[selectedDate] || [] : [];
+  const selectedItems = useMemo(
+    () => (selectedDate ? itemsByDate[selectedDate] || [] : []),
+    [itemsByDate, selectedDate],
+  );
 
   const groupedUpcomingList = useMemo(() => {
     const byDate: Record<string, CalendarItem[]> = {};
@@ -993,9 +931,10 @@ export default function WatchLater() {
     () => sortedItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE),
     [sortedItems, page],
   );
-  const upcomingCalendarCount = displayItems.filter((c) =>
-    isUpcomingRelease(c),
-  ).length;
+  const upcomingCalendarCount = useMemo(
+    () => displayItems.filter((c) => isUpcomingRelease(c)).length,
+    [displayItems],
+  );
 
   useEffect(() => {
     if (upcomingPage >= totalPages)
@@ -1507,18 +1446,18 @@ export default function WatchLater() {
                         >
                           <div className="media-card-poster">
                             <img
-                              src={
-                                (item as WatchLaterItem).poster ||
-                                imageUrl(null)
-                              }
+                              src={safeImageUrl(
+                                (item as WatchLaterItem).poster,
+                              )}
                               alt={(item as WatchLaterItem).title}
                               loading="lazy"
                             />
-                            <WlRatingBadge
+                            <RatingBadge
                               type={(item as WatchLaterItem).type}
                               id={(item as WatchLaterItem).id}
                               title={(item as WatchLaterItem).title}
                               year={(item as WatchLaterItem).year || ""}
+                              className="media-card-rating"
                             />
                             <span
                               className={`media-card-type ${(item as WatchLaterItem).type}`}

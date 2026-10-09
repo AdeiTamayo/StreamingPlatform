@@ -10,13 +10,9 @@ import {
   removeWatchLater,
   clearProgress,
 } from "../api/storage";
-import {
-  getOmdbRatingByTitle,
-  peekOmdbRatingByTmdb,
-  type ImdbRating,
-} from "../api/omdb";
 import { useTVStatus } from "../hooks/useTVStatus";
 import { useAuth } from "../hooks/useAuth";
+import RatingBadge from "./RatingBadge";
 import type { TMDBMovie, TMDBSeries, MediaType } from "../types";
 
 interface MediaCardProps {
@@ -36,10 +32,6 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const [isWatchedState, setIsWatchedState] = useState(() =>
     isWatched(inferredType, item.id),
   );
-  const [imdbRating, setImdbRating] = useState<ImdbRating | null>(() => {
-    const peek = peekOmdbRatingByTmdb(item.id);
-    return peek.state === "cached" ? peek.rating : null;
-  });
   const { isAuthenticated, syncVersion } = useAuth();
   const type = inferredType;
   const id = item.id;
@@ -65,26 +57,6 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
   const rating = item.vote_average ? item.vote_average.toFixed(1) : "?";
   const poster = imageUrl(item.poster_path);
   const posterSrc = imgError ? imageUrl(null) : poster;
-
-  useEffect(() => {
-    const peek = peekOmdbRatingByTmdb(id);
-    if (peek.state !== "fresh") {
-      setImdbRating(peek.rating);
-      return;
-    }
-    let cancelled = false;
-    getOmdbRatingByTitle(
-      id,
-      title,
-      year,
-      type === "tv" ? "series" : "movie",
-    ).then((r) => {
-      if (!cancelled) setImdbRating(r);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [type, id, title, year]);
 
   function toggleWL(e: React.MouseEvent) {
     e.preventDefault();
@@ -139,16 +111,14 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             style={{ opacity: loaded ? 1 : 0 }}
           />
           {loaded && (
-            <span
+            <RatingBadge
+              id={id}
+              title={title}
+              year={year}
+              type={type}
               className="media-card-rating"
-              title={
-                imdbRating
-                  ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ""}`
-                  : `TMDB rating ${rating}/10`
-              }
-            >
-              {imdbRating ? imdbRating.rating : rating}
-            </span>
+              fallbackRating={rating}
+            />
           )}
           {loaded && !isPerson && (
             <span className={`media-card-type ${type}`}>

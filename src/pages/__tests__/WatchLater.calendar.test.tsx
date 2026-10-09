@@ -34,6 +34,12 @@ vi.mock('../../api/tmdb', () => ({
     if (!path) return 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
     return `https://image.tmdb.org/t/p/${size}${path}`;
   },
+  safeImageUrl: (value: unknown) => {
+    if (typeof value !== 'string' || !value) {
+      return 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster';
+    }
+    return value;
+  },
 }));
 
 vi.mock('../../api/tvmaze', () => ({

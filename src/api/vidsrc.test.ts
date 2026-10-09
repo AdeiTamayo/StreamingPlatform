@@ -40,4 +40,26 @@ describe('vidsrc', () => {
   it('exports all source keys', () => {
     expect(SOURCE_KEYS).toEqual(['vidsrc', '2embed', 'embos']);
   });
+
+  // The chosen source is read from localStorage and is user-writable through
+  // Settings -> Import, so an inherited object key must not resolve to a
+  // function. Optional chaining does not help here: SOURCES['constructor']
+  // returns Object's constructor, and calling .movie on it throws.
+  it.each(['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'falls back to vidsrc for the prototype key %s',
+    (key) => {
+      expect(getMovieEmbedUrl(5, key)).toBe('https://vidsrc.fyi/embed/movie/5?autoplay=1');
+      expect(getTVEmbedUrl(5, 1, 2, key)).toBe('https://vidsrc.fyi/embed/tv/5/1/2?autoplay=1');
+    },
+  );
+
+  it('handles an empty or whitespace source without throwing', () => {
+    expect(getMovieEmbedUrl(9, '')).toBe('https://vidsrc.fyi/embed/movie/9?autoplay=1');
+    expect(getMovieEmbedUrl(9, '   ')).toBe('https://vidsrc.fyi/embed/movie/9?autoplay=1');
+  });
+
+  it('does not let a source name reach the URL when it is rejected', () => {
+    const url = getMovieEmbedUrl(1, 'evil.example');
+    expect(url).not.toContain('evil.example');
+  });
 });

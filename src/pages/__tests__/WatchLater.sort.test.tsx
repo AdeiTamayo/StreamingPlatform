@@ -10,6 +10,8 @@ vi.mock('../../api/tmdb', () => ({
   getSeasonDetails: vi.fn().mockResolvedValue({}),
   getTVExternalIds: vi.fn().mockResolvedValue({}),
   imageUrl: (path: string | null) => path || 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster',
+  safeImageUrl: (value: unknown) =>
+    (typeof value === 'string' && value) || 'https://placehold.co/500x750/1a1a2e/eee?text=No+Poster',
 }));
 
 vi.mock('../../api/omdb', () => ({

@@ -211,16 +211,36 @@ async function runSyncPass(): Promise<void> {
 }
 
 let syncInited = false;
+let retryTimer: ReturnType<typeof setInterval> | undefined;
+let onlineListener: (() => void) | undefined;
 
 export function initOfflineQueueSync(): void {
   if (syncInited || typeof window === 'undefined') return;
   syncInited = true;
-  window.addEventListener('online', () => {
+  onlineListener = () => {
     syncOfflineQueue().catch(() => {});
-  });
-  setInterval(() => {
+  };
+  window.addEventListener('online', onlineListener);
+  retryTimer = setInterval(() => {
     syncOfflineQueue().catch(() => {});
   }, RETRY_INTERVAL_MS);
+}
+
+/**
+ * Stops the background retry loop and detaches the online listener. Safe to
+ * call when sync was never initialised. Exists so tests (and any future
+ * teardown path) do not leave a timer running for the life of the tab.
+ */
+export function disposeOfflineQueueSync(): void {
+  if (onlineListener) {
+    window.removeEventListener('online', onlineListener);
+    onlineListener = undefined;
+  }
+  if (retryTimer !== undefined) {
+    clearInterval(retryTimer);
+    retryTimer = undefined;
+  }
+  syncInited = false;
 }
 
 export function getQueueSize(): number {

@@ -9,7 +9,7 @@ import {
   getSeriesWatchedFlag,
   unmarkSeriesWatched,
 } from "../api/storage";
-import { imageUrl } from "../api/tmdb";
+import { imageUrl, safeImageUrl } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
@@ -437,7 +437,7 @@ export default function LastSeen() {
                       <Link to={`/movie/${item.id}`}>
                         <div className="media-card-poster">
                           <img
-                            src={imageUrl(item.meta?.poster as string | null)}
+                            src={safeImageUrl(item.meta?.poster)}
                             alt={item.title || ""}
                             loading="lazy"
                           />
