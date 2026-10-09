@@ -23,9 +23,14 @@
   backdrop-filter: blur(10px);
 }
 
-.card:has(.custom-select) {
+/* An open dropdown menu must paint above the cards below it. Every card
+   has backdrop-filter, i.e. its own stacking context, so the menu's
+   z-index can never escape its own card - and a flat z-index on all cards
+   still loses to later siblings in DOM order. The menu only exists in the
+   DOM while open, so this lifts exactly the card with an open menu. */
+.card:has(:global(.custom-select-menu)) {
   position: relative;
-  z-index: 2;
+  z-index: 5;
 }
 
 .cardTitle {
