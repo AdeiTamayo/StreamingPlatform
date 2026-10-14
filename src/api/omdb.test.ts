@@ -38,15 +38,30 @@ describe('omdb fallback', () => {
     expect(cinemetaCalls().some((c) => c.includes('/meta/movie/tt0111161.json'))).toBe(true);
   });
 
-  it('builds the Cinemeta episode URL from season and episode numbers', async () => {
+  // Cinemeta has no meta/series/{id}/{season}/{episode}.json endpoint - it
+  // 404s. Episodes resolve through meta/episode/{episodeImdbId}.json, so the
+  // season/episode numbers must never be interpolated into the path.
+  it('uses the Cinemeta episode endpoint for an episode imdb id', async () => {
     const { getImdbRating } = await importOmdb();
     const { cinemetaCalls } = mockFetch([
       { url: /omdbapi\.com/, status: 401, body: { Error: 'Request limit reached!' } },
       { url: /cinemeta/, body: { meta: { imdbRating: '9.1', imdbVotes: '999' } } },
     ]);
-    const rating = await getImdbRating('tt0944947', 'episode', undefined, 1, 2);
+    const rating = await getImdbRating('tt1480055', 'episode');
     expect(rating?.rating).toBe('9.1');
-    expect(cinemetaCalls().some((c) => c.includes('/meta/series/tt0944947/1/2.json'))).toBe(true);
+    expect(cinemetaCalls().some((c) => c.includes('/meta/episode/tt1480055.json'))).toBe(true);
+    expect(cinemetaCalls().some((c) => c.includes('/meta/series/'))).toBe(false);
+  });
+
+  it('uses the Cinemeta series endpoint for a series imdb id', async () => {
+    const { getImdbRating } = await importOmdb();
+    const { cinemetaCalls } = mockFetch([
+      { url: /omdbapi\.com/, status: 401, body: { Error: 'Request limit reached!' } },
+      { url: /cinemeta/, body: { meta: { imdbRating: '9.2', imdbVotes: '2000' } } },
+    ]);
+    const rating = await getImdbRating('tt0944947', 'series');
+    expect(rating?.rating).toBe('9.2');
+    expect(cinemetaCalls().some((c) => c.includes('/meta/series/tt0944947.json'))).toBe(true);
   });
 
   it('skips OMDb during the cooldown window and goes straight to Cinemeta', async () => {

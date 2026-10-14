@@ -39,8 +39,13 @@ jobs:
         run: npm test
         env:
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          VITE_OMDB_API_KEY: ${{ secrets.VITE_OMDB_API_KEY }}
 
+      # VITE_OMDB_API_KEY is required here too: a bundle built without it makes
+      # getOmdbRatingByTitle return null for every card, so every IMDb badge
+      # silently falls back to TMDB.
       - name: Build
         run: npm run build
         env:
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          VITE_OMDB_API_KEY: ${{ secrets.VITE_OMDB_API_KEY }}

@@ -23,7 +23,7 @@
 }
 
 .scrolled {
-  background-color: rgba(7, 17, 31, 0.75);
+  background-color: var(--bg-elevated);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
@@ -145,7 +145,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-muted);
   font-size: 0.78rem;
   cursor: pointer;
   transition: color 0.15s ease;
@@ -159,7 +159,7 @@
 
 .navSuggestRow:hover .navSuggestItem,
 .navSuggestRow.navSuggActive .navSuggestItem {
-  color: #fff;
+  color: var(--text);
 }
 
 .navSuggestRemove {
@@ -173,7 +173,7 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--text-dim);
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
@@ -227,8 +227,8 @@
   border-radius: 999px;
   border: 1px solid var(--border);
 
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+  background: var(--surface-overlay);
+  color: var(--text);
 
   font-size: 0.85rem;
   outline: none;
@@ -244,7 +244,7 @@
 }
 
 .navbarSearch input::placeholder {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-dim);
 }
 
 
@@ -262,7 +262,7 @@
   border-radius: 50%;
 
   background: transparent;
-  color: #fff;
+  color: var(--text);
 
   cursor: pointer;
 
@@ -297,7 +297,7 @@
   border: 1px solid rgba(125, 211, 252, 0.3);
   background: rgba(125, 211, 252, 0.12);
 
-  color: #fff;
+  color: var(--text);
 
   font-size: .82rem;
   font-weight: 600;
@@ -343,7 +343,7 @@
 
   border-radius: 50%;
 
-  color: #fff;
+  color: var(--text);
 
   transition:
     background .2s ease,
@@ -412,9 +412,9 @@
 
     border: 1px solid var(--border);
 
-    background: rgba(10, 16, 28, .9);
+    background: var(--bg-elevated);
 
-    color: #fff;
+    color: var(--text);
 
     cursor: pointer;
 
@@ -437,7 +437,7 @@
     width: 100%;
     height: 2px;
 
-    background: #fff;
+    background: var(--text);
 
     border-radius: 5px;
 
@@ -575,7 +575,7 @@
     border-radius: 12px;
 
 
-    color: #fff;
+    color: var(--text);
 
 
     font-size: .9rem;
@@ -737,10 +737,10 @@
 
     background:
 
-      rgba(255, 255, 255, .05);
+      var(--surface-overlay);
 
 
-    color: #fff;
+    color: var(--text);
 
 
     outline: none;
@@ -772,7 +772,7 @@
   .sidebarSearch input::placeholder {
 
     color:
-      rgba(255, 255, 255, .5);
+      var(--text-dim);
 
   }
 
@@ -797,7 +797,7 @@
       rgba(125, 211, 252, .15);
 
 
-    color: #fff;
+    color: var(--text);
 
 
     font-weight: 600;
@@ -845,4 +845,25 @@
 
   display: none;
 
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+
+  .navbar,
+  .searchField,
+  .sidebarHamburger,
+  .sidebarOverlay,
+  .sidebar,
+  .sidebarLink,
+  .searchGoBtn,
+  .hamburgerLine {
+    animation: none;
+    transition: none;
+  }
+
+  .sidebarLink {
+    opacity: 1;
+    transform: none;
+  }
 }

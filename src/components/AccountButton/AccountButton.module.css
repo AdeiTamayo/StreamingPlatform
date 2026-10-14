@@ -8,7 +8,7 @@
   font-size: 0.8rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, var(--accent), #38bdf8);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: var(--ink);
   transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
   box-shadow: 0 0 18px rgba(125, 211, 252, 0.25);
@@ -29,7 +29,7 @@
   border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 800;
-  background: linear-gradient(135deg, var(--accent), #38bdf8);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: var(--ink);
   transition: opacity 0.2s, transform 0.15s;
 }
