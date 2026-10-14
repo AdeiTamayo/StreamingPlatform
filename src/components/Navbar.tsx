@@ -309,6 +309,7 @@ const Navbar = memo(function Navbar() {
           styles.navIconBtn,
           isActive(item.to) ? styles.active : '',
         ].join(' ')}
+        aria-current={isActive(item.to) ? 'page' : undefined}
       >
         <svg
           width="20"
@@ -424,6 +425,7 @@ const Navbar = memo(function Navbar() {
                 className={styles.searchToggleBtn}
                 onClick={toggleSearch}
                 aria-label="Search"
+                title="Search (/)"
               >
                 <svg
                   width="20"
@@ -525,6 +527,21 @@ const Navbar = memo(function Navbar() {
         aria-label="Sidebar navigation"
       >
         <nav className={styles.sidebarNav}>
+          <div className={styles.sidebarHeader}>
+            <span className={styles.sidebarTitle}>Menu</span>
+            <button
+              type="button"
+              className={styles.sidebarClose}
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close menu"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <span className={styles.sidebarSectionLabel}>Browse</span>
           {PUBLIC_NAV_ITEMS.map((item, index) => (
             <Link
               key={item.to}
@@ -536,6 +553,7 @@ const Navbar = memo(function Navbar() {
                   ? styles.active
                   : '',
               ].join(' ')}
+              aria-current={isActive(item.to) ? 'page' : undefined}
               style={{
                 animationDelay: `${index * 50}ms`,
               }}
@@ -568,6 +586,7 @@ const Navbar = memo(function Navbar() {
                   ? styles.active
                   : '',
               ].join(' ')}
+              aria-current={isActive(item.to) ? 'page' : undefined}
               style={{
                 animationDelay: `${(PUBLIC_NAV_ITEMS.length + index) * 50}ms`,
               }}
@@ -599,6 +618,7 @@ const Navbar = memo(function Navbar() {
                   ? styles.active
                   : '',
               ].join(' ')}
+              aria-current={isActive('/settings') ? 'page' : undefined}
             >
               <span className={styles.sidebarIconWrap}>
                 <svg

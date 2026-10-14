@@ -269,6 +269,12 @@ export default function MovieDetail() {
                 <span className="badge" title="You have marked this movie as watched">✓ Watched</span>
               )}
             </div>
+            <div className="detail-primary-actions">
+              <a className="detail-primary-action" href="#watch-heading">
+                {startAt ? 'Continue watching' : 'Play movie'}
+              </a>
+              {startAt && <span className="detail-resume-hint">Continue where you left off</span>}
+            </div>
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast">

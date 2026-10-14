@@ -23,7 +23,7 @@
 .hero-placeholder {
   width: 100%;
   height: 100%;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-overlay);
 }
 
 .hero-gradient {
@@ -47,8 +47,8 @@
   height: 2.4rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(10, 16, 28, 0.9);
-  color: #fff;
+  background: var(--bg-elevated);
+  color: var(--text);
   backdrop-filter: blur(8px);
   transition: background 0.2s, transform 0.2s;
 }
@@ -193,7 +193,7 @@
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--surface-overlay);
   color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 600;
@@ -260,8 +260,8 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card-strong);
   color: var(--text-muted);
   font-size: 0.85rem;
   line-height: 1;
@@ -286,8 +286,8 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card-strong);
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -306,7 +306,7 @@
   position: relative;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface-overlay);
 }
 
 .cw-card-poster img {
@@ -403,5 +403,34 @@
 
   .hero-content {
     bottom: 15%;
+  }
+}
+
+/* Vertical/portrait monitors: hero takes less height, content positioned higher */
+@media (orientation: portrait) and (min-width: 769px) {
+  .hero-backdrop {
+    height: 70dvh;
+  }
+
+  .hero-content {
+    bottom: 10%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-backdrop,
+  .hero-gradient,
+  .hero-content,
+  .hero-search-btn,
+  .cw-card,
+  .cw-card-bar-fill,
+  .cw-remove,
+  .cw-restart {
+    animation: none;
+    transition: none;
+  }
+
+  .cw-card:hover:not(:focus-within) {
+    transform: none;
   }
 }

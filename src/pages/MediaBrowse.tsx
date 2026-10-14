@@ -68,6 +68,17 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
   const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
   const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
   const languageOptions: FilterOption[] = [{ value: '', label: 'Original language' }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
+  const activeFilters = [
+    query.trim() ? { key: 'query', label: `Search: ${query.trim()}` } : null,
+    genre ? { key: 'genre', label: `Genre: ${genreOptions.find((o) => o.value === genre)?.label || genre}` } : null,
+    country ? { key: 'country', label: `Country: ${countryOptions.find((o) => o.value === country)?.label || country}` } : null,
+    year ? { key: 'year', label: `Year: ${year}` } : null,
+    sortBy ? { key: 'sortBy', label: `Sort: ${sortOptionList.find((o) => o.value === sortBy)?.label || sortBy}` } : null,
+    releaseDateFrom ? { key: 'from', label: `From: ${releaseDateFrom}` } : null,
+    releaseDateUntil ? { key: 'until', label: `Until: ${releaseDateUntil}` } : null,
+    language ? { key: 'language', label: `Language: ${languageOptions.find((o) => o.value === language)?.label || language}` } : null,
+    voteCount ? { key: 'votes', label: `Min votes: ${voteCount}` } : null,
+  ].filter((filter): filter is { key: string; label: string } => filter !== null);
 
   const fetchFn = useCallback((page: number, filters: Record<string, string | undefined>, signal: AbortSignal) => {
     const { query: q, genre: g, country: c, year: y, sortBy: s, releaseDateFrom: rdf, releaseDateUntil: rdu, language: l, voteCount: vc } = filters;
@@ -92,7 +103,7 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
   return (
     <div className="page">
       <section className="section" aria-labelledby="browse-heading">
-        <div className="section-header">
+        <div className="section-header browse-header">
           <h2 id="browse-heading" className="section-title">{isMovie ? 'Movies' : 'TV Shows'}</h2>
           <FilterBar
             countryValue={country}
@@ -108,22 +119,19 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
           />
         </div>
         {showMore && (
-          <div className="more-filters-panel">
-            <DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
-            <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
-            <FilterDropdown value={year} options={yearOptions} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} />
-            <FilterDropdown value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} />
-            <FilterDropdown value={language} options={languageOptions} placeholder="Original language" onSelect={(value) => { setLanguage(value); setPage(1); }} />
-            <input
-              className="filter-number-input"
-              type="number"
-              min="0"
-              inputMode="numeric"
-              placeholder="Min votes"
-              aria-label="Minimum votes"
-              value={voteInput}
-              onChange={(e) => setVoteInput(e.target.value)}
-            />
+          <div className="more-filters-panel" aria-label="Additional filters">
+            <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} /></div>
+            <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} /></div>
+            <div className="filter-control"><span className="filter-control-label">Year</span><FilterDropdown value={year} options={yearOptions} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} /></div>
+            <div className="filter-control sort-filter-control"><span className="filter-control-label">Sort results</span><FilterDropdown className="sort-filter" value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} /></div>
+            <div className="filter-control"><span className="filter-control-label">Language</span><FilterDropdown value={language} options={languageOptions} placeholder="Original language" onSelect={(value) => { setLanguage(value); setPage(1); }} /></div>
+            <label className="filter-control"><span className="filter-control-label">Minimum votes</span><input className="filter-number-input" type="number" min="0" inputMode="numeric" placeholder="Any amount" aria-label="Minimum votes" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></label>
+          </div>
+        )}
+        {activeFilters.length > 0 && (
+          <div className="active-filters" aria-label="Active filters">
+            <span className="active-filters-label">Active filters</span>
+            {activeFilters.map((filter) => <span className="filter-chip" key={filter.key}>{filter.label}</span>)}
           </div>
         )}
         <div className="search-bar">
@@ -131,6 +139,7 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             className="search-input"
             type="text"
             placeholder={`Search ${isMovie ? 'movies' : 'TV shows'}...`}
+            aria-label={`Search ${isMovie ? 'movies' : 'TV shows'}`}
             value={query}
             onChange={(e) => { setQuery(e.target.value); setPage(1); }}
             onKeyDown={(e) => {
@@ -146,11 +155,11 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
           </div>
         )}
         {error ? (
-          <div className="loading" role="alert">Failed to load. Check your connection.</div>
+          <div className="empty-state" role="alert"><h3>Couldn’t load results</h3><p>Check your connection, then refresh or adjust your filters.</p></div>
         ) : loading ? (
-          <div className="loading" role="status">Loading...</div>
+          <div className="loading" role="status" aria-live="polite">Finding {isMovie ? 'movies' : 'TV shows'}...</div>
         ) : results.length === 0 ? (
-          <div className="loading" role="status">No results found</div>
+          <div className="empty-state" role="status"><h3>No {isMovie ? 'movies' : 'TV shows'} found</h3><p>Try removing a filter or searching for a different title.</p>{activeFilters.length > 0 && <button className="empty-state-action" onClick={() => { setQuery(''); setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setLanguage(''); setVoteCount(''); setVoteInput(''); setPage(1); }}>Clear filters</button>}</div>
         ) : (
           <>
             <div className="media-grid">

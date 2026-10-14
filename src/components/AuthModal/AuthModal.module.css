@@ -88,7 +88,7 @@
   padding: 0.7rem 0.9rem;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(7, 17, 31, 0.85);
+  background: var(--surface-overlay);
   color: var(--text);
   font-size: 0.9rem;
   outline: none;
@@ -110,7 +110,7 @@
   border-radius: 999px;
   font-size: 0.9rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent), #38bdf8);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: var(--ink);
   transition: opacity 0.2s, transform 0.15s;
 }
@@ -155,7 +155,7 @@
   border-radius: 8px;
   border: 1px solid rgba(239, 68, 68, 0.35);
   background: rgba(239, 68, 68, 0.1);
-  color: #fca5a5;
+  color: var(--danger);
   font-size: 0.8rem;
 }
 
@@ -165,7 +165,7 @@
   border-radius: 8px;
   border: 1px solid rgba(74, 222, 128, 0.35);
   background: rgba(74, 222, 128, 0.1);
-  color: #86efac;
+  color: var(--green-text);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -189,5 +189,17 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal,
+  .closeBtn,
+  .button,
+  .linkBtn,
+  .input {
+    animation: none;
+    transition: none;
   }
 }

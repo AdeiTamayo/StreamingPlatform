@@ -57,7 +57,7 @@
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, .06);
+  background: var(--surface-overlay);
   border: 1px solid var(--border);
 
   display: flex;
@@ -159,7 +159,7 @@
   height: 8px;
   border-radius: 999px;
 
-  background: rgba(255, 255, 255, .06);
+  background: var(--surface-overlay);
   overflow: hidden;
 }
 
@@ -168,8 +168,8 @@
   border-radius: 999px;
 
   background: linear-gradient(90deg,
-      rgba(255, 255, 255, .8),
-      rgba(255, 255, 255, .35));
+      var(--accent),
+      var(--accent-strong));
 
   transition: width .35s ease;
 }
@@ -190,7 +190,7 @@
 
   padding: 1.25rem;
 
-  background: rgba(255, 255, 255, .02);
+  background: var(--surface-overlay);
 
   text-align: center;
 
@@ -302,4 +302,14 @@
     width: 100%;
   }
 
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statCard,
+  .statCard:hover,
+  .storageFill {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
 }

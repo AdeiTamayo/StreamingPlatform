@@ -9,7 +9,7 @@ describe('vidsrc', () => {
 
   it('returns movie embed URL for a specific source', () => {
     const url = getMovieEmbedUrl(456, '2embed');
-    expect(url).toBe('https://www.2embed.cc/embed/456?autoplay=1');
+    expect(url).toBe('https://www.2embed.stream/embed/movie/456?autoplay=1');
   });
 
   it('returns TV embed URL with season and episode', () => {
@@ -29,7 +29,10 @@ describe('vidsrc', () => {
 
   it('returns source label for each source', () => {
     expect(getSourceLabel('vidsrc')).toBe('VidSrc');
+    expect(getSourceLabel('vsembed')).toBe('VsEmbed');
     expect(getSourceLabel('2embed')).toBe('2Embed');
+    expect(getSourceLabel('2embedskin')).toBe('2Embed Skin');
+    expect(getSourceLabel('nontongo')).toBe('NontonGo');
     expect(getSourceLabel('embos')).toBe('Embos');
   });
 
@@ -38,7 +41,30 @@ describe('vidsrc', () => {
   });
 
   it('exports all source keys', () => {
-    expect(SOURCE_KEYS).toEqual(['vidsrc', '2embed', 'embos']);
+    expect(SOURCE_KEYS).toEqual(['vidsrc', 'vsembed', '2embed', '2embedskin', 'nontongo', 'embos']);
+  });
+
+  // 2embed.cc is dead (TLS reset on every connection). The `2embed` key must
+  // survive so a source already persisted in localStorage keeps resolving.
+  it('no longer points at the dead 2embed.cc host', () => {
+    expect(getMovieEmbedUrl(1, '2embed')).not.toContain('2embed.cc');
+    expect(getTVEmbedUrl(1, 1, 1, '2embed')).not.toContain('2embed.cc');
+  });
+
+  it('builds a URL for every declared source', () => {
+    for (const key of SOURCE_KEYS) {
+      expect(getMovieEmbedUrl(550, key)).toMatch(/^https:\/\//);
+      expect(getTVEmbedUrl(1399, 1, 1, key)).toMatch(/^https:\/\//);
+    }
+  });
+
+  it('passes a start time only to providers that support one', () => {
+    expect(getMovieEmbedUrl(1, 'vidsrc', 120)).toContain('&t=120');
+    expect(getMovieEmbedUrl(1, 'embos', 120)).toContain('&t=120');
+    // These ignore an unknown parameter entirely rather than sending it.
+    expect(getMovieEmbedUrl(1, '2embed', 120)).not.toContain('t=120');
+    expect(getMovieEmbedUrl(1, 'nontongo', 120)).not.toContain('t=120');
+    expect(getMovieEmbedUrl(1, '2embedskin', 120)).not.toContain('t=120');
   });
 
   // The chosen source is read from localStorage and is user-writable through

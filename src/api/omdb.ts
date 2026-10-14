@@ -92,19 +92,16 @@ async function fetchRating(url: string, signal?: AbortSignal): Promise<FetchOutc
   }
 }
 
+// `imdbId` must be the IMDb id matching `type`. Episodes are addressed by
+// their own id via meta/episode/{id}.json, which resolves the parent series
+// server-side. The meta/series/{id}/{season}/{episode}.json form does not
+// exist and 404s, so the season/episode numbers must not be interpolated here.
 async function fetchCinemetaRating(
   imdbId: string,
-  season?: number,
-  episode?: number,
+  type: OmdbMediaType,
   signal?: AbortSignal,
 ): Promise<ImdbRating | null> {
-  let url: string;
-  if (season != null && episode != null) {
-    url = `${CINEMETA_BASE}/series/${encodeURIComponent(imdbId)}/${season}/${episode}.json`;
-  } else {
-    const type = season == null ? 'movie' : 'series';
-    url = `${CINEMETA_BASE}/${type}/${encodeURIComponent(imdbId)}.json`;
-  }
+  const url = `${CINEMETA_BASE}/${type}/${encodeURIComponent(imdbId)}.json`;
   try {
     const res = await fetch(url, { signal });
     if (!res.ok) return null;
@@ -128,8 +125,6 @@ export async function getImdbRating(
   imdbId: string,
   type: OmdbMediaType,
   signal?: AbortSignal,
-  season?: number,
-  episode?: number,
 ): Promise<ImdbRating | null> {
   const key = cacheKey(imdbId);
   const entry = readEntry(key);
@@ -151,8 +146,8 @@ export async function getImdbRating(
   }
 
   // OMDb unavailable, limited, or missing the title - try the fallback
-  // provider (episodes need the season/episode numbers for Cinemeta).
-  const fallback = await fetchCinemetaRating(imdbId, season, episode, signal);
+  // provider, which is addressed by the id matching `type`.
+  const fallback = await fetchCinemetaRating(imdbId, type, signal);
   writeEntry(key, fallback);
   return fallback;
 }
