@@ -155,10 +155,10 @@ describe('detail pages render', () => {
     expect(screen.getByTitle('Save to Watch Later')).toHaveTextContent('Save to List');
     expect(screen.getByTitle('Mark as watched')).toHaveTextContent('Mark as Watched');
     expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
-    // Episode-level action buttons are gone from the player bar...
-    expect(screen.queryByTitle('Mark episode as watched')).not.toBeInTheDocument();
+    // Episode mark-watched toggle stays in the player bar (episode Watch Later is gone)...
+    expect(screen.getByTitle('Mark episode as watched')).toBeInTheDocument();
     expect(screen.queryByTitle('Save episode to Watch Later')).not.toBeInTheDocument();
-    // ...leaving the restart control beside the nav/source.
+    // ...beside the restart control and nav/source.
     expect(screen.getByTitle('Restart episode from the beginning')).toBeInTheDocument();
     expect(screen.queryByText('Season:')).not.toBeInTheDocument();
     // Episode IMDb badge sits beside the Watch Now heading, not in the bar.
