@@ -7,7 +7,9 @@
 }
 
 .last-seen-controls .custom-select-trigger {
-  padding: 0.5rem 0.85rem;
+  height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 0.9rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
@@ -29,7 +31,9 @@
 }
 
 .last-seen-search {
-  padding: 0.5rem 0.85rem;
+  height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 0.95rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
@@ -47,7 +51,11 @@
 }
 
 .last-seen-clear-btn {
-  padding: 0.5rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  box-sizing: border-box;
+  padding: 0 0.95rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
@@ -61,20 +69,6 @@
 .last-seen-clear-btn:hover {
   background: rgba(125, 211, 252, 0.1);
   color: var(--text);
-}
-
-.last-seen-series-index {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-dim);
-  font-size: 0.7rem;
-  font-weight: 700;
-  flex-shrink: 0;
 }
 
 .last-seen-series-poster {
@@ -133,8 +127,7 @@
   gap: 0.3rem;
 }
 
-.last-seen-episode,
-.last-seen-item {
+.last-seen-episode {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -145,14 +138,12 @@
   transition: background 0.2s, border-color 0.2s;
 }
 
-.last-seen-episode-row .last-seen-episode,
-.last-seen-episode-row .last-seen-item {
+.last-seen-episode-row .last-seen-episode {
   flex: 1;
   min-width: 0;
 }
 
-.last-seen-episode:hover,
-.last-seen-item:hover {
+.last-seen-episode:hover {
   background: rgba(125, 211, 252, 0.08);
   border-color: rgba(125, 211, 252, 0.16);
 }
@@ -213,10 +204,6 @@
 
 .last-seen-view-btn:hover {
   background: rgba(125, 211, 252, 0.18);
-}
-
-.last-seen-pagination {
-  margin-top: 0.9rem;
 }
 
 .ls-label {

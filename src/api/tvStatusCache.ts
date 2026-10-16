@@ -4,6 +4,7 @@ import type { TMDBSeries } from '../types';
 export interface TVStatus {
   ended: boolean;
   endYear: string | null;
+  episodes: number | null;
 }
 
 const STATUS_MAX = 100;
@@ -57,6 +58,7 @@ export async function fetchTVStatus(id: number) {
       remember(id, {
         ended: series.status === 'Ended',
         endYear: series.last_air_date?.slice(0, 4) || null,
+        episodes: series.number_of_episodes ?? null,
       });
       notify(id);
     }

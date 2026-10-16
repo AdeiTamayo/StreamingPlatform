@@ -8,9 +8,12 @@ vi.mock('../../api/tmdb', () => ({
   getTrending: vi.fn().mockResolvedValue({ results: [] }),
   getPopularMovies: vi.fn().mockResolvedValue({ results: [] }),
   getPopularTV: vi.fn().mockResolvedValue({ results: [] }),
+  getMovieGenres: vi.fn().mockResolvedValue({ genres: [] }),
+  getTVGenres: vi.fn().mockResolvedValue({ genres: [] }),
   getTVExternalIds: vi.fn().mockResolvedValue({}),
   getImdbRating: vi.fn().mockResolvedValue(null),
   imageUrl: (path: string | null) => path || 'placeholder',
+  safeImageUrl: (path: string | null) => path || 'placeholder',
 }));
 
 vi.mock('../../api/omdb', () => ({

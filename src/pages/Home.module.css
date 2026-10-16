@@ -70,20 +70,6 @@
   gap: 0.6rem;
 }
 
-.hero-badge {
-  display: inline-block;
-  align-self: flex-start;
-  padding: 0.3rem 0.85rem;
-  border-radius: 999px;
-  background: rgba(125, 211, 252, 0.15);
-  border: 1px solid rgba(125, 211, 252, 0.25);
-  color: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
 .hero-title {
   font-size: clamp(1.8rem, 4vw, 3rem);
   font-weight: 800;
@@ -99,19 +85,7 @@
   margin-top: 0.1rem;
 }
 
-.hero-rating {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem 0.6rem;
-  border-radius: 6px;
-  background: rgba(245, 197, 24, 0.2);
-  color: var(--gold-text);
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.hero-year {
+.hero-facts {
   color: var(--text-muted);
   font-size: 0.88rem;
 }
@@ -169,7 +143,7 @@
   border-radius: 999px;
   background: none;
   cursor: pointer;
-  transition: background 0.25s, border-color 0.25s, transform 0.25s;
+  transition: width 0.3s ease, background 0.3s ease, border-color 0.3s ease;
   flex-shrink: 0;
 }
 
@@ -178,53 +152,111 @@
 }
 
 .hero-dot.active {
+  width: 26px;
   background: var(--accent);
   border-color: var(--accent);
-  transform: scale(1.35);
 }
 
 /* Continue Watching */
 .cw-toggles {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border);
 }
 
 .cw-toggle {
-  padding: 0.3rem 0.7rem;
+  padding: 0.35rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface-overlay);
+  border: 0;
+  background: transparent;
   color: var(--text-muted);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
-  transition: background 0.18s, color 0.18s, border-color 0.18s;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
 }
 
 .cw-toggle:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(125, 211, 252, 0.22);
 }
 
 .cw-toggle.active {
-  color: var(--text);
-  background: rgba(125, 211, 252, 0.12);
-  border-color: rgba(125, 211, 252, 0.3);
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+
+/* Browse by genre */
+.genre-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 120px;
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: var(--bg-card);
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.genre-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.05) 35%, rgba(6, 12, 22, 0.88) 100%);
+}
+
+.genre-tile-name,
+.genre-tile-example {
+  position: relative;
+  z-index: 1;
+}
+
+.genre-tile-name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.genre-tile-example {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 0.1rem;
+}
+
+.genre-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.32);
 }
 
 .cw-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
 }
 
 .cw-card {
   position: relative;
-  border-radius: calc(var(--radius) + 2px);
+  border-radius: calc(var(--radius) + 4px);
   overflow: hidden;
   background: var(--bg-card);
-  border: 1px solid var(--border);
-  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.cw-card:focus-within {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.cw-card:hover:not(:focus-within) {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.3);
 }
 
 .cw-card-link {
@@ -235,81 +267,14 @@
   cursor: pointer;
 }
 
-.cw-card-link:focus-visible {
-  outline: none;
-}
-
-/* Using outline for focus ring to respect border-radius */
-.cw-card:focus-within {
-  outline: 2px solid rgba(125, 211, 252, 0.7);
-  outline-offset: 2px;
-}
-
-/* Hover state without focus */
-.cw-card:hover:not(:focus-within) {
-  transform: translateY(-3px);
-  border-color: rgba(125, 211, 252, 0.2);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-}
-
-.cw-remove {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
-  z-index: 5;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card-strong);
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-  transition: background 0.18s, color 0.18s;
-}
-
-.cw-remove:hover {
-  background: rgba(239, 68, 68, 0.7);
-  color: #fff;
-  border-color: rgba(239, 68, 68, 0.4);
-}
-
-.cw-restart {
-  position: absolute;
-  top: 0.35rem;
-  left: 0.35rem;
-  z-index: 5;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border-strong);
-  background: var(--bg-card-strong);
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-  transition: background 0.18s, color 0.18s;
-}
-
-.cw-restart:hover {
-  background: rgba(125, 211, 252, 0.7);
-  color: #fff;
-  border-color: rgba(125, 211, 252, 0.4);
-}
-
-.cw-card-poster {
+.cw-card-backdrop {
   position: relative;
-  aspect-ratio: 2 / 3;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: var(--surface-overlay);
 }
 
-.cw-card-poster img {
+.cw-card-backdrop img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -318,44 +283,118 @@
 .cw-card-placeholder {
   width: 100%;
   height: 100%;
-  min-height: 120px;
+}
+
+.cw-card-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.05) 30%, rgba(6, 12, 22, 0.65) 100%);
+}
+
+.cw-card-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.92);
+  color: #04121f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease;
+}
+
+.cw-card:hover .cw-card-play {
+  transform: translate(-50%, -50%) scale(1.08);
 }
 
 .cw-card-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.08);
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .cw-card-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  border-radius: 0 3px 3px 0;
   transition: width 0.3s;
 }
 
-.cw-card-info {
-  padding: 0.55rem 0.65rem 0.65rem;
+.cw-card-body {
+  padding: 0.7rem 0.85rem 0.85rem;
 }
 
-.cw-card-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.cw-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.cw-card-type {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cw-card-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
 }
 
-.cw-card-meta {
+.cw-card-sub {
   display: block;
-  font-size: 0.7rem;
   color: var(--text-muted);
-  margin-top: 0.15rem;
+  font-size: 0.82rem;
+  margin-top: 0.1rem;
+}
+
+.cw-card-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.cw-remove,
+.cw-restart {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: rgba(6, 12, 22, 0.66);
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.cw-remove:hover {
+  background: rgba(239, 68, 68, 0.85);
+}
+
+.cw-restart:hover {
+  background: rgba(56, 189, 248, 0.85);
+  color: #04121f;
 }
 
 .cw-empty {
@@ -384,8 +423,8 @@
 
 @media (max-width: 480px) {
   .cw-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 0.6rem;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 
   .hero-backdrop {

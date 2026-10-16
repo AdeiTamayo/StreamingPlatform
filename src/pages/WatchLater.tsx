@@ -18,7 +18,9 @@ import { getEpisodeAirInstant } from "../api/tvmaze";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import RatingBadge from "../components/RatingBadge";
 import FilterDropdown from "../components/FilterDropdown";
+import TypeToggle from "../components/TypeToggle";
 import Pagination from "../components/Pagination";
+import CloseIcon from "../components/CloseIcon";
 import { useToast } from "../components/useToast";
 import { useAbortController } from "../hooks/useAbortController";
 import {
@@ -1255,15 +1257,14 @@ export default function WatchLater() {
             {items.length > 0 && (
               <>
                 <div className={styles.wlControls}>
-                  <FilterDropdown
+                  <TypeToggle
                     value={filterType}
                     options={[
-                      { value: "all", label: "All types" },
+                      { value: "all", label: "All" },
                       { value: "movies", label: "Movies" },
                       { value: "tv", label: "TV Shows" },
                     ]}
-                    placeholder="All types"
-                    onSelect={(v: string) => {
+                    onChange={(v) => {
                       setFilterType(v);
                       setPage(1);
                     }}
@@ -1487,7 +1488,7 @@ export default function WatchLater() {
                             }
                             title="Remove"
                           >
-                            &times;
+                            <CloseIcon />
                           </button>
                         )}
                       </div>
@@ -1555,7 +1556,7 @@ export default function WatchLater() {
                           }
                           title="Remove"
                         >
-                          &times;
+                          <CloseIcon />
                         </button>
                       )}
                     </div>

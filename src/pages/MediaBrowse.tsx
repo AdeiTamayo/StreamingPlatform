@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { getPopularMovies, getPopularTV, getMovieGenres, getTVGenres, getCountries, getLanguages, discover, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
@@ -6,7 +7,7 @@ import FilterBar from '../components/FilterBar';
 import FilterDropdown from '../components/FilterDropdown';
 import DatePickerField from '../components/DatePickerField';
 import useSearchFilter from '../hooks/useSearchFilter';
-import type { MediaType, TMDBGenre, TMDBCountry, TMDBLanguage, FilterOption } from '../types';
+import type { MediaType, TMDBGenre, TMDBCountry, TMDBLanguage, TMDBMovie, TMDBSeries, TMDBPaginatedResponse, FilterOption } from '../types';
 
 const years = Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i);
 
@@ -28,16 +29,37 @@ const tvSortOptions: FilterOption[] = [
 
 const yearOptions: FilterOption[] = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
 
+// TMDB's /search endpoints ignore browse filters (genre, language, year,
+// votes), so when a text query is combined with those filters we refine the
+// returned page client-side to keep both working together.
+function refineSearchPage(
+  data: TMDBPaginatedResponse<TMDBMovie | TMDBSeries>,
+  filters: { genre?: string; language?: string; year?: string; voteCount?: string },
+): TMDBPaginatedResponse<TMDBMovie | TMDBSeries> {
+  const { genre, language, year, voteCount } = filters;
+  if (!genre && !language && !year && !voteCount) return data;
+  const results = (data.results || []).filter((item) => {
+    if (genre && !(item.genre_ids || []).includes(Number(genre))) return false;
+    if (language && item.original_language !== language) return false;
+    const date = (item as TMDBMovie).release_date || (item as TMDBSeries).first_air_date || '';
+    if (year && date.slice(0, 4) !== year) return false;
+    if (voteCount && (item.vote_count || 0) < Number(voteCount)) return false;
+    return true;
+  });
+  return { ...data, results };
+}
+
 interface MediaBrowseProps {
   type: MediaType;
 }
 
 export default function MediaBrowse({ type }: MediaBrowseProps) {
   const isMovie = type === 'movie';
+  const [searchParams, setSearchParams] = useSearchParams();
   const [genres, setGenres] = useState<TMDBGenre[]>([]);
   const [countries, setCountries] = useState<TMDBCountry[]>([]);
   const [languages, setLanguages] = useState<TMDBLanguage[]>([]);
-  const [genre, setGenre] = useState('');
+  const [genre, setGenre] = useState(searchParams.get('genre') || '');
   const [country, setCountry] = useState('');
   const [year, setYear] = useState('');
   const [sortBy, setSortBy] = useState('');
@@ -80,10 +102,11 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
     voteCount ? { key: 'votes', label: `Min votes: ${voteCount}` } : null,
   ].filter((filter): filter is { key: string; label: string } => filter !== null);
 
-  const fetchFn = useCallback((page: number, filters: Record<string, string | undefined>, signal: AbortSignal) => {
+  const fetchFn = useCallback(async (page: number, filters: Record<string, string | undefined>, signal: AbortSignal) => {
     const { query: q, genre: g, country: c, year: y, sortBy: s, releaseDateFrom: rdf, releaseDateUntil: rdu, language: l, voteCount: vc } = filters;
     if (q?.trim()) {
-      return (isMovie ? searchMovies : searchTV)(q.trim(), page, signal);
+      const data = await (isMovie ? searchMovies : searchTV)(q.trim(), page, signal) as TMDBPaginatedResponse<TMDBMovie | TMDBSeries>;
+      return refineSearchPage(data, { genre: g, language: l, year: y, voteCount: vc });
     }
     const hasFilters = g || c || y || s || rdf || rdu || l || vc;
     if (hasFilters) {
@@ -91,14 +114,46 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
         genreId: g || undefined, country: c || undefined, year: y || undefined, sortBy: s || undefined,
         releaseDateGte: rdf || undefined, releaseDateLte: rdu || undefined,
         originalLanguage: l || undefined, voteCountGte: vc || undefined,
-      }, page, signal);
+      }, page, signal) as Promise<TMDBPaginatedResponse<TMDBMovie | TMDBSeries>>;
     }
-    return (isMovie ? getPopularMovies : getPopularTV)(page, signal);
+    return (isMovie ? getPopularMovies : getPopularTV)(page, signal) as Promise<TMDBPaginatedResponse<TMDBMovie | TMDBSeries>>;
   }, [isMovie, type]);
 
   const { results, page, setPage, totalPages, loading, error } = useSearchFilter(fetchFn, {
     query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount,
   });
+
+  // Keep the genre filter in sync with the URL so the "Browse by genre" cards
+  // can deep-link into a pre-filtered browse page (?genre=<id>).
+  useEffect(() => {
+    const g = searchParams.get('genre') || '';
+    if (g !== genre) { setGenre(g); setPage(1); }
+  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGenreChange = useCallback((value: string) => {
+    setGenre(value);
+    setPage(1);
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('genre', value); else next.delete('genre');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setPage]);
+
+  const clearFilters = useCallback(() => {
+    setQuery('');
+    setCountry('');
+    setGenre('');
+    setYear('');
+    setSortBy('');
+    setReleaseDateFrom('');
+    setReleaseDateUntil('');
+    setLanguage('');
+    setVoteCount('');
+    setVoteInput('');
+    setPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete('genre');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, setPage]);
 
   return (
     <div className="page">
@@ -111,11 +166,11 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             showMore={showMore}
             onToggleShowMore={() => setShowMore((s) => !s)}
             onCountryChange={(value) => { setCountry(value); setPage(1); }}
-            onGenreChange={(value) => { setGenre(value); setPage(1); }}
+            onGenreChange={handleGenreChange}
             countryOptions={countryOptions}
             genreOptions={genreOptions}
             hasActiveFilters={!!query || !!country || !!genre || !!year || !!sortBy || !!releaseDateFrom || !!releaseDateUntil || !!language || !!voteCount}
-            onClearFilters={() => { setQuery(''); setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setLanguage(''); setVoteCount(''); setVoteInput(''); setPage(1); }}
+            onClearFilters={clearFilters}
           />
         </div>
         {showMore && (
@@ -149,17 +204,12 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
             }}
           />
         </div>
-        {query.trim() && (country || genre || year || sortBy || releaseDateFrom || releaseDateUntil || language || voteCount) && (
-          <div className="loading" role="note" style={{ fontSize: "0.8rem", opacity: 0.75 }}>
-            Text search ignores the browse filters above - clear the search to browse with filters.
-          </div>
-        )}
         {error ? (
           <div className="empty-state" role="alert"><h3>Couldn’t load results</h3><p>Check your connection, then refresh or adjust your filters.</p></div>
         ) : loading ? (
           <div className="loading" role="status" aria-live="polite">Finding {isMovie ? 'movies' : 'TV shows'}...</div>
         ) : results.length === 0 ? (
-          <div className="empty-state" role="status"><h3>No {isMovie ? 'movies' : 'TV shows'} found</h3><p>Try removing a filter or searching for a different title.</p>{activeFilters.length > 0 && <button className="empty-state-action" onClick={() => { setQuery(''); setCountry(''); setGenre(''); setYear(''); setSortBy(''); setReleaseDateFrom(''); setReleaseDateUntil(''); setLanguage(''); setVoteCount(''); setVoteInput(''); setPage(1); }}>Clear filters</button>}</div>
+          <div className="empty-state" role="status"><h3>No {isMovie ? 'movies' : 'TV shows'} found</h3><p>Try removing a filter or searching for a different title.</p>{activeFilters.length > 0 && <button className="empty-state-action" onClick={clearFilters}>Clear filters</button>}</div>
         ) : (
           <>
             <div className="media-grid">

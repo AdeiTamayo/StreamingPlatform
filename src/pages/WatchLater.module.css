@@ -4,6 +4,7 @@
   margin-bottom: 1rem;
   flex-wrap: wrap;
   align-items: center;
+  --type-toggle-height: 42px;
 }
 
 /* Every control in this row shares one 42px height */

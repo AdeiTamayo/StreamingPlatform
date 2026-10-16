@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
@@ -8,10 +8,15 @@ import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
 import PersonList from '../components/PersonList';
+import ViewModeToggle from '../components/ViewModeToggle';
+import MediaCarousel from '../components/MediaCarousel';
+import Duration from '../components/Duration';
+import DetailActions from '../components/DetailActions';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
 import { logDebug } from '../utils/logger';
+import { formatVotes } from '../utils/format';
 import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
 
@@ -149,7 +154,7 @@ export default function MovieDetail() {
   function handleProgress(currentTime: number, duration: number) {
     lastTimeRef.current = currentTime;
     if (watchedRef.current || !movie) return;
-    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path }, duration || undefined);
+    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path, backdrop: movie?.backdrop_path }, duration || undefined);
     const tmdbRuntime = movie.runtime || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
@@ -211,6 +216,16 @@ export default function MovieDetail() {
     }
   }
 
+  function switchMode(next: 'trailer' | 'player') {
+    // Returning from the trailer: resume the film where it was left off
+    // instead of restarting at 0:00.
+    if (next === 'player' && showTrailer && lastTimeRef.current != null) {
+      setStartAt(lastTimeRef.current);
+      setRestartTick((t) => t + 1);
+    }
+    setShowTrailer(next === 'trailer');
+  }
+
   function retry() {
     if (!id) return;
     setLoading(true);
@@ -235,8 +250,21 @@ export default function MovieDetail() {
   const crew: TMDBCrewMember[] = movie.credits?.crew || [];
   const director = crew.find((c) => c.job === 'Director');
   const writers = crew.filter((c) => c.job === 'Screenplay' || c.job === 'Writer').slice(0, 2);
-  const genres = movie.genres?.map((g) => g.name).join(', ') || '';
-  const recommendations = movie.recommendations?.results?.slice(0, 10) || [];
+  const genres = movie.genres?.slice(0, 3).map((g) => g.name).join(', ') || '';
+  const recommendations = movie.recommendations?.results?.slice(0, 24) || [];
+
+  // Secondary facts render as a single bullet-separated line (hero style)
+  // instead of individual pill badges.
+  const metaNodes: ReactNode[] = [];
+  const addMeta = (key: string, node: ReactNode, title?: string) => {
+    if (metaNodes.length > 0) {
+      metaNodes.push(<span key={`sep-${key}`} className="detail-meta-sep" aria-hidden="true">{'\u00b7'}</span>);
+    }
+    metaNodes.push(<span key={key} className="detail-meta-item" title={title}>{node}</span>);
+  };
+  if (genres) addMeta('genres', genres);
+  if (movie.runtime != null && movie.runtime > 0) addMeta('runtime', <Duration minutes={movie.runtime} />);
+  if (watched) addMeta('watched', '\u2713 Watched', 'You have marked this movie as watched');
 
   return (
     <div className="page">
@@ -254,27 +282,29 @@ export default function MovieDetail() {
                   href={`https://www.imdb.com/title/${movie.imdb_id}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}` : 'Open on IMDb'}
                 >
-                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
+                  <span className="rating-source">{imdbRating ? imdbRating.rating : movie.vote_average.toFixed(1)}</span>
+                  {imdbRating?.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
               ) : movie.vote_average != null ? (
-                <span className="badge rating">TMDB {movie.vote_average.toFixed(1)}</span>
+                <span className="badge rating">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
+                  <span className="rating-source">{movie.vote_average.toFixed(1)}</span>
+                </span>
               ) : null}
-              {genres && <span className="badge">{genres}</span>}
-              {movie.runtime != null && movie.runtime > 0 && (
-                <span className="badge">{movie.runtime} min</span>
-              )}
-              {watched && (
-                <span className="badge" title="You have marked this movie as watched">✓ Watched</span>
+              {metaNodes.length > 0 && (
+                <span className="detail-meta-line">{metaNodes}</span>
               )}
             </div>
-            <div className="detail-primary-actions">
-              <a className="detail-primary-action" href="#watch-heading">
-                {startAt ? 'Continue watching' : 'Play movie'}
-              </a>
-              {startAt && <span className="detail-resume-hint">Continue where you left off</span>}
-            </div>
+            <DetailActions
+              inList={inWL}
+              watched={watched}
+              onToggleList={toggleWatchLater}
+              onToggleWatched={toggleWatched}
+              shareTitle={movie.title}
+            />
             <p className="detail-overview">{movie.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast">
@@ -292,7 +322,12 @@ export default function MovieDetail() {
       </div>
 
       <section className="section" aria-labelledby="watch-heading">
-        <h2 id="watch-heading" className="section-title">Watch Now</h2>
+        <div className="section-header">
+          <h2 id="watch-heading" className="section-title">Watch Now</h2>
+          {trailerKey && (
+            <ViewModeToggle mode={showTrailer ? 'trailer' : 'player'} onChange={switchMode} />
+          )}
+        </div>
         {showTrailer && trailerKey ? (
           <div className="trailer-wrapper">
             <iframe
@@ -314,44 +349,12 @@ export default function MovieDetail() {
               onProgress={handleProgress}
               onEnded={handleEnded}
               runtimeMinutes={movie.runtime ?? null}
-              startAt={showTrailer && lastTimeRef.current ? lastTimeRef.current : (startAt ?? undefined)}
+              startAt={startAt ?? undefined}
             />
           </div>
         )}
         <div className={styles.playerBar}>
           <div className={styles.playerBarStart}>
-            <button
-              type="button"
-              className={`${styles.iconBtn} ${watched ? styles.activeWatched : ''}`}
-              onClick={toggleWatched}
-              title={watched ? 'Unmark as watched' : 'Mark as watched'}
-              aria-label={watched ? 'Unmark as watched' : 'Mark as watched'}
-              aria-pressed={watched}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
-            </button>
-            <button
-              type="button"
-              className={`${styles.iconBtn} ${inWL ? styles.activeWatchLater : ''}`}
-              onClick={toggleWatchLater}
-              title={inWL ? 'Remove from Watch Later' : 'Save to Watch Later'}
-              aria-label={inWL ? 'Remove from Watch Later' : 'Save to Watch Later'}
-              aria-pressed={inWL}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
-            </button>
-            {trailerKey && (
-              <button
-                type="button"
-                className={styles.iconBtn}
-                onClick={() => setShowTrailer((s) => !s)}
-                title={showTrailer ? 'Hide trailer' : 'Play trailer'}
-                aria-label={showTrailer ? 'Hide trailer' : 'Play trailer'}
-                aria-pressed={showTrailer}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg>
-              </button>
-            )}
             <button
               type="button"
               className={styles.iconBtn}
@@ -377,11 +380,11 @@ export default function MovieDetail() {
       {recommendations.length > 0 && (
         <section className="section" aria-labelledby="recs-heading">
           <h2 id="recs-heading" className="section-title">You might also like</h2>
-          <div className="media-grid">
+          <MediaCarousel>
             {recommendations.map((item) => (
               <MediaCard key={(item as { id: number }).id} item={item as TMDBMovie} mediaType="movie" />
             ))}
-          </div>
+          </MediaCarousel>
         </section>
       )}
     </div>

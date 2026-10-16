@@ -136,11 +136,15 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
           ) : (
             <>
               <h3>{title}</h3>
-              {year && (
+              {(year || (!isMovie && tvStatus?.episodes)) && (
                 <span className="media-card-year">
-                  {tvStatus?.ended && tvStatus.endYear
-                    ? `${year}-${tvStatus.endYear}`
-                    : year}
+                  {year &&
+                    (tvStatus?.ended && tvStatus.endYear
+                      ? `${year}-${tvStatus.endYear}`
+                      : year)}
+                  {!isMovie && tvStatus?.episodes
+                    ? `${year ? " \u00b7 " : ""}${tvStatus.episodes} episodes`
+                    : ""}
                 </span>
               )}
             </>

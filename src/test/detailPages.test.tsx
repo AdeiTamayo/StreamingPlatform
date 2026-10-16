@@ -136,7 +136,7 @@ describe('detail pages render', () => {
     expect(consoleErrorCaptured.filter((m) => m.includes('Objects are not valid as a React child'))).toHaveLength(0);
   });
 
-  it('TVDetail player controls live in one icon bar below the video', async () => {
+  it('TVDetail header shows action pills and the player bar keeps only restart', async () => {
     render(
       <MemoryRouter initialEntries={['/tv/1399']}>
         <Routes>
@@ -151,23 +151,22 @@ describe('detail pages render', () => {
     // Back to episodes is an icon link now, not text.
     expect(screen.getByRole('link', { name: 'Back to episodes' })).toBeInTheDocument();
     expect(screen.queryByText('Back to episodes')).not.toBeInTheDocument();
-    // The old text buttons and the ✓ tick below the video are gone...
-    expect(screen.queryByTitle('Mark as watched')).not.toBeInTheDocument();
+    // Series actions live in the header as labelled pills with a share button.
+    expect(screen.getByTitle('Save to Watch Later')).toHaveTextContent('Save to List');
+    expect(screen.getByTitle('Mark as watched')).toHaveTextContent('Mark as Watched');
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    // Episode-level action buttons are gone from the player bar...
+    expect(screen.queryByTitle('Mark episode as watched')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Save episode to Watch Later')).not.toBeInTheDocument();
+    // ...leaving the restart control beside the nav/source.
+    expect(screen.getByTitle('Restart episode from the beginning')).toBeInTheDocument();
     expect(screen.queryByText('Season:')).not.toBeInTheDocument();
-    // ...replaced by episode-list-style icon buttons.
-    expect(screen.getByTitle('Mark episode as watched')).toBeInTheDocument();
-    expect(screen.getByTitle('Save episode to Watch Later')).toBeInTheDocument();
     // Episode IMDb badge sits beside the Watch Now heading, not in the bar.
     const watchHeader = screen.getByText('Watch Now').parentElement;
     expect(watchHeader?.textContent).toMatch(/IMDb/);
-    // Series header actions are icon buttons too (no text pills left).
-    expect(screen.getByTitle('Save series to Watch Later')).toBeInTheDocument();
-    expect(screen.getByTitle('Mark series as watched')).toBeInTheDocument();
-    expect(screen.queryByText('Saved')).not.toBeInTheDocument();
-    expect(screen.queryByText('Watch Later')).not.toBeInTheDocument();
   });
 
-  it('MovieDetail player actions are icon buttons below the video', async () => {
+  it('MovieDetail header shows action pills with a share button', async () => {
     render(
       <MemoryRouter initialEntries={['/movie/550']}>
         <Routes>
@@ -179,9 +178,11 @@ describe('detail pages render', () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(screen.getByTitle('Mark as watched')).toBeInTheDocument();
-    expect(screen.getByTitle('Save to Watch Later')).toBeInTheDocument();
-    expect(screen.queryByText('Mark as watched')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Mark as watched')).toHaveTextContent('Mark as Watched');
+    expect(screen.getByTitle('Save to Watch Later')).toHaveTextContent('Save to List');
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    // Restart stays below the player bar.
+    expect(screen.getByTitle('Restart from the beginning')).toBeInTheDocument();
     expect(screen.queryByText('Watch Later')).not.toBeInTheDocument();
   });
 

@@ -13,12 +13,20 @@ import { imageUrl, safeImageUrl } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
+import CloseIcon from "../components/CloseIcon";
+import TypeToggle from "../components/TypeToggle";
 import { useToast } from "../components/useToast";
 import type { LastSeenItem } from "../types";
 import styles from "./LastSeen.module.css";
 
 const MOVIES_PER_PAGE = 20;
 const SERIES_PER_PAGE = 20;
+
+const TYPE_TABS = [
+  { value: "all", label: "All" },
+  { value: "movies", label: "Movies" },
+  { value: "tv", label: "Series" },
+];
 
 interface SeriesGroup {
   id: number | string;
@@ -248,16 +256,7 @@ export default function LastSeen() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 aria-label="Filter by title"
               />
-              <FilterDropdown
-                value={filterType}
-                options={[
-                  { value: "all", label: "All types" },
-                  { value: "tv", label: "TV Shows" },
-                  { value: "movies", label: "Movies" },
-                ]}
-                placeholder="All types"
-                onSelect={setFilterType}
-              />
+              <TypeToggle value={filterType} options={TYPE_TABS} onChange={setFilterType} />
               <FilterDropdown
                 value={sortBy}
                 options={[
@@ -331,7 +330,7 @@ export default function LastSeen() {
                         onClick={() => handleRemoveShow(show.id)}
                         title="Remove all episodes"
                       >
-                        &times;
+                        <CloseIcon />
                       </button>
                     </div>
                   ))}
@@ -419,7 +418,7 @@ export default function LastSeen() {
                           onClick={() => handleRemove(item)}
                           title="Remove"
                         >
-                          &times;
+                          <CloseIcon />
                         </button>
                       </div>
                     ))}
@@ -451,7 +450,7 @@ export default function LastSeen() {
                         onClick={() => handleRemove(item)}
                         title="Remove"
                       >
-                        &times;
+                        <CloseIcon />
                       </button>
                     </div>
                   ))}

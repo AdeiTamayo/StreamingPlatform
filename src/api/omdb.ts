@@ -13,6 +13,8 @@ const FALLBACK_COOLDOWN_MS = 60 * 60 * 1000;
 export interface ImdbRating {
   rating: string;
   votes: string;
+  /** Rotten Tomatoes score as returned by OMDb, e.g. "94%". */
+  tomatoes?: string;
 }
 
 interface OmdbCacheEntry {
@@ -56,11 +58,13 @@ function writeEntry(key: string, data: ImdbRating | null): void {
   }
 }
 
-function extractRating(data: { imdbRating?: string; imdbVotes?: string; Error?: string }): ImdbRating | null {
+function extractRating(data: { imdbRating?: string; imdbVotes?: string; Ratings?: { Source?: string; Value?: string }[]; Error?: string }): ImdbRating | null {
   if (data?.Error || !data?.imdbRating || data.imdbRating === 'N/A') return null;
+  const rt = data.Ratings?.find((r) => r.Source === 'Rotten Tomatoes')?.Value;
   return {
     rating: data.imdbRating,
     votes: data.imdbVotes && data.imdbVotes !== 'N/A' ? data.imdbVotes : '',
+    tomatoes: rt && rt !== 'N/A' ? rt : undefined,
   };
 }
 
@@ -83,7 +87,7 @@ async function fetchRating(url: string, signal?: AbortSignal): Promise<FetchOutc
       if (res.status === 401) return { status: 'limited' };
       return { status: 'failed' };
     }
-    const data = (await res.json()) as { imdbRating?: string; imdbVotes?: string; Error?: string };
+    const data = (await res.json()) as { imdbRating?: string; imdbVotes?: string; Ratings?: { Source?: string; Value?: string }[]; Error?: string };
     if (data.Error?.toLowerCase().includes('limit')) return { status: 'limited' };
     return { status: 'ok', rating: extractRating(data) };
   } catch (err) {

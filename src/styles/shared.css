@@ -65,20 +65,71 @@
 }
 
 .browse-header {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: end;
-}
-
-.browse-header .section-title {
-  grid-column: 1;
-  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
 }
 
 .browse-header .filter-row {
-  grid-column: 2;
-  grid-row: 1;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+/* Segmented Trailer / Player selector (detail pages) */
+.view-mode-toggle {
+  display: inline-flex;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  border: 1px solid var(--border);
+}
+
+.view-mode-option {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.95rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.view-mode-option:hover {
+  color: var(--text);
+}
+
+.view-mode-option.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+}
+
+/* "Show more / Show less" footer used by paginated grids */
+.section-more {
+  display: flex;
   justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.show-more-btn {
+  border: 1px solid var(--border);
+  background: var(--surface-overlay);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 1.4rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.show-more-btn:hover {
+  border-color: rgba(125, 211, 252, 0.55);
+  background: var(--surface-overlay-hover);
 }
 
 /* Search Input (shared) */
@@ -118,7 +169,7 @@
 .filter-row {
   display: flex;
   gap: 0.5rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-end;
 }
 
@@ -225,7 +276,7 @@
   margin-bottom: 1.25rem;
   flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .filter-label {
@@ -283,14 +334,101 @@
   contain-intrinsic-size: auto 320px;
 }
 
+/* Media carousel: batch-by-batch horizontal navigation */
+.media-carousel {
+  position: relative;
+}
+
+.media-carousel-track {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scroll-snap-type: x proximity;
+  padding: 0.25rem 0.25rem 0.5rem;
+  scrollbar-width: none;
+}
+
+.media-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.media-carousel-track > * {
+  flex: 0 0 auto;
+  width: 160px;
+  scroll-snap-align: start;
+}
+
+.media-carousel-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  background: rgba(8, 14, 24, 0.82);
+  color: var(--text);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: background 0.18s ease, opacity 0.18s ease;
+}
+
+.media-carousel-nav:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.22);
+}
+
+.media-carousel-nav:disabled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.media-carousel-nav.prev {
+  left: -0.5rem;
+}
+
+.media-carousel-nav.next {
+  right: -0.5rem;
+}
+
+/* Genre tiles need wider carousel items than poster cards. */
+.media-carousel.genre-carousel .media-carousel-track > * {
+  width: 236px;
+}
+
+@media (max-width: 480px) {
+  .media-carousel-track > * {
+    width: 120px;
+  }
+
+  .media-carousel.genre-carousel .media-carousel-track > * {
+    width: 200px;
+  }
+
+  .media-carousel-nav {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* Clock + runtime label */
+.duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 /* Media Card */
 .media-card {
   position: relative;
   border-radius: calc(var(--radius) + 4px);
   overflow: hidden;
-  padding: 4px;
-  background: linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95));
-  border: 1px solid var(--border);
+  border: 1.5px solid transparent;
+  background: transparent;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -306,75 +444,27 @@
 .media-card:focus-within {
   outline: 2px solid rgba(125, 211, 252, 0.7);
   outline-offset: 2px;
-  /* Keep existing border hover styles for pointer devices */
 }
 
-/* Hover state without focus */
 .media-card:hover:not(:focus-within) {
-  transform: translateY(-5px);
-  border-color: rgba(125, 211, 252, 0.24);
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
+  transform: translateY(-4px);
+  border-color: rgba(125, 211, 252, 0.22);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.3);
 }
 
-/* Hover keeps the state colors - only the lift applies, so watched and
-   watch-later cards stay visibly marked while hovered. */
-.media-card.seen:hover:not(:focus-within) {
-  transform: translateY(-5px);
-  border-color: rgba(22, 163, 74, 0.85);
-  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.35), 0 18px 34px rgba(0, 0, 0, 0.32);
-}
-
-.media-card.watch-later:hover:not(:focus-within) {
-  transform: translateY(-5px);
-  border-color: rgba(245, 197, 24, 0.75);
-  box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.25), 0 18px 34px rgba(0, 0, 0, 0.32);
-}
-
-.media-card.seen.watch-later:hover:not(:focus-within) {
-  transform: translateY(-5px);
-  border: 1px solid transparent;
-  background:
-    linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95)) padding-box,
-    linear-gradient(135deg, rgba(22, 163, 74, 1) 0 50%, rgba(245, 197, 24, 1) 50% 100%) border-box;
-  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.32);
-}
-
-/* Focus state with seen/watch-later combination */
-.media-card.seen:focus-within {
-  outline: 2px solid rgba(125, 211, 252, 0.7);
-  outline-offset: 2px;
-}
-
-.media-card.watch-later:focus-within {
-  outline: 2px solid rgba(125, 211, 252, 0.7);
-  outline-offset: 2px;
-}
-
-.media-card.seen.watch-later:focus-within {
-  outline: 2px solid rgba(125, 211, 252, 0.7);
-  outline-offset: 2px;
-}
-
-/* Original state styles */
+/* Watched / watch-later are marked with a subtle ring instead of a heavy
+   border, keeping the poster the focus of the card. */
 .media-card.seen {
-  border-color: rgba(22, 163, 74, 0.65);
-  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.3), 0 0 14px rgba(22, 163, 74, 0.14);
+  border-color: rgba(22, 163, 74, 0.7);
 }
 
 .media-card.watch-later {
-  border-color: rgba(245, 197, 24, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.2);
+  border-color: rgba(245, 197, 24, 0.65);
 }
 
-/* Both states: split border, half green (watched) half gold (watch later).
-   A transparent border over a border-box gradient draws the two colors while
-   respecting the card radius (border-image would ignore it). */
 .media-card.seen.watch-later {
-  border: 1px solid transparent;
-  background:
-    linear-gradient(180deg, rgba(20, 31, 49, 0.95), rgba(12, 18, 30, 0.95)) padding-box,
-    linear-gradient(135deg, rgba(22, 163, 74, 0.9) 0 50%, rgba(245, 197, 24, 0.9) 50% 100%) border-box;
-  box-shadow: 0 0 14px rgba(22, 163, 74, 0.14), 0 0 14px rgba(245, 197, 24, 0.1);
+  border-color: rgba(245, 197, 24, 0.65);
+  box-shadow: inset 0 0 0 1.5px rgba(22, 163, 74, 0.55);
 }
 
 .media-card-poster {
@@ -410,12 +500,30 @@
   position: absolute;
   top: 6px;
   left: 6px;
-  background: var(--accent-warm);
-  color: #000;
-  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  background: rgba(20, 16, 7, 0.82);
+  color: var(--accent-warm, #f5c518);
+  font-size: 0.72rem;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 3px 8px;
   border-radius: 999px;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+}
+
+.media-card-rating svg {
+  flex-shrink: 0;
+}
+
+.media-card-rating .rating-source {
+  color: var(--accent-warm, #f5c518);
+}
+
+.media-card-rating .rating-rt-text {
+  color: #f28b82;
+  font-weight: 700;
 }
 
 .media-card-type {
@@ -856,8 +964,98 @@
 .detail-badges {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.5rem;
   margin: 0.75rem 0;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0;
+}
+
+.detail-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+
+.detail-action-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.detail-action-pill svg {
+  flex-shrink: 0;
+}
+
+.detail-action-pill.active-saved svg {
+  color: var(--gold-text);
+}
+
+.detail-action-pill.active-watched {
+  color: var(--green-text);
+  background: rgba(22, 163, 74, 0.16);
+  border-color: rgba(22, 163, 74, 0.45);
+}
+
+.detail-action-pill.active-watched:hover {
+  background: rgba(22, 163, 74, 0.24);
+}
+
+.detail-action-pill.active-trailer {
+  color: var(--accent);
+}
+
+.detail-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.detail-action-icon:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.detail-meta-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.detail-meta-item {
+  white-space: nowrap;
+}
+
+.detail-meta-sep {
+  margin: 0 0.45rem;
+  color: var(--text-dim);
+}
+
+/* Extra breathing room between the meta line (e.g. "Ended") and the action buttons */
+.detail-meta-line + button {
+  margin-left: 0.6rem;
 }
 
 .badge {
@@ -868,9 +1066,31 @@
 }
 
 .badge.rating {
-  background: var(--accent-warm);
-  color: #000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  background: rgba(20, 16, 7, 0.7);
+  color: var(--accent-warm, #f5c518);
   font-weight: 700;
+  text-decoration: none;
+}
+
+.badge.rating svg {
+  flex-shrink: 0;
+}
+
+.badge.rating .rating-source {
+  color: #cdd7e3;
+}
+
+.rating-votes {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.badge.rating .rating-rt-text {
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .imdb-badge {
@@ -980,6 +1200,42 @@
 .player-fs-wrap:fullscreen > * {
   width: 100%;
   max-height: 100%;
+}
+
+/* Media type toggle (All / Movies / TV Shows) */
+.type-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0.2rem;
+  padding: 0.25rem;
+  height: var(--type-toggle-height, 2.5rem);
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+}
+
+.type-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.type-toggle-btn:hover {
+  color: var(--text);
+}
+
+.type-toggle-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
 
 /* Custom Select */

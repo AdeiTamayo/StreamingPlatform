@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds, imageUrl } from '../api/tmdb';
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
@@ -11,9 +11,13 @@ import SeasonDropdown from '../components/SeasonDropdown';
 import FilterDropdown from '../components/FilterDropdown';
 import MediaCard from '../components/MediaCard';
 import PersonList from '../components/PersonList';
+import MediaCarousel from '../components/MediaCarousel';
+import Duration from '../components/Duration';
+import DetailActions from '../components/DetailActions';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
+import { formatVotes } from '../utils/format';
 import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
 import styles from './TVDetail.module.css';
 
@@ -529,7 +533,7 @@ export default function TVDetail() {
 
   function handleProgress(currentTime: number, duration: number) {
     if (watchedRef.current || !show || !id) return;
-    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path }, duration || undefined);
+    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: episodes.find((item) => item.episode_number === episode)?.name }, duration || undefined);
 
     // Runtime estimate: real duration when the embed reports one, else TMDB
     // metadata for the current episode/series.
@@ -688,8 +692,45 @@ export default function TVDetail() {
   const cast = show.credits?.cast?.slice(0, 8) || [];
   const created = show.created_by || [];
   const networks = show.networks || [];
-  const genres = show.genres?.map((g) => g.name).join(', ') || '';
-  const recommendations = show.recommendations?.results?.slice(0, 10) || [];
+  const genres = show.genres?.slice(0, 3).map((g) => g.name).join(', ') || '';
+  const recommendations = show.recommendations?.results?.slice(0, 24) || [];
+
+  // Unwatched episodes of the viewed season that aired in the last 7 days.
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const freshCount = episodes.filter(
+    (ep) =>
+      ep.air_date &&
+      new Date(ep.air_date).getTime() >= weekAgo &&
+      new Date(ep.air_date).getTime() <= Date.now() &&
+      !watchedMap[ep.episode_number],
+  ).length;
+
+  // Secondary facts render as a single bullet-separated line (hero style)
+  // instead of individual pill badges.
+  const metaNodes: ReactNode[] = [];
+  const addMeta = (key: string, node: ReactNode, title?: string) => {
+    if (metaNodes.length > 0) {
+      metaNodes.push(<span key={`sep-${key}`} className="detail-meta-sep" aria-hidden="true">{'\u00b7'}</span>);
+    }
+    metaNodes.push(<span key={key} className="detail-meta-item" title={title}>{node}</span>);
+  };
+  if (genres) addMeta('genres', genres);
+  if (show.episode_run_time?.[0]) addMeta('runtime', <Duration minutes={show.episode_run_time[0]} />);
+  if (seasons.length > 0) addMeta('seasons', `${seasons.length} Seasons`);
+  if (show.number_of_episodes) addMeta('episodes', `${show.number_of_episodes} Episodes`);
+  if (show.status) {
+    addMeta('status', ended || show.status === 'Canceled' ? 'Ended' : 'Ongoing', `Series status: ${show.status}`);
+  }
+  if (freshCount > 0) {
+    addMeta(
+      'fresh',
+      `${freshCount} new`,
+      `${freshCount} unwatched ${freshCount === 1 ? 'episode' : 'episodes'} aired in the last 7 days (season ${season})`,
+    );
+  }
+  if (watchedCount > 0) {
+    addMeta('watched', `${watchedCount}/${episodeCount} watched`, `You have watched ${watchedCount} of ${episodeCount} episodes in season ${season}`);
+  }
 
   return (
     <div className="page">
@@ -707,79 +748,34 @@ export default function TVDetail() {
                   href={`https://www.imdb.com/title/${imdbId}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}` : 'Open on IMDb'}
                 >
-                  IMDb{imdbRating ? ` ${imdbRating.rating}` : ''}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
+                  <span className="rating-source">{imdbRating ? imdbRating.rating : show.vote_average.toFixed(1)}</span>
+                  {imdbRating?.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
               ) : show.vote_average != null ? (
-                <span className="badge rating">TMDB {show.vote_average.toFixed(1)}</span>
-              ) : null}
-              {genres && <span className="badge">{genres}</span>}
-              <span className="badge">{seasons.length} Seasons</span>
-              {show.status === 'Ended' || show.status === 'Canceled' ? (
-                <span className="badge" title={`Series status: ${show.status}`}>Ended</span>
-              ) : show.status ? (
-                <span className="badge" title={`Series status: ${show.status}`}>Ongoing</span>
-              ) : null}
-              {(() => {
-                // Decision support from already-loaded data only (no extra
-                // requests): unwatched episodes of the viewed season that
-                // aired in the last 7 days.
-                const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-                const fresh = episodes.filter(
-                  (ep) =>
-                    ep.air_date &&
-                    new Date(ep.air_date).getTime() >= weekAgo &&
-                    new Date(ep.air_date).getTime() <= Date.now() &&
-                    !watchedMap[ep.episode_number],
-                ).length;
-                return fresh > 0 ? (
-                  <span className="badge" title={`${fresh} unwatched ${fresh === 1 ? 'episode' : 'episodes'} aired in the last 7 days (season ${season})`}>
-                    {fresh} new
-                  </span>
-                ) : null;
-              })()}
-              {watchedCount > 0 && (
-                <span className="badge" title={`You have watched ${watchedCount} of ${episodeCount} episodes in season ${season}`}>
-                  {watchedCount}/{episodeCount} watched
+                <span className="badge rating">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
+                  <span className="rating-source">{show.vote_average.toFixed(1)}</span>
                 </span>
-              )}
-              <button
-                type="button"
-                className={`${styles.epActionBtn} ${inWL ? styles.activeWatchLater : ''}`}
-                onClick={() => {
-                  if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
-                  else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
-                }}
-                title={inWL ? 'Remove series from Watch Later' : 'Save series to Watch Later'}
-                aria-label={inWL ? 'Remove series from Watch Later' : 'Save series to Watch Later'}
-                aria-pressed={inWL}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
-              </button>
-              <button
-                type="button"
-                className={`${styles.epActionBtn} ${seriesWatched ? styles.activeWatched : ''}`}
-                onClick={toggleSeriesWatched}
-                title={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}
-                aria-label={seriesWatched ? 'Unmark series as watched' : 'Mark series as watched'}
-                aria-pressed={seriesWatched}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
-              </button>
-              {trailerKey && (
-                <button
-                  type="button"
-                  className={styles.epActionBtn}
-                  onClick={() => { setShowTrailer((s: boolean) => !s); }}
-                  title={showTrailer ? 'Hide trailer' : 'Play trailer'}
-                  aria-label={showTrailer ? 'Hide trailer' : 'Play trailer'}
-                  aria-pressed={showTrailer}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3Z" /><path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" /><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /></svg>
-                </button>
+              ) : null}
+              {metaNodes.length > 0 && (
+                <span className="detail-meta-line">{metaNodes}</span>
               )}
             </div>
+            <DetailActions
+              inList={inWL}
+              watched={seriesWatched}
+              onToggleList={() => {
+                if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
+                else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
+              }}
+              onToggleWatched={toggleSeriesWatched}
+              shareTitle={show.name}
+              onToggleTrailer={trailerKey ? () => { setPlayerOpen(true); setShowTrailer((s: boolean) => !s); } : undefined}
+              trailerActive={showTrailer}
+            />
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast"><strong>Cast:</strong> <PersonList people={cast} /></div>
@@ -858,29 +854,6 @@ export default function TVDetail() {
                 episodes={episodes}
                 onSelect={(ep: number) => { setEpisode(ep); }}
               />
-              <button
-                type="button"
-                className={`${styles.epActionBtn} ${watched ? styles.activeWatched : ''}`}
-                onClick={toggleWatched}
-                title={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
-                aria-label={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
-                aria-pressed={watched}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
-              </button>
-              <button
-                type="button"
-                className={`${styles.epActionBtn} ${inEpWL ? styles.activeWatchLater : ''}`}
-                onClick={() => {
-                  if (inEpWL) { removeEpisodeWatchLater(safeId, season, episode); setInEpWL(false); toast?.('Removed from Watch Later'); }
-                  else { addEpisodeWatchLater(safeId, season, episode, show.name); setInEpWL(true); toast?.('Added to Watch Later'); }
-                }}
-                title={inEpWL ? 'Remove episode from Watch Later' : 'Save episode to Watch Later'}
-                aria-label={inEpWL ? 'Remove episode from Watch Later' : 'Save episode to Watch Later'}
-                aria-pressed={inEpWL}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></svg>
-              </button>
               <button
                 type="button"
                 className={styles.epActionBtn}
@@ -1029,7 +1002,7 @@ export default function TVDetail() {
       {recommendations.length > 0 && (
         <section className="section" aria-labelledby="recs-heading-tv">
           <h2 id="recs-heading-tv" className="section-title">You might also like</h2>
-          <div className="media-grid">
+          <MediaCarousel>
             {recommendations.map((item) => (
               <MediaCard
                 key={`${(item as { media_type?: string }).media_type || "tv"}-${(item as { id: number }).id}`}
@@ -1037,7 +1010,7 @@ export default function TVDetail() {
                 mediaType={(item as { media_type?: string }).media_type === "movie" ? "movie" : "tv"}
               />
             ))}
-          </div>
+          </MediaCarousel>
         </section>
       )}
     </div>
