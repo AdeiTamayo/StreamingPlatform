@@ -1,0 +1,6 @@
+/* The shared .custom-select-item styles assume a <button>; the listbox rows
+   are non-interactive divs, so restore the pointer affordance here. */
+.option {
+  cursor: pointer;
+  user-select: none;
+}

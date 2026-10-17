@@ -484,9 +484,6 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 /* Poster shimmer sits under the loaded image - remove it so dozens of
@@ -649,20 +646,36 @@
   100% { background-position: 200px 0; }
 }
 
-.media-card-skeleton {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
+/* One gradient/animation definition shared by every shimmer surface. */
+.media-card-poster::before,
+.media-card-skeleton,
+.skeleton-text,
+.skeleton-line,
+.skeleton-avatar,
+.skeleton-pill,
+.skeleton-row,
+.skeleton-button-bar {
+  background: var(--shimmer-gradient);
   background-size: 400px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
-.skeleton-text {
+.media-card-skeleton {
+  position: absolute;
+  inset: 0;
+}
+
+.skeleton-text,
+.skeleton-line {
   height: 12px;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-text {
+  border-radius: var(--radius-xs);
+}
+
+.skeleton-line {
+  border-radius: 999px;
 }
 
 .skeleton-title {
@@ -691,23 +704,12 @@
   width: 42px;
   height: 63px;
   border-radius: 10px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 .skeleton-series-copy {
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
-}
-
-.skeleton-line {
-  height: 12px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 .skeleton-line-title {
@@ -722,26 +724,17 @@
   width: 92px;
   height: 34px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 .skeleton-row {
   height: 32px;
   border-radius: 12px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 .skeleton-button-bar {
   height: 28px;
   margin: 0 0.8rem 0.8rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--surface-overlay) 25%, var(--surface-overlay-hover) 50%, var(--surface-overlay) 75%);
-  background-size: 400px 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
 }
 
 /* Loading */
