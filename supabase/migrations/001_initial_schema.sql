@@ -146,6 +146,8 @@ create table if not exists public.search_history (
 
 create index if not exists idx_search_history_user_id on public.search_history using btree (user_id);
 create index if not exists idx_search_history_created on public.search_history using btree (user_id, created_at desc);
+-- Repeated searches must not stack duplicate rows for the same query.
+create unique index if not exists idx_search_history_user_query on public.search_history using btree (user_id, query);
 
 alter table public.search_history enable row level security;
 

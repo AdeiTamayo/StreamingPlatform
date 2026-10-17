@@ -310,8 +310,8 @@ function addToEpwlIndex(key: string): void {
 
 // Guards against concurrent migration runs (e.g. sign-in resolving while the
 // SIGNED_IN event fires too). Without this, two overlapping runs would upload
-// the same local rows twice - search_history/notifications have no unique
-// constraint, so the duplicates would persist in Supabase.
+// the same local rows twice - notifications have no unique constraint, so the
+// duplicates would persist in Supabase.
 let inflightMigration: { userId: string; promise: Promise<void> } | null = null;
 
 export const dataMigration = {
@@ -333,8 +333,8 @@ export const dataMigration = {
       return;
     }
     // Upgrade path: migrated under the old global flag - don't re-upload
-    // (search_history has no unique constraint, so re-uploading would
-    // duplicate every row), just mark this user and sync down.
+    // (that history is already on the server), just mark this user and sync
+    // down.
     if (localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY)) {
       try {
         localStorage.setItem(flagKey, 'true');
@@ -346,6 +346,9 @@ export const dataMigration = {
     }
 
     let hasData = false;
+    // Only flips when a write did not reach the server (it was queued for a
+    // later sync, or even that failed). Repositories never throw - they park
+    // failures in the offline queue - so "no exception" is not "persisted".
     let failed = false;
 
     const watchedItems = getLegacyWatched();
@@ -353,7 +356,8 @@ export const dataMigration = {
       hasData = true;
       try {
         const batch = watchedItems.map((item) => ({ ...item, user_id: userId }));
-        await watchedRepository.markBatch(batch);
+        const result = await watchedRepository.markBatch(batch);
+        if (result?.queued) failed = true;
       } catch (err) {
         failed = true;
         logError('dataMigration.watched', err);
@@ -365,7 +369,7 @@ export const dataMigration = {
       hasData = true;
       try {
         for (const item of wlItems) {
-          await watchLaterRepository.add({
+          const result = await watchLaterRepository.add({
             user_id: userId,
             media_type: item.media_type,
             tmdb_id: item.tmdb_id,
@@ -375,6 +379,7 @@ export const dataMigration = {
             season: item.season,
             episode: item.episode,
           });
+          if (result?.queued) failed = true;
         }
       } catch (err) {
         failed = true;
@@ -387,7 +392,8 @@ export const dataMigration = {
       hasData = true;
       try {
         for (const query of searchItems) {
-          await searchHistoryRepository.add({ user_id: userId, query });
+          const result = await searchHistoryRepository.add({ user_id: userId, query });
+          if (result?.queued) failed = true;
         }
       } catch (err) {
         failed = true;
@@ -395,8 +401,10 @@ export const dataMigration = {
       }
     }
 
-    // Only clear the mirrored data and mark the flag when every section
-    // succeeded - otherwise the next login retries the incomplete sections.
+    // Only clear the mirrored data and mark the flag when every row actually
+    // reached the server - a queued-only upload (offline/RLS failure) is not
+    // a success, or the pre-login library would be deleted while nothing was
+    // stored remotely. The next login retries the incomplete sections.
     // Local-only state is never wiped here (see clearMigratedData).
     if (hasData && !failed) {
       clearMigratedData();
@@ -407,7 +415,8 @@ export const dataMigration = {
       }
       await this.syncFromSupabase(userId);
     } else if (failed) {
-      // Don't set the flag; next login will retry the failed sections.
+      // Don't clear local data or set the flag; next login retries the
+      // incomplete sections.
       await this.syncFromSupabase(userId);
     } else {
       // No local data to migrate; just sync and set the flag.

@@ -35,4 +35,30 @@ describe('withRetry', () => {
     await withRetry(fn2, { baseDelayMs: 1, maxAttempts: 0 }).catch(() => {});
     expect(fn2).toHaveBeenCalledTimes(1);
   });
+
+  // Regression: PostgREST errors are thrown from inside the callback, so
+  // retrying them used to be impossible; permanent ones must still fail fast
+  // and stay unwrapped so callers can match on `code`.
+  it('fails fast on permanent Postgres errors without wrapping them', async () => {
+    const err = { code: '23505', message: 'duplicate key value' };
+    const fn = vi.fn().mockRejectedValue(err);
+    const result = await withRetry(fn, { baseDelayMs: 1 }).catch((e: unknown) => e);
+    expect(result).toBe(err);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails fast on RLS denial instead of burning backoff', async () => {
+    const fn = vi.fn().mockRejectedValue({ code: '42501', message: 'permission denied' });
+    await withRetry(fn, { baseDelayMs: 1 }).catch(() => {});
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours a custom shouldRetry predicate', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('give up'));
+    const result = await withRetry(fn, { baseDelayMs: 1, shouldRetry: () => false }).catch(
+      (e: unknown) => e,
+    );
+    expect((result as Error).message).toBe('give up');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
 });

@@ -3,7 +3,7 @@ import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
-import { syncOfflineQueue, initOfflineQueueSync, clearOfflineQueue, setSyncUserId, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
+import { syncOfflineQueue, initOfflineQueueSync, disposeOfflineQueueSync, clearOfflineQueue, setSyncUserId, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
 import { isValidTimezone, getSystemTimezone } from '../utils/calendar';
 import type { WatchedInsert } from '../types/database';
 import type { LastSeenItem, ContinueWatchingItem, WatchLaterItem, EpisodeWatchLaterItem, NotificationItem, StorageUsage, Stats, ProgressData, WatchedData, MediaType } from '../types';
@@ -53,6 +53,10 @@ export function setCurrentUserId(userId: string | null): void {
   if (userId) {
     initOfflineQueueSync();
     syncOfflineQueue().catch(() => {});
+  } else {
+    // Signed out: stop the retry loop so the queue can't be replayed (and
+    // dropped) without a session. Re-initialised on the next sign-in.
+    disposeOfflineQueueSync();
   }
 }
 
@@ -233,8 +237,15 @@ export function getSeriesWatchedShows(): Array<{ id: string; title: string; post
   for (const k of index) {
     const m = k.match(/^watched:tv-(\d+)$/);
     if (!m) continue;
+    const raw = localStorage.getItem(k);
+    if (!raw) {
+      // Index points at a missing value: heal it instead of fabricating a
+      // titleless show from the key alone.
+      removeFromWatchedIndex(k);
+      continue;
+    }
     try {
-      const data = JSON.parse(localStorage.getItem(k) || '{}') as WatchedData;
+      const data = JSON.parse(raw) as WatchedData;
       shows.push({
         id: m[1],
         title: data.title || '',
@@ -451,7 +462,14 @@ export function getLastSeen(): LastSeenItem[] {
   const watchedIndex = getWatchedIndex();
   for (const k of watchedIndex) {
     try {
-      const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
+      const raw = localStorage.getItem(k);
+      if (!raw) {
+        // Dangling index key: heal it rather than emitting a ghost row
+        // (empty title, ts 0) built from the key alone.
+        removeFromWatchedIndex(k);
+        continue;
+      }
+      const data = JSON.parse(raw) as Record<string, unknown>;
       const parsed = parseWatchedKey(k);
       if (parsed) {
         items.push({
@@ -902,6 +920,12 @@ export function getStats(): Stats {
   let seriesWatched = 0;
   const index = getWatchedIndex();
   for (const k of index) {
+    // Only count keys whose value exists - a dangling index entry used to
+    // inflate the stats even though nothing is stored for it.
+    if (!localStorage.getItem(k)) {
+      removeFromWatchedIndex(k);
+      continue;
+    }
     if (k.includes('movie-')) moviesWatched++;
     else if (k.match(/tv-\d+-S\d+E\d+/)) episodesWatched++;
     else if (k.match(/^watched:tv-\d+$/)) seriesWatched++;

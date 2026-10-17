@@ -68,6 +68,7 @@ describe('offlineQueue', () => {
   });
 
   it('drains ops for dropped local-only tables immediately', async () => {
+    setSyncUserId('u');
     enqueueWrite('progress', 'upsert', { user_id: 'u', tmdb_id: 1 });
     enqueueWrite('settings', 'upsert', { user_id: 'u' });
     enqueueWrite('notifications', 'insert', { user_id: 'u' });
@@ -75,7 +76,24 @@ describe('offlineQueue', () => {
     expect(getQueueSize()).toBe(0);
   });
 
+  it('leaves every op queued without burning attempts while signed out', async () => {
+    enqueueWrite('watched', 'insert', { user_id: 'user-a', tmdb_id: 1 });
+    enqueueWrite('watch_later', 'delete', { user_id: 'user-a', tmdb_id: 2 });
+    // syncUserId is null here (afterEach / signed-out state).
+    await syncOfflineQueue();
+    const queue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    expect(queue).toHaveLength(2);
+    expect(queue.every((op: { attempts: number }) => op.attempts === 0)).toBe(true);
+    // The owner signs back in - ops are replayed and, being offline, count attempts.
+    setSyncUserId('user-a');
+    await syncOfflineQueue();
+    const retry = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    expect(retry).toHaveLength(2);
+    expect(retry.every((op: { attempts: number }) => op.attempts === 1)).toBe(true);
+  });
+
   it('keeps failing operations up to MAX_OP_ATTEMPTS, then drops them', async () => {
+    setSyncUserId('u');
     enqueueWrite('watched', 'insert', { tmdb_id: 1 });
     for (let i = 1; i <= 5; i++) {
       await syncOfflineQueue();

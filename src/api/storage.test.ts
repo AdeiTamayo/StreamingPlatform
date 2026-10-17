@@ -784,3 +784,37 @@ describe('removeSearchHistory', () => {
     expect(getSearchHistory()).toEqual(['hello']);
   });
 });
+
+// An index entry whose value was removed out-of-band (partial wipe, manual
+// edit, failed migration) must be skipped and healed - not rendered as a
+// ghost entry fabricated from the key alone.
+describe('dangling watched-index keys', () => {
+  it('getStats does not count keys whose value is missing', () => {
+    markWatched('movie', '550', 'Fight Club');
+    expect(getStats().moviesWatched).toBe(1);
+    localStorage.removeItem('watched:movie-550');
+    expect(getStats().moviesWatched).toBe(0);
+  });
+
+  it('getLastSeen skips rows whose watched value is missing', () => {
+    markWatched('tv', '1399', 'Game of Thrones', 1, 1);
+    expect(getLastSeen()).toHaveLength(1);
+    localStorage.removeItem('watched:tv-1399-S1E1');
+    expect(getLastSeen()).toEqual([]);
+  });
+
+  it('getSeriesWatchedShows skips shows whose flag is missing', () => {
+    markSeriesWatched('1399', 'Game of Thrones', '/p.jpg');
+    expect(getSeriesWatchedShows()).toHaveLength(1);
+    localStorage.removeItem('watched:tv-1399');
+    expect(getSeriesWatchedShows()).toEqual([]);
+  });
+
+  it('heals the index so later reads stay clean', () => {
+    markWatched('movie', '550', 'Fight Club');
+    localStorage.removeItem('watched:movie-550');
+    getStats();
+    const index = JSON.parse(localStorage.getItem('watched_index') || '[]') as string[];
+    expect(index).not.toContain('watched:movie-550');
+  });
+});

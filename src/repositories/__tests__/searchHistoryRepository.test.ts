@@ -25,7 +25,8 @@ beforeEach(() => {
 });
 
 describe('searchHistoryRepository', () => {
-  // withRetry sleeps ~3s across attempts before the op is queued.
+  // The mock's requireSupabase() error is marked permanent, so withRetry
+  // fails fast instead of sleeping through its backoff schedule.
   it('queues the remove op when offline', async () => {
     await searchHistoryRepository.remove('user-1', 'Hello %');
     const ops = queuedOps();

@@ -18,7 +18,10 @@ export interface QueuedOperation {
 
 function getQueue(): QueuedOperation[] {
   try {
-    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    // Only trust arrays - a hand-edited/imported non-array value would throw
+    // on every push below.
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -28,7 +31,12 @@ function saveQueue(queue: QueuedOperation[]): void {
   localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
 }
 
-export function enqueueWrite(table: string, method: QueuedOperation['method'], data: Record<string, unknown>): void {
+/**
+ * Appends an op to the queue. Never throws (quota/corruption are logged, not
+ * propagated) and reports whether the op was actually persisted - callers that
+ * treat "queued" as a fallback success path need to know when even that failed.
+ */
+export function enqueueWrite(table: string, method: QueuedOperation['method'], data: Record<string, unknown>): boolean {
   const queue = getQueue();
   queue.push({
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -41,7 +49,13 @@ export function enqueueWrite(table: string, method: QueuedOperation['method'], d
   if (queue.length > MAX_QUEUE_SIZE) {
     queue.splice(0, queue.length - MAX_QUEUE_SIZE);
   }
-  saveQueue(queue);
+  try {
+    saveQueue(queue);
+    return true;
+  } catch (err) {
+    logError('offlineQueue.enqueue', err);
+    return false;
+  }
 }
 
 // Tables dropped as local-only (progress, settings by migration 003,
@@ -163,6 +177,11 @@ export async function syncOfflineQueue(): Promise<void> {
 }
 
 async function runSyncPass(): Promise<void> {
+  // No session: replaying would fail RLS on every op and burn attempts until
+  // they're permanently dropped. Leave the queue untouched - it syncs when
+  // the owner signs back in.
+  if (syncUserId == null) return;
+
   const queue = getQueue();
   if (queue.length === 0) return;
 

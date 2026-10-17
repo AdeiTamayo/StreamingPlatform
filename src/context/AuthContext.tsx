@@ -118,10 +118,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setAuth, runMigration]);
 
   const signOut = useCallback(async () => {
-    await authService.signOut();
-    setCurrentUserId(null);
-    setAuth(null, null);
-    navigate('/');
+    // A failed remote sign-out (expired token, offline) must not strand the
+    // user signed in locally: clear local state and the storage-layer user id
+    // regardless, then surface the remote failure only in the log.
+    try {
+      await authService.signOut();
+    } catch (err) {
+      logError('auth.signOut', err);
+    } finally {
+      setCurrentUserId(null);
+      setAuth(null, null);
+      navigate('/');
+    }
   }, [setAuth, navigate]);
 
   const resetPassword = useCallback(async (email: string) => {
