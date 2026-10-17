@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { isTypingTarget } from '../utils/isTypingTarget';
 
 /**
  * Arrow-key navigation for listbox-style dropdowns.
@@ -27,6 +28,9 @@ export default function useDropdownKeys(
     if (!open || count === 0) return;
 
     function handleKey(e: KeyboardEvent) {
+      // Keystrokes that belong to a focused field (e.g. the navbar search
+      // box) must not be swallowed by the open dropdown's navigation.
+      if (isTypingTarget(e.target)) return;
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault();
         setActiveIndex((i) => {

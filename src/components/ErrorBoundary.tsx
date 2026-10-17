@@ -8,6 +8,11 @@ interface ErrorBoundaryProps {
   // Changing this resets a tripped boundary (e.g. pass the route path so a
   // crash on one page doesn't stick after navigating away).
   resetKey?: string | number;
+  // Called before the retry re-render. React.lazy memoizes a rejected import,
+  // so re-rendering the same component type re-throws instantly; the owner
+  // must hand us fresh component types (e.g. recreate the route's lazy
+  // elements) for the retry to actually reload anything.
+  onRetry?: () => void;
 }
 
 interface ErrorBoundaryState {
@@ -40,6 +45,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   }
 
   handleRetry = () => {
+    this.props.onRetry?.();
     this.setState({ hasError: false, error: null });
   };
 

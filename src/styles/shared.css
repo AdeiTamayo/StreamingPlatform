@@ -21,6 +21,12 @@
   min-width: 0;
 }
 
+/* Focused programmatically on route change (tabindex=-1, never tabbed to),
+   so no ring needed. */
+#main-content:focus {
+  outline: none;
+}
+
 /* Page layout */
 .page {
   width: min(1280px, calc(100% - 2rem));

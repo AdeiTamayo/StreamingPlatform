@@ -259,29 +259,18 @@ const Navbar = memo(function Navbar() {
 
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
+      // The toggle button only exists while the bar is closed, so testing it
+      // as "ref present AND click outside" made the whole condition false and
+      // an open bar could never be dismissed by clicking away. Ask the
+      // inverse question instead: did the click land on any search surface?
+      const inside = (el: HTMLElement | null) => el != null && el.contains(target);
+      const clickedSearchSurface =
+        inside(searchRef.current) ||
+        inside(searchBtnRef.current) ||
+        inside(goBtnRef.current) ||
+        inside(suggestRef.current);
 
-      const outsideInput =
-        searchRef.current &&
-        !searchRef.current.contains(target);
-
-      const outsideToggle =
-        searchBtnRef.current &&
-        !searchBtnRef.current.contains(target);
-
-      const outsideGo =
-        goBtnRef.current &&
-        !goBtnRef.current.contains(target);
-
-      const outsideSuggest =
-        !suggestRef.current ||
-        !suggestRef.current.contains(target);
-
-      if (
-        outsideInput &&
-        outsideToggle &&
-        outsideGo &&
-        outsideSuggest
-      ) {
+      if (!clickedSearchSurface) {
         setSearchOpen(false);
         setQuery('');
       }

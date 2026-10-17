@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -7,23 +7,42 @@ import AuthModal from './components/AuthModal/AuthModal';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import './styles/shared.css';
 
-const Home = lazy(() => import('./pages/Home'));
-const Movies = lazy(() => import('./pages/Movies'));
-const TVShows = lazy(() => import('./pages/TVShows'));
-const MovieDetail = lazy(() => import('./pages/MovieDetail'));
-const TVDetail = lazy(() => import('./pages/TVDetail'));
-const Search = lazy(() => import('./pages/Search'));
-const WatchLater = lazy(() => import('./pages/WatchLater'));
-const LastSeen = lazy(() => import('./pages/LastSeen'));
-const Settings = lazy(() => import('./pages/Settings'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+// Lazy components memoize a rejected import, so a module-scope constant can
+// never recover from a failed chunk load. Created through a factory so the
+// ErrorBoundary's "Try Again" can swap in fresh types and re-run the import.
+function createPages() {
+  return {
+    Home: lazy(() => import('./pages/Home')),
+    Movies: lazy(() => import('./pages/Movies')),
+    TVShows: lazy(() => import('./pages/TVShows')),
+    MovieDetail: lazy(() => import('./pages/MovieDetail')),
+    TVDetail: lazy(() => import('./pages/TVDetail')),
+    Search: lazy(() => import('./pages/Search')),
+    WatchLater: lazy(() => import('./pages/WatchLater')),
+    LastSeen: lazy(() => import('./pages/LastSeen')),
+    Settings: lazy(() => import('./pages/Settings')),
+    NotFound: lazy(() => import('./pages/NotFound')),
+  };
+}
 
 export default function App() {
   const location = useLocation();
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [pageEpoch, setPageEpoch] = useState(0);
+  const pages = useMemo(createPages, [pageEpoch]);
+  const mainRef = useRef<HTMLElement>(null);
+  const isFirstNav = useRef(true);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // After a route change (not the initial load), move focus to the new
+    // page's content so keyboard/screen-reader users don't stay parked on
+    // whatever link or control triggered the navigation.
+    if (isFirstNav.current) {
+      isFirstNav.current = false;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
   }, [location.pathname, location.search]);
 
   useEffect(() => {
@@ -46,24 +65,27 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <ErrorBoundary resetKey={`${location.pathname}${location.search}`}>
+      <ErrorBoundary
+        resetKey={`${location.pathname}${location.search}`}
+        onRetry={() => setPageEpoch((epoch) => epoch + 1)}
+      >
         <div className="app-shell">
           <a href="#main-content" className="skip-link">Skip to content</a>
           <Navbar />
           <AuthModal />
-          <main id="main-content" className="app-content">
+          <main id="main-content" className="app-content" ref={mainRef} tabIndex={-1}>
             <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
               <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/movies" element={<Movies />} />
-                <Route path="/tv" element={<TVShows />} />
-                <Route path="/movie/:id" element={<MovieDetail />} />
-                <Route path="/tv/:id" element={<TVDetail />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/watch-later" element={<ProtectedRoute><WatchLater /></ProtectedRoute>} />
-                <Route path="/last-seen" element={<ProtectedRoute><LastSeen /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                <Route path="*" element={<NotFound />} />
+                <Route path="/" element={<pages.Home />} />
+                <Route path="/movies" element={<pages.Movies />} />
+                <Route path="/tv" element={<pages.TVShows />} />
+                <Route path="/movie/:id" element={<pages.MovieDetail />} />
+                <Route path="/tv/:id" element={<pages.TVDetail />} />
+                <Route path="/search" element={<pages.Search />} />
+                <Route path="/watch-later" element={<ProtectedRoute><pages.WatchLater /></ProtectedRoute>} />
+                <Route path="/last-seen" element={<ProtectedRoute><pages.LastSeen /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><pages.Settings /></ProtectedRoute>} />
+                <Route path="*" element={<pages.NotFound />} />
               </Routes>
             </Suspense>
           </main>
@@ -71,6 +93,10 @@ export default function App() {
             className={`back-to-top${showBackToTop ? ' visible' : ''}`}
             onClick={scrollToTop}
             aria-label="Back to top"
+            // Hidden state is opacity-only, so keep the invisible button out
+            // of the tab order and the accessibility tree until it shows.
+            tabIndex={showBackToTop ? 0 : -1}
+            aria-hidden={!showBackToTop}
           >
             &#8593;
           </button>

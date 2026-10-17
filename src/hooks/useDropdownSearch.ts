@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { isTypingTarget } from '../utils/isTypingTarget';
 
 export default function useDropdownSearch(open: boolean, onClose: () => void) {
   const [search, setSearch] = useState('');
@@ -26,6 +27,9 @@ export default function useDropdownSearch(open: boolean, onClose: () => void) {
     }
 
     function handleKey(e: KeyboardEvent) {
+      // Typeahead must not eat keystrokes aimed at a focused field elsewhere
+      // (e.g. the navbar search box) while this dropdown is open.
+      if (isTypingTarget(e.target)) return;
       if (e.key === 'Escape') { onCloseRef.current?.(); return; }
       if (e.key === 'Backspace') {
         setSearch((s) => s.slice(0, -1));

@@ -277,11 +277,15 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   }
 
   function handleToggle() {
-    if (!open) {
-      // Fresh check on open so newly released episodes show immediately.
-      void scanForNewEpisodes(true).then(load);
+    if (open) {
+      // Same close path as outside-click/Escape so unread items still get
+      // marked read when the bell itself is used to dismiss the panel.
+      closePanel();
+      return;
     }
-    setOpen((previous) => !previous);
+    // Fresh check on open so newly released episodes show immediately.
+    void scanForNewEpisodes(true).then(load);
+    setOpen(true);
   }
 
   // Unread items are marked as read when the panel closes, so the unread

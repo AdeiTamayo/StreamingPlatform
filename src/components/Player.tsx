@@ -53,6 +53,14 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
   const graceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const staleTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
 
+  // Read through a ref so a runtime that resolves late (episodes load while
+  // playing) doesn't change startWallClockFallback's identity and re-run the
+  // reset effect below, which would wipe playback state mid-play.
+  const runtimeMinutesRef = useRef(runtimeMinutes);
+  useEffect(() => {
+    runtimeMinutesRef.current = runtimeMinutes;
+  }, [runtimeMinutes]);
+
   const clearFallbackTimers = useCallback(() => {
     if (fallbackIntervalRef.current) clearInterval(fallbackIntervalRef.current);
     if (graceTimerRef.current) clearTimeout(graceTimerRef.current);
@@ -79,14 +87,15 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
       state.current.currentTime += 10;
       savedOnProgress.current?.(state.current.currentTime, state.current.duration);
 
-      if (runtimeMinutes) {
-        const runtimeSeconds = runtimeMinutes * 60;
+      const runtime = runtimeMinutesRef.current;
+      if (runtime) {
+        const runtimeSeconds = runtime * 60;
         if (state.current.currentTime >= runtimeSeconds) markEnded();
       } else if (state.current.currentTime >= FALLBACK_MAX_SECONDS) {
         markEnded();
       }
     }, FALLBACK_POLL_MS);
-  }, [runtimeMinutes, markEnded]);
+  }, [markEnded]);
 
   const armStaleWatchdog = useCallback(() => {
     if (staleTimerRef.current) clearTimeout(staleTimerRef.current);
