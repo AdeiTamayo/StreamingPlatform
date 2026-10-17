@@ -151,6 +151,12 @@ export default function LastSeen() {
     (safeMoviePage + 1) * MOVIES_PER_PAGE,
   );
 
+  // When no search filter is active, "Remove all" must operate on the full
+  // unfiltered list - not just the currently paginated slice, which would
+  // silently leave most of the history behind.
+  const filterActive = !!searchQuery.trim();
+  const removeTargets = filterActive ? visibleMovies : movies;
+
   const totalSeriesPages = Math.max(
     1,
     Math.ceil(series.length / SERIES_PER_PAGE),
@@ -189,22 +195,26 @@ export default function LastSeen() {
     toast?.("Series removed from history");
   }
 
-  // Removes only the movies currently listed (respects the title filter),
-  // so a filtered view can't wipe unfiltered history by accident.
+  // Removes every movie in the current view - all of them when unfiltered,
+  // or just the search matches when a filter is active. Pagination never
+  // limits the scope, so page 1 of 3 no longer leaves pages 2-3 behind. With
+  // a filter active the clear-all shortcut is skipped: `movies` is already
+  // filtered then, so `targets.length >= movies.length` would be trivially
+  // true and hand control to the wipe-everything path.
   function handleRemoveAllMovies() {
-    if (visibleMovies.length >= movies.length) {
+    if (!filterActive) {
       clearAllMoviesWatched();
     } else {
-      for (const item of visibleMovies) {
+      for (const item of removeTargets) {
         markUnwatched("movie", item.id);
         clearProgress("movie", item.id);
       }
     }
     setItems(getLastSeen());
     toast?.(
-      visibleMovies.length >= movies.length
-        ? "All watched movies removed from history"
-        : `${visibleMovies.length} movie${visibleMovies.length === 1 ? "" : "s"} removed from history`,
+      filterActive
+        ? `${removeTargets.length} movie${removeTargets.length === 1 ? "" : "s"} removed from history`
+        : "All watched movies removed from history",
     );
   }
 

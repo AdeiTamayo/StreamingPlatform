@@ -165,12 +165,20 @@ export default function Home() {
     setError(false);
     const signal = getSignal();
     getTrending('all', 1, signal)
-      .then((data) => setTrending((data as { results: (TMDBMovie | TMDBSeries)[] }).results || []))
-      .catch(() => {
+      .then((data) => {
+        if (signal.aborted) return;
+        setTrending((data as { results: (TMDBMovie | TMDBSeries)[] }).results || []);
+      })
+      .catch((err) => {
+        // Aborts (unmount or a re-fetch replacing this one) are not user-
+        // visible failures - the page is gone or a newer request owns state.
+        if (signal.aborted || (err as Error)?.name === 'AbortError') return;
         setError(true);
         toast?.('Failed to load trending');
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!signal.aborted) setLoading(false);
+      });
     getMovieGenres(signal)
       .then((data) => setMovieGenres((data as { genres?: TMDBGenre[] })?.genres || []))
       .catch(() => {});
@@ -196,21 +204,28 @@ export default function Home() {
     setContinueWatching(getContinueWatching());
   }, [isAuthenticated, syncVersion]);
 
-  useEffect(() => {
-    if (trending.length < 2 || heroPaused) return;
-    const timer = setInterval(() => {
-      setHeroIdx((i) => (i + 1) % Math.min(trending.length, 8));
-    }, 6000);
-    return () => clearInterval(timer);
-  }, [trending.length, heroPaused]);
-
   // Trending "all" can include people - they have no detail page, so keep
   // them out of the hero rotation and the grid (MediaCard also guards).
   const playableTrending = trending.filter(
     (item) => (item as unknown as { media_type?: string }).media_type !== "person",
   );
   const heroItems = playableTrending.slice(0, 8);
-  const hero = heroItems[heroIdx];
+  // The stored index can outlive a shrink of the list (e.g. type switches),
+  // so clamp before reading - otherwise the hero renders blank.
+  const activeHeroIdx = heroItems.length > 0 ? heroIdx % heroItems.length : 0;
+  const hero = heroItems[activeHeroIdx];
+
+  // Rotate over the hero's actual slides. The modulus must be the playable
+  // list length: using raw `trending.length` walked past the filtered list
+  // (people removed) and blanked the hero for a full 6s tick.
+  useEffect(() => {
+    if (heroItems.length < 2 || heroPaused) return;
+    const timer = setInterval(() => {
+      setHeroIdx((i) => (i + 1) % heroItems.length);
+    }, 6000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroItems.length, heroPaused]);
   const heroGenreNames = (hero?.genre_ids || [])
     .map((gid) => (movieGenres.find((g) => g.id === gid) || tvGenres.find((g) => g.id === gid))?.name)
     .filter((name): name is string => !!name)
@@ -369,8 +384,8 @@ export default function Home() {
               {heroItems.map((_, i) => (
                 <button
                   key={i}
-                  aria-pressed={i === heroIdx}
-                  className={`${styles.heroDot} ${i === heroIdx ? styles.active : ''}`}
+                  aria-pressed={i === activeHeroIdx}
+                  className={`${styles.heroDot} ${i === activeHeroIdx ? styles.active : ''}`}
                   onClick={() => setHeroIdx(i)}
                   aria-label={`Show item ${i + 1}`}
                 />

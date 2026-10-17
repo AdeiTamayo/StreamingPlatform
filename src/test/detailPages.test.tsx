@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, afterEach, expect, vi } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { Profiler } from 'react';
+import { MemoryRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import TVDetail from '../pages/TVDetail';
 import MovieDetail from '../pages/MovieDetail';
 import { markWatched } from '../api/storage';
@@ -315,4 +316,265 @@ describe('detail pages render', () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  // Navigating between ids while an earlier request is still in flight used to
+  // show stale content: the superseded request's .finally cleared the new
+  // request's loading flag, and the previous item was never removed from state.
+  it('MovieDetail never renders the previous movie once the :id changes', async () => {
+    let resolveSecond: ((response: Response) => void) | undefined;
+    let resolveThird: ((response: Response) => void) | undefined;
+    const secondPending = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    const thirdPending = new Promise<Response>((resolve) => { resolveThird = resolve; });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('api.themoviedb.org/3/movie/680')) return secondPending;
+      if (url.includes('api.themoviedb.org/3/movie/681')) return thirdPending;
+      return mockFetchImpl(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/movie/550']}>
+        <Link to="/movie/680">movie 680</Link>
+        <Link to="/movie/681">movie 681</Link>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fight Club'), { timeout: 5000 });
+
+    // Second movie goes into flight, then we move on before it settles.
+    fireEvent.click(screen.getByRole('link', { name: 'movie 680' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/movie/680'))).toBe(true), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('link', { name: 'movie 681' }));
+
+    // The superseded request must not clear the new request's loading state -
+    // that is what used to reveal the previous movie under the new URL.
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('Fight Club')).not.toBeInTheDocument();
+
+    resolveThird?.({ ok: true, json: async () => ({ ...MOVIE, id: 681, title: 'Se7en' }) } as Response);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Se7en'), { timeout: 5000 });
+
+    // Settling the abandoned request afterwards must not resurrect anything.
+    resolveSecond?.({ ok: true, json: async () => MOVIE } as Response);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Se7en');
+    expect(screen.queryByText('Fight Club')).not.toBeInTheDocument();
+  });
+
+  it('TVDetail never renders the previous show once the :id changes', async () => {
+    let resolveSecond: ((response: Response) => void) | undefined;
+    let resolveThird: ((response: Response) => void) | undefined;
+    const secondPending = new Promise<Response>((resolve) => { resolveSecond = resolve; });
+    const thirdPending = new Promise<Response>((resolve) => { resolveThird = resolve; });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('api.themoviedb.org/3/tv/3000?')) return secondPending;
+      if (url.includes('api.themoviedb.org/3/tv/3001?')) return thirdPending;
+      return mockFetchImpl(url);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/tv/1399']}>
+        <Link to="/tv/3000">show 3000</Link>
+        <Link to="/tv/3001">show 3001</Link>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Game of Thrones'), { timeout: 5000 });
+
+    fireEvent.click(screen.getByRole('link', { name: 'show 3000' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/tv/3000'))).toBe(true), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('link', { name: 'show 3001' }));
+
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.queryByText('Game of Thrones')).not.toBeInTheDocument();
+
+    resolveThird?.({ ok: true, json: async () => ({ ...SHOW, id: 3001, name: 'Other Show' }) } as Response);
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Other Show'), { timeout: 5000 });
+
+    resolveSecond?.({ ok: true, json: async () => SHOW } as Response);
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Other Show');
+    expect(screen.queryByText('Game of Thrones')).not.toBeInTheDocument();
+  });
+
+  // Auto-marking a resumed film watched used to clear startAt, which flips the
+  // Player key and the embed URL - unmounting the iframe and replaying the
+  // finished film from 0:00 right as it ends.
+  it('MovieDetail keeps the player mounted when a resumed film is auto-marked watched', async () => {
+    saveProgress('movie', '550', 100, null, null, { title: 'Fight Club' }, 139 * 60);
+    render(
+      <MemoryRouter initialEntries={['/movie/550']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fight Club'), { timeout: 5000 });
+    // The Player subscribes to window messages in a passive effect. If the
+    // one-shot event below fires before that effect flushes, it is lost and
+    // progress is never cleared.
+    await act(async () => {});
+
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    const srcBefore = iframe!.getAttribute('src');
+    expect(srcBefore).toContain('t=100');
+
+    // 8000s of 8340s runtime: past the 90% auto-watch threshold and the
+    // completion ratio, so both autoMarkWatched paths run.
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          source: iframe!.contentWindow,
+          data: { type: 'PLAYER_EVENT', data: { event: 'time', currentTime: 8000, duration: 8400 } },
+        }),
+      );
+    });
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fight Club');
+    expect(document.querySelector('iframe')).toBe(iframe);
+    expect(iframe!.getAttribute('src')).toBe(srcBefore);
+    expect(getProgress('movie', 550)).toBeNull();
+    expect(screen.getByTitle('Unmark as watched')).toHaveTextContent('Watched');
+  });
+});
+
+// The episode the player is open on must be written back into
+// ?season=&episode= (replace) so refresh/share restore it, and it must
+// update when stepping with Prev/Next.
+describe('TVDetail episode URL sync', () => {
+  function LocationDisplay() {
+    const location = useLocation();
+    return <div data-testid="location-search">{location.search}</div>;
+  }
+
+  function renderTV(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/tv/:id" element={<><TVDetail /><LocationDisplay /></>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => mockFetchImpl(String(input))));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes season/episode into the URL when stepping to the next episode', async () => {
+    renderTV('/tv/1399');
+    await screen.findByText(/Winter Is Coming/, {}, { timeout: 5000 });
+    // Opening the player from the episode list is a state change, so the URL
+    // starts empty and must be filled in by the sync effect.
+    fireEvent.click(screen.getByRole('link', { name: /E1\. Winter Is Coming/ }));
+    const next = await screen.findByRole('button', { name: /Next/ }, { timeout: 5000 });
+    fireEvent.click(next);
+    await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe('?season=1&episode=2'));
+  });
+
+  it('keeps deep-link params and advances the URL from there', async () => {
+    renderTV('/tv/1399?season=1&episode=1');
+    await screen.findByLabelText('Back to episodes', {}, { timeout: 5000 });
+    expect(screen.getByTestId('location-search').textContent).toBe('?season=1&episode=1');
+    const next = await screen.findByRole('button', { name: /Next/ });
+    fireEvent.click(next);
+    await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe('?season=1&episode=2'));
+  });
+});
+
+// Each rating used to call setState on its own, re-rendering the whole page
+// once per episode (N renders per season). The badges must land in a handful
+// of commits instead.
+describe('TVDetail episode ratings coalescing', () => {
+  const EPISODES = Array.from({ length: 12 }, (_, i) => ({
+    id: 7000 + i,
+    episode_number: i + 1,
+    name: `Ep ${i + 1}`,
+    air_date: '2011-04-17',
+    runtime: 50,
+    overview: 'x',
+    still_path: '/s.png',
+    vote_average: 8,
+  }));
+
+  const BIG_SHOW = {
+    ...SHOW,
+    id: 520000,
+    name: 'Coalesce Show',
+    seasons: [{ id: 1, season_number: 1, episode_count: 12, air_date: '2011-04-17' }],
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    // Every response on its own macrotask so per-episode setState calls land
+    // in separate React commits unless coalesced.
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      const delay = <T,>(value: T, ms = 1) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
+      if (url.includes('api.themoviedb.org/3/tv/520000?')) {
+        return delay({ ok: true, json: () => Promise.resolve(BIG_SHOW) });
+      }
+      if (url.includes('/tv/520000/external_ids')) {
+        return delay({ ok: true, json: () => Promise.resolve({ imdb_id: 'tt9900000' }) });
+      }
+      const epExt = url.match(/\/tv\/520000\/season\/1\/episode\/(\d+)\/external_ids/);
+      if (epExt) {
+        const n = Number(epExt[1]);
+        return delay({ ok: true, json: () => Promise.resolve({ imdb_id: `tt9900${String(n).padStart(3, '0')}` }) }, 10);
+      }
+      if (url.includes('/tv/520000/season/1')) {
+        return delay({ ok: true, json: () => Promise.resolve({ id: 1, season_number: 1, episodes: EPISODES }) });
+      }
+      if (url.includes('omdbapi.com') || url.includes('cinemeta.strem.io')) {
+        return delay({ ok: true, json: () => Promise.resolve({ imdbRating: '8.5', imdbVotes: '1000' }) }, 10);
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('applies all season IMDb badges in one commit instead of one per episode', async () => {
+    let commits = 0;
+    render(
+      <MemoryRouter initialEntries={['/tv/520000']}>
+        <Profiler id="tv-detail" onRender={() => { commits++; }}>
+          <Routes>
+            <Route path="/tv/:id" element={<TVDetail />} />
+          </Routes>
+        </Profiler>
+      </MemoryRouter>,
+    );
+
+    // Season list rendered; the ratings loop (10ms per fetch below) is still
+    // running, so commits from here on are mostly rating badges landing.
+    await screen.findByRole('link', { name: /E1\. Ep 1/ }, { timeout: 8000 });
+    const anchor = commits;
+
+    await waitFor(() => {
+      const matches = document.body.textContent?.match(/· IMDb 8\.5/g) || [];
+      expect(matches).toHaveLength(12);
+    }, { timeout: 15000 });
+    const ratingCommits = commits - anchor;
+
+    // One flush for the whole season, not one render per episode.
+    expect(ratingCommits).toBeLessThanOrEqual(5);
+  }, 30000);
 });

@@ -17,6 +17,7 @@ import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
 import { logDebug } from '../utils/logger';
 import { formatVotes } from '../utils/format';
+import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
 
@@ -45,6 +46,11 @@ export default function MovieDetail() {
   const autoWatchedRef = useRef(false);
   const lastTimeRef = useRef<number | null>(null);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
+  // Identifies the latest fetch so a superseded request's handlers (which can
+  // resolve after the effect for a new :id has already started) never touch
+  // state - without this the previous movie is rendered under the new URL and
+  // its .finally wrongly clears the new request's loading flag.
+  const requestIdRef = useRef(0);
   const { getSignal } = useAbortController();
   const { isAuthenticated, syncVersion } = useAuth();
 
@@ -63,14 +69,20 @@ export default function MovieDetail() {
 
   useEffect(() => {
     if (!id) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
+    // Never keep the previous item around while the new one loads: the old
+    // movie's title/metadata would otherwise be paired with the new id by the
+    // shortcut and progress handlers.
+    setMovie(null);
     refreshFromStorage();
     autoWatchedRef.current = false;
     setTrailerKey(null);
     setShowTrailer(false);
     getMovieDetail(id, getSignal())
       .then((data) => {
+        if (requestId !== requestIdRef.current) return;
         setMovie(data as TMDBMovie);
         document.title = `${(data as TMDBMovie).title} - StreamFlow`;
         const vids = (data as TMDBMovie).videos?.results || [];
@@ -78,10 +90,12 @@ export default function MovieDetail() {
         if (yt) setTrailerKey(yt.key);
       })
       .catch((err: Error) => {
-        if (err?.name === 'AbortError') return;
+        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
         setError(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }, [id, refreshFromStorage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -100,9 +114,6 @@ export default function MovieDetail() {
   // F = toggle player fullscreen. Ignored while typing in a field or with
   // modifier keys held.
   useEffect(() => {
-    function isTypingTarget(t: EventTarget | null): boolean {
-      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if (isTypingTarget(e.target)) return;
@@ -148,7 +159,10 @@ export default function MovieDetail() {
     clearProgress('movie', safeId);
     watchedRef.current = true;
     setWatched(true);
-    setStartAt(null);
+    // Deliberately not resetting startAt: the stored progress is already
+    // cleared, and flipping startAt to null rewrites the Player key and the
+    // embed URL - which unmounts the iframe and replays the finished film
+    // from 0:00 while the credits roll.
   }
 
   function handleProgress(currentTime: number, duration: number) {
@@ -228,9 +242,21 @@ export default function MovieDetail() {
 
   function retry() {
     if (!id) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
-    getMovieDetail(id, getSignal()).then(setMovie).catch((err: Error) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
+    getMovieDetail(id, getSignal())
+      .then((data) => {
+        if (requestId !== requestIdRef.current) return;
+        setMovie(data as TMDBMovie);
+      })
+      .catch((err: Error) => {
+        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
+        setError(true);
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }
 
   if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;

@@ -18,6 +18,7 @@ import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
 import { formatVotes } from '../utils/format';
+import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
 import styles from './TVDetail.module.css';
 
@@ -51,7 +52,7 @@ export default function TVDetail() {
   // can never reach API paths, storage keys, or the embed iframe src.
   const id = rawId && /^\d+$/.test(rawId) ? rawId : undefined;
   const toast = useToast();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlSeason = searchParams.get('season');
   const urlEpisode = searchParams.get('episode');
   const [show, setShow] = useState<TMDBSeries | null>(null);
@@ -84,6 +85,11 @@ export default function TVDetail() {
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
+  // Identifies the latest fetch so a superseded request's handlers (which can
+  // settle after the effect for a new :id has started) never touch state -
+  // otherwise the previous show is rendered under the new URL and its
+  // .finally wrongly clears the new request's loading flag.
+  const requestIdRef = useRef(0);
   const { getSignal } = useAbortController();
 
   const seasons: TMDBSeason[] = useMemo(() => show?.seasons?.filter((s) => s.season_number > 0) || [], [show]);
@@ -119,8 +125,13 @@ export default function TVDetail() {
   // separately below so changing ?season= never refetches the show).
   useEffect(() => {
     if (!id) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
+    // Never keep the previous show around while the new one loads: its name/
+    // metadata would otherwise be paired with the new id by the shortcut,
+    // watched and progress handlers.
+    setShow(null);
     watchedRef.current = false;
     autoWatchedRef.current = null;
     setTrailerKey(null);
@@ -133,6 +144,7 @@ export default function TVDetail() {
     const signal = getSignal();
     getTVDetail(id, signal)
       .then((data) => {
+        if (requestId !== requestIdRef.current) return;
         const showData = data as TMDBSeries;
         setShow(showData);
         document.title = `${showData.name} - StreamFlow`;
@@ -142,6 +154,7 @@ export default function TVDetail() {
         if (!showData.imdb_id) {
           getTVExternalIds(id, signal)
             .then((ext) => {
+              if (requestId !== requestIdRef.current) return;
               setImdbId(((ext as { imdb_id?: string })?.imdb_id) || null);
             })
             .catch(() => {});
@@ -161,10 +174,12 @@ export default function TVDetail() {
         }
       })
       .catch((err: Error) => {
-        if (err?.name === 'AbortError') return;
+        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
         setError(true);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deep links (?season=&episode=) switch the selected episode without
@@ -194,6 +209,20 @@ export default function TVDetail() {
     if (Number(urlSeason) > 0 && Number(urlEpisode) > 0) return;
     setPlayerOpen(false);
   }, [urlSeason, urlEpisode, show]);
+
+  // Keep the URL in step with the selected episode so refresh and share
+  // restore the same position (state alone was lost on reload). Only while
+  // the player is open: closing navigates to the bare URL via the "Back to
+  // episodes" link, which the effect above already mirrors into state.
+  // `replace` keeps Next/Prev from spamming history entries.
+  useEffect(() => {
+    if (!show || !playerOpen) return;
+    const next = new URLSearchParams(searchParams);
+    if (next.get('season') === String(season) && next.get('episode') === String(episode)) return;
+    next.set('season', String(season));
+    next.set('episode', String(episode));
+    setSearchParams(next, { replace: true });
+  }, [show, playerOpen, season, episode, searchParams, setSearchParams]);
 
   // A deep link past the end of the season would target a nonexistent
   // episode - clamp it to the season's known episode count.
@@ -415,10 +444,23 @@ export default function TVDetail() {
   // IMDb ratings for the episode list (whole season view): resolves each
   // episode's imdb_id via TMDB and the rating via OMDb, one at a time so the
   // free OMDb tier isn't bursted. Cached per episode for 7 days.
+  // Ratings are accumulated locally and flushed at most every 200ms: writing
+  // state once per episode re-rendered the whole page N times in a row.
   useEffect(() => {
     setEpImdbRatings({});
     if (playerOpen || !show || episodes.length === 0) return;
     let cancelled = false;
+    const partial: Record<number, ImdbRating | null> = {};
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    function flush() {
+      flushTimer = null;
+      if (cancelled) return;
+      setEpImdbRatings({ ...partial });
+    }
+    function scheduleFlush() {
+      if (flushTimer !== null) return;
+      flushTimer = setTimeout(flush, 200);
+    }
     (async () => {
       for (const ep of episodes) {
         if (cancelled) return;
@@ -430,10 +472,17 @@ export default function TVDetail() {
           // Best-effort rating enrichment: leave the badge empty on failure.
         } catch {}
         if (cancelled) return;
-        setEpImdbRatings((prev) => ({ ...prev, [ep.episode_number]: rating }));
+        partial[ep.episode_number] = rating;
+        scheduleFlush();
       }
+      // Final synchronous flush so the last entries never wait on the timer.
+      if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
+      flush();
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (flushTimer !== null) clearTimeout(flushTimer);
+    };
   }, [playerOpen, show, season, episodes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keyboard shortcuts while the player is open: N = next episode,
@@ -441,9 +490,6 @@ export default function TVDetail() {
   // Ignored while typing in a field or with modifier keys held.
   useEffect(() => {
     if (!playerOpen || showTrailer) return;
-    function isTypingTarget(t: EventTarget | null): boolean {
-      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if (isTypingTarget(e.target)) return;
@@ -467,9 +513,6 @@ export default function TVDetail() {
   // current episode; on the series view it targets the series itself.
   // Ignored while typing or with modifiers held.
   useEffect(() => {
-    function isTypingTarget(t: EventTarget | null): boolean {
-      return t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
-    }
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if (isTypingTarget(e.target)) return;
@@ -528,7 +571,10 @@ export default function TVDetail() {
     clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
-    setStartAt(null);
+    // Deliberately not resetting startAt: the stored progress is already
+    // cleared, and flipping startAt to null rewrites the Player key and the
+    // embed URL - which unmounts the iframe and replays the finished episode
+    // from 0:00. A real episode change reloads startAt from storage anyway.
   }
 
   function handleProgress(currentTime: number, duration: number) {
@@ -666,9 +712,21 @@ export default function TVDetail() {
 
   function retry() {
     if (!id) return;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
-    getTVDetail(id, getSignal()).then((data) => { setShow(data as TMDBSeries); }).catch((err: Error) => { if (err?.name !== 'AbortError') setError(true); }).finally(() => setLoading(false));
+    getTVDetail(id, getSignal())
+      .then((data) => {
+        if (requestId !== requestIdRef.current) return;
+        setShow(data as TMDBSeries);
+      })
+      .catch((err: Error) => {
+        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
+        setError(true);
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) setLoading(false);
+      });
   }
 
   if (!id) return <div className="page"><div className="loading">Show not found</div></div>;

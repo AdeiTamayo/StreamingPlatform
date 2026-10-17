@@ -475,4 +475,53 @@ describe('WatchLater calendar integration', () => {
       screen.getByRole('button', { name: new RegExp(`${monthName} 5,.*0 releases`) }),
     ).toBeInTheDocument();
   });
+
+  // Offset of a zone at an instant, in hours (formatToParts round-trip).
+  function zoneOffsetHours(tz: string, utcMs: number): number {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date(utcMs));
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'));
+    return (asUtc - utcMs) / 3_600_000;
+  }
+
+  it('day label keeps the selected day even when device and calendar zones are far apart', async () => {
+    const { movieDate, now } = currentMonthDates();
+    setupSuccessMocks(movieDate, movieDate);
+    addWatchLater('movie', 550, 'Fight Club', '1999', '/x.png');
+
+    // Old code parsed the date string as device-local noon and reformatted
+    // it in the stored zone, which shifts the label by a day whenever the two
+    // zones are 12h+ apart. Force that gap from either direction so the test
+    // is deterministic regardless of the machine's zone.
+    const probe = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12);
+    const deviceOffset = zoneOffsetHours(Intl.DateTimeFormat().resolvedOptions().timeZone, probe);
+    setTimezone(deviceOffset <= 2 ? 'Pacific/Kiritimati' : 'Pacific/Pago_Pago');
+
+    renderWatchLater();
+    await switchToCalendarView();
+
+    const todayIso = formatISODate(now);
+    const [y, m, d] = todayIso.split('-').map(Number);
+    // Weekday of the calendar date itself, in the test's locale - the label
+    // must agree with it (a one-day shift always changes the weekday).
+    const expectedWeekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
+      weekday: 'short',
+    });
+
+    await waitFor(() => {
+      const label = screen.getAllByRole('heading', { level: 3 }).find(
+        (h) => h.textContent?.includes(expectedWeekday),
+      );
+      expect(label, `a heading showing weekday "${expectedWeekday}"`).toBeDefined();
+      expect(label!.textContent).toMatch(new RegExp(`\\b${now.getDate()}\\b`));
+    });
+  }, 20000);
 });

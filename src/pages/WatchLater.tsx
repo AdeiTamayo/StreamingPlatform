@@ -73,16 +73,17 @@ function isCalendarRelevant(dateStr: string) {
 
 
 
-function formatDate(dateStr: string, timeZone?: string) {
-  const d = parseLocalDate(dateStr);
-  // Noon avoids the day shifting when the label is rendered in a zone
-  // other than the device default.
-  d.setHours(12, 0, 0, 0);
-  return d.toLocaleDateString(undefined, {
+function formatDate(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  // The string is already the calendar date in the release timezone (see
+  // toZonedDateString), so render exactly that date. Interpreting it as a
+  // device-local noon and re-formatting in another zone (the old code) shifts
+  // the label by a day whenever the two zones are 12h+ apart.
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
-    ...(timeZone ? { timeZone } : {}),
+    timeZone: "UTC",
   });
 }
 
@@ -1146,7 +1147,7 @@ export default function WatchLater() {
             {selectedDate ? (
               <>
                 <div className={styles.dayPanelHeader}>
-                  <h3>{formatDate(selectedDate, timeZone)}</h3>
+                  <h3>{formatDate(selectedDate)}</h3>
 
                   <span>
                     {selectedItems.length} release
@@ -1663,7 +1664,7 @@ export default function WatchLater() {
             {paginatedGroups.map((group) => (
               <div key={group.date} className={styles.upcomingDateGroup}>
                 <div className={styles.upcomingDateLabel}>
-                  {formatDate(group.date, timeZone)}
+                  {formatDate(group.date)}
                 </div>
                 {group.items.map((item, idx) => (
                   <div
