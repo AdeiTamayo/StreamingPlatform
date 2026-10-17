@@ -80,8 +80,8 @@ export async function importSupabaseData(data: SupabaseBackupData): Promise<bool
   }
 
   if ((data.searchHistory?.length ?? 0) > 0) {
-    // search_history has no unique constraint - skip queries already on the
-    // server so a repeated import doesn't duplicate every row.
+    // Skip queries already on the server so a repeated import doesn't bump
+    // their created_at (a unique index now blocks duplicates anyway).
     const existing = await searchHistoryRepository.getAll(userId).catch(() => []);
     const seen = new Set(existing.map((r) => r.query.toLowerCase()));
     for (const item of data.searchHistory ?? []) {

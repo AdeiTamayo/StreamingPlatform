@@ -6,6 +6,11 @@ if (!TMDB_API_KEY) {
   );
 }
 
+// The TMDB key is intentionally client-side: TMDB issues browser keys and
+// expects them in the bundle. Restrict it by HTTP referrer in the TMDB
+// dashboard rather than trying to hide it. vite.config.ts validates it at
+// build time so a keyless production bundle fails the build instead of the
+// first page load.
 const CONFIG = {
   TMDB_API_KEY,
   TMDB_BASE_URL: 'https://api.themoviedb.org/3',

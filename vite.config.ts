@@ -1,9 +1,34 @@
 /// <reference types="vitest" />
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
-  plugins: [react()],
+// Catches a production bundle that would ship broken: VITE_TMDB_API_KEY is
+// required at runtime (src/config.ts throws), so building without it used to
+// succeed and only blow up in the browser. VITE_OMDB_API_KEY degrades
+// gracefully (IMDb badges fall back to TMDB), so it warns instead of failing.
+// apply: 'build' keeps this out of `vite dev` and the test runner.
+function validateApiKeys(mode: string): Plugin {
+  const env = loadEnv(mode, process.cwd(), '')
+  return {
+    name: 'validate-api-keys',
+    apply: 'build',
+    buildStart() {
+      if (!env.VITE_TMDB_API_KEY) {
+        throw new Error(
+          'VITE_TMDB_API_KEY is not set. Add it to .env (see .env.example) or the CI environment before building.',
+        )
+      }
+      if (!env.VITE_OMDB_API_KEY) {
+        console.warn(
+          '[validate-api-keys] VITE_OMDB_API_KEY is not set - every IMDb badge will fall back to TMDB ratings.',
+        )
+      }
+    },
+  }
+}
+
+export default defineConfig((config) => ({
+  plugins: [react(), validateApiKeys(config.mode)],
   css: {
     modules: {
       // Page components use styles.someClassName against kebab-case CSS.
@@ -36,5 +61,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: false,
+    // setup.ts installs a rejecting default fetch, so tests are offline by
+    // default. unstubGlobals restores any per-test fetch stub back to that
+    // guard after each test instead of leaking it (or the real fetch).
+    unstubGlobals: true,
   },
-})
+}))
