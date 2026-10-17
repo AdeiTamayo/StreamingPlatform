@@ -41,19 +41,42 @@ const RETRY_429_DELAY_MS = 1500;
 // instead of firing N parallel fetches.
 const inflight = new Map<string, Promise<unknown>>();
 
-async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = null) {
+function createAbortError(): Error {
+  return Object.assign(new Error('Aborted'), { name: 'AbortError' });
+}
+
+/**
+ * Lets one caller walk away from a shared request without cancelling it for
+ * the other joiners: only this caller's promise rejects, the underlying fetch
+ * still completes (and caches its result).
+ */
+function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(createAbortError());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
+// The shared request never takes a caller's signal - see fetchWithFallback.
+async function fetchJson(url: string, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const onAbort = () => controller.abort();
-    signal?.addEventListener('abort', onAbort, { once: true });
 
     let res: Response;
     try {
       res = await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
-      // Caller aborted (navigation/unmount) - propagate immediately.
-      if (signal?.aborted) throw err;
       // Network failure or our own timeout - retry like a bad status would.
       if (attempt < retries) {
         await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
@@ -62,7 +85,6 @@ async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = 
       throw new Error(`TMDB request failed: ${(err as Error)?.message ?? String(err)}`);
     } finally {
       clearTimeout(timeoutId);
-      signal?.removeEventListener('abort', onAbort);
     }
 
     if (res.ok) {
@@ -94,18 +116,22 @@ async function fetchJson(url: string, retries = 2, signal: AbortSignal | null = 
 }
 
 async function fetchWithFallback(url: string, signal?: AbortSignal) {
+  if (signal?.aborted) throw createAbortError();
   const cached = await getCached(url);
   if (cached) return cached;
+  if (signal?.aborted) throw createAbortError();
 
-  const existing = inflight.get(url);
-  if (existing) {
-    if (signal?.aborted) throw Object.assign(new Error('AbortError'), { name: 'AbortError' });
-    return existing;
+  let existing = inflight.get(url);
+  if (!existing) {
+    // Deliberately not passing `signal`: the shared request must not be tied
+    // to one caller. A card's status timeout or a page unmount would
+    // otherwise abort it for everyone else - including a detail page that
+    // joined the same URL and then rendered "not found".
+    existing = fetchJson(url, 2).finally(() => inflight.delete(url));
+    inflight.set(url, existing);
   }
-
-  const promise = fetchJson(url, 2, signal ?? null).finally(() => inflight.delete(url));
-  inflight.set(url, promise);
-  return promise;
+  // Each caller still honours its own signal via a per-caller race.
+  return signal ? withAbort(existing, signal) : existing;
 }
 
 export async function getPopularMovies(page = 1, signal?: AbortSignal) {

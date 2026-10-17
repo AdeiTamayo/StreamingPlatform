@@ -100,24 +100,31 @@ async function fetchRating(url: string, signal?: AbortSignal): Promise<FetchOutc
 // their own id via meta/episode/{id}.json, which resolves the parent series
 // server-side. The meta/series/{id}/{season}/{episode}.json form does not
 // exist and 404s, so the season/episode numbers must not be interpolated here.
+//
+// `failed` means the answer is untrustworthy (network error, 5xx, abort) -
+// callers must not treat it as a "no rating" miss.
+type FallbackOutcome =
+  | { status: 'ok'; rating: ImdbRating | null }
+  | { status: 'failed' };
+
 async function fetchCinemetaRating(
   imdbId: string,
   type: OmdbMediaType,
   signal?: AbortSignal,
-): Promise<ImdbRating | null> {
+): Promise<FallbackOutcome> {
   const url = `${CINEMETA_BASE}/${type}/${encodeURIComponent(imdbId)}.json`;
   try {
     const res = await fetch(url, { signal });
-    if (!res.ok) return null;
+    if (!res.ok) return { status: 'failed' };
     const data = (await res.json()) as {
       meta?: { imdbRating?: string | null; imdbVotes?: string | null };
     };
     const rating = data.meta?.imdbRating;
-    if (!rating || rating === 'N/A') return null;
-    return { rating, votes: data.meta?.imdbVotes && data.meta.imdbVotes !== 'N/A' ? data.meta.imdbVotes : '' };
+    if (!rating || rating === 'N/A') return { status: 'ok', rating: null };
+    return { status: 'ok', rating: { rating, votes: data.meta?.imdbVotes && data.meta.imdbVotes !== 'N/A' ? data.meta.imdbVotes : '' } };
   } catch (err) {
     if ((err as Error)?.name !== 'AbortError') logDebug(`Cinemeta fallback fetch failed: ${(err as Error)?.message ?? String(err)}`);
-    return null;
+    return { status: 'failed' };
   }
 }
 
@@ -125,6 +132,8 @@ async function fetchCinemetaRating(
 // CORS-enabled). When OMDb is out of daily quota (or no key is set) it falls
 // back to the keyless Cinemeta API. Results are cached in localStorage for 7
 // days so the free tier's daily request limit isn't exhausted by repeat visits.
+// Transient failures (network/5xx/abort) are NOT cached - only definitive
+// answers are, so a flaky connection can't pin a 24h "no rating" miss.
 export async function getImdbRating(
   imdbId: string,
   type: OmdbMediaType,
@@ -138,6 +147,7 @@ export async function getImdbRating(
     const url = `https://www.omdbapi.com/?i=${encodeURIComponent(imdbId)}&type=${type}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
     const outcome = await fetchRating(url, signal);
     if (outcome.status === 'ok') {
+      // Includes definitive misses (rating null) - those are safe to cache.
       writeEntry(key, outcome.rating);
       return outcome.rating;
     }
@@ -152,8 +162,14 @@ export async function getImdbRating(
   // OMDb unavailable, limited, or missing the title - try the fallback
   // provider, which is addressed by the id matching `type`.
   const fallback = await fetchCinemetaRating(imdbId, type, signal);
-  writeEntry(key, fallback);
-  return fallback;
+  if (fallback.status === 'ok') {
+    writeEntry(key, fallback.rating);
+    return fallback.rating;
+  }
+
+  // Both providers failed transiently. Return null without writing, so the
+  // next visit retries instead of showing "no rating" for a full day.
+  return null;
 }
 
 export type RatingLookup =
@@ -193,10 +209,19 @@ export async function getOmdbRatingByTitle(
   if (!promise) {
     const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&y=${encodeURIComponent(year)}&type=${type}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
     promise = fetchRating(url).then((outcome) => {
-      const rating = outcome.status === 'ok' ? outcome.rating : null;
-      writeEntry(key, rating);
       inFlight.delete(key);
-      return rating;
+      if (outcome.status === 'ok') {
+        // Includes definitive misses (rating null) - those are safe to cache.
+        writeEntry(key, outcome.rating);
+        return outcome.rating;
+      }
+      if (outcome.status === 'limited') {
+        logDebug('OMDb quota reached, skipping card lookups during cooldown');
+        omdbLimitedUntil = Date.now() + FALLBACK_COOLDOWN_MS;
+      }
+      // Transient failure (and quota): return null WITHOUT caching, so the
+      // next visit retries instead of pinning a 24h "no rating" miss.
+      return null;
     });
     inFlight.set(key, promise);
   }
