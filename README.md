@@ -1,6 +1,6 @@
 # StreamFlow
 
-A personal streaming web app built with React and TypeScript. Browse movies and TV shows using TMDB metadata, watch via embedded players, and track your viewing progress. Everything works locally with no sign-up required, and an optional Supabase account syncs your library, watch history, and settings across devices.
+A personal streaming web app built with React and TypeScript. Browse movies and TV shows using TMDB metadata, watch via embedded players, and track your viewing progress. Everything works locally with no sign-up required, and an optional Supabase account syncs your library, watch history, and continue-watching list across devices.
 
 ## Screenshots
 
@@ -92,6 +92,7 @@ flowchart TD
 - **Continue Watching** tracks progress and shows unfinished content on the home page, each card with two actions:
   - **Restart** (↺) clears the saved position and reopens the same episode/movie from 0:00
   - **Remove** (×) drops it from Continue Watching without touching the watched mark
+  - **Cross-device** (signed in) syncs the metadata — which titles you're partway through, not how far — so the list follows you between devices, while the resume position stays local to each browser
 - **Decision badges** on detail pages so you can tell what to do next without reading:
   - Series status — `Ended` or `Ongoing`
   - New episodes — `N new`, unwatched episodes of the current season that aired in the last 7 days
@@ -131,7 +132,7 @@ flowchart TD
 ### Accounts & Sync (optional)
 - **Guest mode** — browse, search, and watch everything with no account; personal features (Watch Later, Last Seen, Notifications, Settings) prompt a sign-in
 - **Sign In / Register** via a global modal (forgot-password flow included) with focus trap, scroll lock, and Escape/outside-click to close
-- **Cloud sync** — watched marks, watch later, and search history sync to Supabase with Row Level Security (playback progress, video source, and notifications stay local-only)
+- **Cloud sync** — watched marks, watch later, search history, and Continue Watching metadata (which titles you're partway through — never the playback position) sync to Supabase with Row Level Security (playback position, video source, and notifications stay local-only)
 - **Local-first storage** — every write goes to localStorage instantly and to Supabase in the background; the app is fully functional offline or without Supabase configured
 - **Offline resilience** — failed sync writes are queued and retried with exponential backoff
 - **One-time migration** — after signing in, local data is uploaded to the cloud and the app continues reading from localStorage
@@ -194,7 +195,12 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 ### Setting up Supabase (optional)
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. In the SQL editor, run `supabase/migrations/001_initial_schema.sql` — a single migration that creates the 3 tables (watched, watch_later, search_history), their indexes and unique constraints, and Row Level Security policies. It also drops the legacy `progress`, `settings`, and `notifications` tables if they exist (playback progress, the video source preference, and episode notifications are local-only). The file is idempotent, so re-running it is safe
+2. In the SQL editor, run the migrations in order:
+   - `001_initial_schema.sql` — creates the `watched`, `watch_later`, and `search_history` tables with their indexes, unique constraints, and Row Level Security policies, and drops any legacy `settings` / `notifications` tables
+   - `002_search_history_unique_index.sql` — dedupes search history and adds its unique index
+   - `003_progress_table.sql` — creates the `progress` table for cross-device Continue Watching metadata (media identity only, never playback time)
+
+   All three are idempotent, so re-running them is safe.
 3. Copy your project URL and anon key into `.env`
 
 ### Migrating existing local data
@@ -221,10 +227,10 @@ Output goes to the `dist/` directory.
 npm run test
 ```
 
-259 tests across 19 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze calls are mocked, so the suite never touches the network.
+321 tests across 31 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze and Supabase calls are mocked, so the suite never touches the network.
 
 ```bash
-npx tsc --noEmit   # typecheck
+npm run typecheck  # tsc -b (also covers vite.config.ts and scripts/)
 npm run lint       # oxlint
 npm audit          # dependency vulnerabilities (currently 0)
 ```
@@ -261,6 +267,7 @@ src/
     watchedRepository.ts       # Supabase writes for watched marks
     watchLaterRepository.ts    # Supabase writes for watch later lists
     searchHistoryRepository.ts # Supabase writes for search history
+    progressRepository.ts      # Supabase writes for Continue Watching metadata
   services/auth/
     authService.ts      # Supabase auth wrapper (sign in/up/out, reset password, session)
   context/
@@ -276,7 +283,8 @@ src/
     ErrorBoundary.tsx   # Render crash catcher with retry
     Toast.tsx           # Toast notification system
     Notifications.tsx   # In-app notification bell
-    SeasonDropdown.tsx / EpisodeDropdown.tsx / FilterDropdown.tsx / FilterBar.tsx / DatePickerField.tsx / CollectionSkeleton.tsx
+    SeasonDropdown.tsx / EpisodeDropdown.tsx / FilterDropdown.tsx / FilterBar.tsx / TypeToggle.tsx / DatePickerField.tsx / CollectionSkeleton.tsx
+    MediaCarousel.tsx / BulkSelectBar.tsx / Pagination.tsx / PersonList.tsx
   pages/
     Home.tsx            # Hero carousel + Continue Watching (restart/remove) + Trending
     MovieDetail.tsx     # Movie detail with badges, player, trailer, recommendations
@@ -312,7 +320,9 @@ src/
     shared.css          # Global shared styles
   config.ts             # Environment variable setup
 supabase/migrations/
-  001_initial_schema.sql  # Tables, indexes, unique constraints, and RLS policies
+  001_initial_schema.sql  # watched / watch_later / search_history: tables, indexes, RLS
+  002_search_history_unique_index.sql  # Dedupe search history + its unique index
+  003_progress_table.sql  # Continue Watching metadata (media identity only)
 scripts/
   transfer-localstorage-to-supabase.ts  # One-time data transfer helper
 ```
