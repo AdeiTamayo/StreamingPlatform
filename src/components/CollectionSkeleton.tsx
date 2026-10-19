@@ -36,15 +36,20 @@ const CollectionSkeleton = memo(function CollectionSkeleton({ variant = 'grid', 
     return (
         <div className="media-grid">
             {Array.from({ length: count }, (_, index) => (
-                <div key={index} className="media-card skeleton-card">
+                <div key={index} className="media-card skeleton-card" aria-hidden="true">
                     <div className="media-card-poster">
                         <div className="media-card-skeleton" />
+                        <span className="media-card-rating" />
+                        <span className="media-card-type movie" />
                     </div>
                     <div className="media-card-info">
                         <div className="skeleton-text skeleton-title" />
                         <div className="skeleton-text skeleton-year" />
                     </div>
-                    <div className="skeleton-button-bar" />
+                    <div className="media-card-actions">
+                        <span className="media-card-wl" />
+                        <span className="media-card-watched-btn" />
+                    </div>
                 </div>
             ))}
         </div>

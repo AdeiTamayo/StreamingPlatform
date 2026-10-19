@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import styles from '../pages/Search.module.css';
 
 export interface PersonListPerson {
   id: number;
@@ -10,20 +11,20 @@ interface PersonListProps {
 }
 
 export default function PersonList({ people }: PersonListProps) {
+  if (people.length === 0) return null;
   return (
-    <>
-      {people.map((p, i) => (
-        <span key={`${p.id}-${i}`}>
-          {i > 0 && ', '}
+    <ul className={styles.personList}>
+      {people.map((p) => (
+        <li key={p.id} className={styles.personListItem}>
           <Link
-            className="detail-person-link"
+            className={styles.personListLink}
             to={`/search?person=${p.id}&q=${encodeURIComponent(p.name)}`}
             title={`View all ${p.name} movies and TV shows`}
           >
             {p.name}
           </Link>
-        </span>
+        </li>
       ))}
-    </>
+    </ul>
   );
 }

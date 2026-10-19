@@ -4,13 +4,25 @@
   align-items: center;
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .bellBtn {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.4rem;
-  height: 2.4rem;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   border: none;
   background: transparent;
@@ -33,7 +45,7 @@
 }
 
 .bellBtn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -143,8 +155,9 @@
 .clearBtn:focus-visible,
 .openBtn:focus-visible,
 .removeBtn:focus-visible,
+.markReadBtn:focus-visible,
 .closeBtn:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -282,6 +295,32 @@
   transform: translateY(-1px);
 }
 
+.markReadBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--accent);
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.markReadBtn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.markReadBtn:hover {
+  background: rgba(125, 211, 252, 0.2);
+  transform: translateY(-1px);
+}
+
 .removeBtn {
   display: inline-flex;
   align-items: center;
@@ -374,6 +413,13 @@
 .footerHint {
   font-size: 0.72rem;
   color: var(--text-dim);
+}
+
+.footerConfirm {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
 }
 
 .clearBtn {

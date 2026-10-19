@@ -39,20 +39,28 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
     return () => document.removeEventListener('keydown', handleKey);
   }, [open]);
 
-  // Move focus into the grid on open / view switch (never on month
+  // Move focus into the active grid on open / view switch (never on month
   // navigation, so keyboard users don't lose their place on the nav buttons).
-  // Focus the selected day, else today, else the first cell, and sync the
-  // roving tabindex so the grid always offers exactly one tab stop.
+  // Focus the selected day, else today, else the first cell; in the month and
+  // year views focus the current month/year so focus is never dropped when
+  // switching views, and sync the roving tabindex so each grid offers exactly
+  // one tab stop.
   useEffect(() => {
-    if (!open || view !== 'day' || !gridRef.current) return;
+    if (!open || !gridRef.current) return;
     const buttons = gridRef.current.querySelectorAll('button');
     if (buttons.length === 0) return;
     let target = 0;
-    const selectedIdx = calendarGrid.cells.findIndex((c) => c.isSelected);
-    if (selectedIdx >= 0) target = selectedIdx;
-    else {
-      const todayIdx = calendarGrid.cells.findIndex((c) => c.isToday);
-      if (todayIdx >= 0) target = todayIdx;
+    if (view === 'day') {
+      const selectedIdx = calendarGrid.cells.findIndex((c) => c.isSelected);
+      if (selectedIdx >= 0) target = selectedIdx;
+      else {
+        const todayIdx = calendarGrid.cells.findIndex((c) => c.isToday);
+        if (todayIdx >= 0) target = todayIdx;
+      }
+    } else if (view === 'month') {
+      target = viewDate.getMonth();
+    } else {
+      target = Math.min(Math.max(viewDate.getFullYear() - yearRangeStart, 0), buttons.length - 1);
     }
     setFocusedCellIndex(target);
     (buttons[target] as HTMLElement)?.focus();
@@ -118,6 +126,66 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
     const nextButton = gridRef.current?.querySelectorAll('button')[newIndex] as HTMLElement;
     nextButton?.focus();
     setFocusedCellIndex(newIndex);
+  }
+
+  function focusGridButton(index: number) {
+    const nextButton = gridRef.current?.querySelectorAll('button')[index] as HTMLElement;
+    nextButton?.focus();
+    setFocusedCellIndex(index);
+  }
+
+  function handleMonthKeyDown(e: React.KeyboardEvent, index: number) {
+    const total = 12;
+    let next = index;
+    switch (e.key) {
+      case 'ArrowRight': next = (index + 1) % total; break;
+      case 'ArrowLeft': next = (index - 1 + total) % total; break;
+      case 'ArrowDown': next = Math.min(index + 4, total - 1); break;
+      case 'ArrowUp': next = Math.max(index - 4, 0); break;
+      case 'Home': next = index - (index % 4); break;
+      case 'End': next = Math.min(index - (index % 4) + 3, total - 1); break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        setViewDate((c) => new Date(c.getFullYear(), index, 1));
+        setView('day');
+        return;
+      case 'Escape':
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    focusGridButton(next);
+  }
+
+  function handleYearKeyDown(e: React.KeyboardEvent, index: number) {
+    const total = 20;
+    let next = index;
+    switch (e.key) {
+      case 'ArrowRight': next = (index + 1) % total; break;
+      case 'ArrowLeft': next = (index - 1 + total) % total; break;
+      case 'ArrowDown': next = Math.min(index + 4, total - 1); break;
+      case 'ArrowUp': next = Math.max(index - 4, 0); break;
+      case 'Home': next = index - (index % 4); break;
+      case 'End': next = Math.min(index - (index % 4) + 3, total - 1); break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        setViewDate((c) => new Date(yearRangeStart + index, c.getMonth(), 1));
+        setView('month');
+        return;
+      case 'Escape':
+        setOpen(false);
+        triggerRef.current?.focus();
+        return;
+      default:
+        return;
+    }
+    e.preventDefault();
+    focusGridButton(next);
   }
 
   function openPicker() {
@@ -206,7 +274,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                 </button>
                 <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 1, c.getMonth(), 1))}>&#10095;</button>
               </div>
-              <div className={`${styles.datePickerGrid} ${styles.months}`}>
+              <div className={`${styles.datePickerGrid} ${styles.months}`} ref={gridRef}>
                 {getMonthName(0).slice(0, 3) && Array.from({ length: 12 }, (_, i) => {
                   const isCurrent = i === viewDate.getMonth();
                   return (
@@ -218,8 +286,10 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                         setViewDate((c) => new Date(c.getFullYear(), i, 1));
                         setView('day');
                       }}
+                      onKeyDown={(e) => handleMonthKeyDown(e, i)}
                       aria-pressed={isCurrent}
                       aria-label={getMonthName(i)}
+                      tabIndex={i === focusedCellIndex ? 0 : -1}
                     >
                       {getMonthName(i).slice(0, 3)}
                     </button>
@@ -238,8 +308,8 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                 </span>
                 <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 20, c.getMonth(), 1))}>&#10095;</button>
               </div>
-              <div className={`${styles.datePickerGrid} ${styles.years}`}>
-                {Array.from({ length: 20 }, (_, i) => yearRangeStart + i).map((yr) => {
+              <div className={`${styles.datePickerGrid} ${styles.years}`} ref={gridRef}>
+                {Array.from({ length: 20 }, (_, i) => yearRangeStart + i).map((yr, i) => {
                   const isCurrent = yr === viewDate.getFullYear();
                   return (
                     <button
@@ -250,8 +320,10 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                         setViewDate((c) => new Date(yr, c.getMonth(), 1));
                         setView('month');
                       }}
+                      onKeyDown={(e) => handleYearKeyDown(e, i)}
                       aria-pressed={isCurrent}
                       aria-label={String(yr)}
+                      tabIndex={i === focusedCellIndex ? 0 : -1}
                     >
                       {yr}
                     </button>

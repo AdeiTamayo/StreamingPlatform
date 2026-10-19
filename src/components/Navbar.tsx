@@ -40,6 +40,37 @@ const PERSONAL_NAV_ITEMS = [
 
 type NavItem = typeof PUBLIC_NAV_ITEMS[number];
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function getFocusable(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => el.getAttribute('aria-hidden') !== 'true',
+  );
+}
+
+function trapTab(e: KeyboardEvent, container: HTMLElement | null): void {
+  if (e.key !== 'Tab') return;
+  const focusable = getFocusable(container);
+  if (focusable.length === 0) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 const Navbar = memo(function Navbar() {
   const [query, setQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -109,6 +140,8 @@ const Navbar = memo(function Navbar() {
 
   function handleNavSuggestKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
+      setSearchOpen(false);
+      setQuery('');
       (e.target as HTMLInputElement).blur();
       return;
     }
@@ -165,8 +198,18 @@ const Navbar = memo(function Navbar() {
           return;
         }
 
+        // Never steal the shortcut while a modal or the sidebar is open.
+        if (document.querySelector('[role="dialog"]')) {
+          return;
+        }
+
+        if (document.body.classList.contains('sidebar-open')) {
+          return;
+        }
+
         e.preventDefault();
 
+        setHidden(false);
         setSearchOpen(true);
 
         setTimeout(() => {
@@ -211,11 +254,36 @@ const Navbar = memo(function Navbar() {
 
   useEffect(() => {
     if (!menuOpen) return;
-    function handleEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') setMenuOpen(false);
+    const sidebar = document.getElementById('sidebar-menu');
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        return;
+      }
+      trapTab(e, sidebar);
     }
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [menuOpen]);
+
+  // While the sidebar is open, everything behind it must be inert so keyboard
+  // and screen-reader users cannot reach the background content.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const sidebar = document.getElementById('sidebar-menu');
+    if (!sidebar) return;
+    const parent = sidebar.parentElement;
+    if (!parent) return;
+    const siblings = Array.from(parent.children).filter(
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement &&
+        el !== sidebar &&
+        el !== sidebar.previousElementSibling,
+    );
+    siblings.forEach((el) => el.setAttribute('inert', ''));
+    return () => {
+      siblings.forEach((el) => el.removeAttribute('inert'));
+    };
   }, [menuOpen]);
 
   useEffect(() => {
@@ -325,6 +393,7 @@ const Navbar = memo(function Navbar() {
           scrolled ? styles.scrolled : '',
           hidden ? styles.hidden : '',
         ].join(' ')}
+        aria-label="Primary"
       >
         <div className={styles.navbarInner}>
           <div className={styles.navLinks}>
@@ -335,6 +404,8 @@ const Navbar = memo(function Navbar() {
           <form
             className={styles.navbarSearch}
             onSubmit={handleSubmit}
+            role="search"
+            aria-label="Search"
           >
             <span
               className={
@@ -342,17 +413,20 @@ const Navbar = memo(function Navbar() {
                   ? `${styles.searchField} ${styles.open}`
                   : styles.searchField
               }
+              inert={!searchOpen}
             >
             <input
               ref={searchRef}
-              type="text"
+              type="search"
               placeholder="Search... (/)"
               aria-label="Search"
               autoComplete="off"
               role="combobox"
               aria-expanded={showNavSuggest}
               aria-controls="nav-suggest-list"
+              aria-autocomplete="list"
               aria-activedescendant={activeNavSugg >= 0 ? `nav-sugg-${activeNavSugg}` : undefined}
+              tabIndex={searchOpen ? 0 : -1}
               value={query}
               onChange={(e) =>
                 setQuery(e.target.value)
@@ -366,44 +440,51 @@ const Navbar = memo(function Navbar() {
               <div
                 ref={suggestRef}
                 className={styles.navSuggest}
-                role="listbox"
-                aria-label="Recent searches"
-                id="nav-suggest-list"
               >
-                {navSuggestions.map((h, hi) => (
-                  <div key={h} className={`${styles.navSuggestRow} ${hi === activeNavSugg ? styles.navSuggActive : ""}`}>
-                    <button
-                      type="button"
-                      role="option"
-                      id={`nav-sugg-${hi}`}
-                      aria-selected={hi === activeNavSugg}
-                      className={styles.navSuggestItem}
-                      // mousedown fires before blur: prevent the default so
-                      // the input keeps focus and the click is not swallowed.
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectSuggestion(h)}
+                <div
+                  className={styles.navSuggestList}
+                  role="listbox"
+                  aria-label="Recent searches"
+                  id="nav-suggest-list"
+                >
+                  {navSuggestions.map((h, hi) => (
+                    <div
+                      key={h}
+                      role="group"
+                      aria-label={h}
+                      className={`${styles.navSuggestRow} ${hi === activeNavSugg ? styles.navSuggActive : ""}`}
                     >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" />
-                        <polyline points="12 7 12 12 15.5 14" />
-                      </svg>
-                      <span>{h}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.navSuggestRemove}
-                      aria-label={`Remove "${h}" from search history`}
-                      title="Remove from history"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => removeSuggestion(h)}
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+                      <button
+                        type="button"
+                        role="option"
+                        id={`nav-sugg-${hi}`}
+                        aria-selected={hi === activeNavSugg}
+                        className={styles.navSuggestItem}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectSuggestion(h)}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="12" r="9" />
+                          <polyline points="12 7 12 12 15.5 14" />
+                        </svg>
+                        <span>{h}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.navSuggestRemove}
+                        aria-label={`Remove "${h}" from search history`}
+                        title="Remove from history"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => removeSuggestion(h)}
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -459,6 +540,7 @@ const Navbar = memo(function Navbar() {
                   : '',
               ].join(' ')}
               aria-label="Settings"
+              aria-current={isActive('/settings') ? 'page' : undefined}
             >
               <svg
                 width="20"
@@ -515,7 +597,7 @@ const Navbar = memo(function Navbar() {
         inert={!menuOpen}
         aria-label="Sidebar navigation"
       >
-        <nav className={styles.sidebarNav}>
+        <nav className={styles.sidebarNav} aria-label="Sidebar">
           <div className={styles.sidebarHeader}>
             <span className={styles.sidebarTitle}>Menu</span>
             <button
@@ -640,9 +722,11 @@ const Navbar = memo(function Navbar() {
         <form
           className={styles.sidebarSearch}
           onSubmit={handleSubmit}
+          role="search"
+          aria-label="Search"
         >
           <input
-            type="text"
+            type="search"
             placeholder="Search..."
             aria-label="Search"
             value={query}

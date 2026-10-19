@@ -37,7 +37,7 @@
 }
 
 .date-picker-value.empty {
-  color: var(--text);
+  color: var(--text-muted);
 }
 
 .date-picker-inline-label {

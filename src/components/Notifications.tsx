@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useId, memo, type RefObject } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useId, memo, type RefObject, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications, pruneOldNotifications } from '../api/storage';
+import { getNotifications, removeNotification, markAllNotificationsRead, clearAllNotifications, pruneOldNotifications, NOTIFICATIONS_KEY } from '../api/storage';
 import { scanForNewEpisodes } from '../api/newEpisodeScan';
 import { useAuth } from '../hooks/useAuth';
 import type { NotificationItem } from '../types';
@@ -10,7 +10,7 @@ import styles from './Notifications.module.css';
 function formatRelativeTime(timestamp: number): string {
   if (!timestamp) return '';
 
-  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
   if (seconds < 10) return 'just now';
   if (seconds < 60) return `${seconds}s ago`;
 
@@ -26,10 +26,19 @@ function formatRelativeTime(timestamp: number): string {
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(timestamp));
 }
 
+function isFutureDate(airDate: string | null): boolean {
+  if (!airDate) return false;
+  return new Date(airDate).getTime() > Date.now();
+}
+
 function formatAirDate(airDate: string | null): string {
   if (!airDate) return '';
   const date = new Date(airDate);
-  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const time = date.getTime();
+  if (time > Date.now()) {
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
+  }
+  const diffDays = Math.floor((Date.now() - time) / (1000 * 60 * 60 * 24));
   if (diffDays < 1) return 'Today';
   if (diffDays < 7) return `${diffDays}d ago`;
   return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
@@ -37,7 +46,31 @@ function formatAirDate(airDate: string | null): string {
 
 function isRecentEpisode(airDate: string | null): boolean {
   if (!airDate) return false;
-  return Date.now() - new Date(airDate).getTime() < 7 * 24 * 60 * 60 * 1000;
+  const time = new Date(airDate).getTime();
+  if (time > Date.now()) return false;
+  return Date.now() - time < 7 * 24 * 60 * 60 * 1000;
+}
+
+function markNotificationRead(id: string): void {
+  const list = getNotifications();
+  let changed = false;
+  list.forEach((n) => {
+    if (n.id === id && !n.read) {
+      n.read = true;
+      changed = true;
+    }
+  });
+  if (changed) localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(list));
+}
+
+function getFocusable(container: HTMLElement | null): HTMLElement[] {
+  if (!container) return [];
+  const selector = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  return Array.from(container.querySelectorAll<HTMLElement>(selector)).filter(
+    (el) =>
+      el.getAttribute('aria-hidden') !== 'true' &&
+      (el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0),
+  );
 }
 
 type NotificationPanelProps = {
@@ -48,10 +81,17 @@ type NotificationPanelProps = {
   unreadCount: number;
   onClose: () => void;
   onRemove: (id: string) => void;
+  onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
-  onClearAll: () => void;
+  onRequestClear: () => void;
+  onConfirmClear: () => void;
+  onCancelClear: () => void;
+  onUndoClear: () => void;
+  clearConfirm: boolean;
+  undoCount: number;
   onScan: () => void;
   sidebar?: boolean;
+  panelStyle?: CSSProperties;
 };
 
 function NotificationPanel({
@@ -62,11 +102,33 @@ function NotificationPanel({
   unreadCount,
   onClose,
   onRemove,
+  onMarkRead,
   onMarkAllRead,
-  onClearAll,
+  onRequestClear,
+  onConfirmClear,
+  onCancelClear,
+  onUndoClear,
+  clearConfirm,
+  undoCount,
   onScan,
   sidebar,
+  panelStyle,
 }: NotificationPanelProps) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== 'Tab') return;
+    const focusable = getFocusable(panelRef.current);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   return (
     <>
       <div
@@ -79,8 +141,11 @@ function NotificationPanel({
         id={panelId}
         className={`${styles.panel}${sidebar ? ` ${styles.sidebarPanel}` : ''}`}
         role="dialog"
+        aria-modal="true"
         aria-labelledby={panelTitleId}
         tabIndex={-1}
+        style={panelStyle}
+        onKeyDown={handleKeyDown}
       >
         <div className={styles.header}>
           <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
@@ -124,11 +189,24 @@ function NotificationPanel({
                     {n.episodeTitle && <span> &middot; {n.episodeTitle}</span>}
                   </div>
                   <div className={styles.itemMeta}>
-                    {n.airDate && <span>Aired {formatAirDate(n.airDate)}</span>}
+                    {n.airDate && <span>{isFutureDate(n.airDate) ? 'Airs' : 'Aired'} {formatAirDate(n.airDate)}</span>}
                     <span>{formatRelativeTime(n.createdAt)}</span>
                   </div>
                 </div>
                 <div className={styles.itemActionsButtons}>
+                  {!n.read && (
+                    <button
+                      type="button"
+                      className={styles.markReadBtn}
+                      onClick={() => onMarkRead(n.id)}
+                      aria-label={`Mark notification for ${n.showTitle} as read`}
+                      title="Mark as read"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </button>
+                  )}
                   <Link
                     to={`/tv/${n.showId}?season=${n.season}&episode=${n.episode}`}
                     className={styles.openBtn}
@@ -152,10 +230,27 @@ function NotificationPanel({
             ))}
           </ul>
         )}
-        {notifications.length > 0 && (
+        {(notifications.length > 0 || undoCount > 0) && (
           <div className={styles.footer}>
-            <span className={styles.footerHint}>{notifications.length} total</span>
-            <button onClick={onClearAll} className={styles.clearBtn}>Clear all</button>
+            {undoCount > 0 ? (
+              <>
+                <span className={styles.footerHint}>Cleared {undoCount}</span>
+                <button onClick={onUndoClear} className={styles.clearBtn}>Undo</button>
+              </>
+            ) : clearConfirm ? (
+              <>
+                <span className={styles.footerHint}>Clear all notifications?</span>
+                <div className={styles.footerConfirm}>
+                  <button onClick={onConfirmClear} className={styles.clearBtn}>Clear</button>
+                  <button onClick={onCancelClear} className={styles.headerAction}>Cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className={styles.footerHint}>{notifications.length} total</span>
+                <button onClick={onRequestClear} className={styles.clearBtn}>Clear all</button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -176,13 +271,40 @@ function sharedForceScan(): Promise<number> {
   return inflightSharedScan;
 }
 
+// One 30s background loop for every mounted bell instead of one per instance.
+const scanListeners = new Set<() => void>();
+let scanIntervalId: ReturnType<typeof setInterval> | null = null;
+
+function subscribeScanRefresh(listener: () => void): () => void {
+  scanListeners.add(listener);
+  if (scanIntervalId === null) {
+    scanIntervalId = setInterval(() => {
+      if (document.hidden) return;
+      void scanForNewEpisodes().then(() => {
+        scanListeners.forEach((notify) => notify());
+      });
+    }, 30000);
+  }
+  return () => {
+    scanListeners.delete(listener);
+    if (scanListeners.size === 0 && scanIntervalId !== null) {
+      clearInterval(scanIntervalId);
+      scanIntervalId = null;
+    }
+  };
+}
+
 const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boolean }) {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [clearConfirm, setClearConfirm] = useState(false);
+  const [undoSnapshot, setUndoSnapshot] = useState<NotificationItem[] | null>(null);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties | undefined>(undefined);
   const panelRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const panelTitleId = useId();
   const panelId = useId();
 
@@ -193,13 +315,6 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     setUnreadCount(list.filter((n) => !n.read).length);
   }
 
-  // Periodic background refresh is throttled to avoid hammering the TMDB API;
-  // one-off actions (startup, opening the panel, sync) force an immediate scan.
-  async function refresh() {
-    await scanForNewEpisodes();
-    load();
-  }
-
   async function forceScan() {
     await sharedForceScan();
     load();
@@ -207,19 +322,11 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
 
   const { syncVersion } = useAuth();
 
-  // Background new-episode detection: scan at startup and keep
-  // refreshing so the bell reflects new releases within the last
-  // week without visiting the series page.
   useEffect(() => {
     load();
     void forceScan();
-    const interval = setInterval(() => {
-      // Hidden tabs don't need fresh badges - the scan is throttled anyway.
-      if (document.hidden) return;
-      load();
-      void refresh();
-    }, 30000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeScanRefresh(load);
+    return unsubscribe;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -261,8 +368,40 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     }
   }, [open]);
 
+  // Anchor the portaled panel to the bell on desktop. On mobile the panel is a
+  // bottom sheet positioned by CSS.
+  useLayoutEffect(() => {
+    if (!open || sidebar) return;
+    function update() {
+      const rect = btnRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPanelStyle({
+        position: 'fixed',
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right),
+        left: 'auto',
+      });
+    }
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open, sidebar]);
+
+  useEffect(() => () => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+  }, []);
+
   function handleRemove(id: string) {
     removeNotification(id);
+    load();
+  }
+
+  function handleMarkRead(id: string) {
+    markNotificationRead(id);
     load();
   }
 
@@ -271,8 +410,31 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
     load();
   }
 
-  function handleClearAll() {
+  function handleRequestClear() {
+    setClearConfirm(true);
+  }
+
+  function handleCancelClear() {
+    setClearConfirm(false);
+  }
+
+  function handleConfirmClear() {
+    const snapshot = getNotifications();
     clearAllNotifications();
+    setClearConfirm(false);
+    load();
+    if (snapshot.length === 0) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoSnapshot(snapshot);
+    undoTimerRef.current = setTimeout(() => setUndoSnapshot(null), 8000);
+  }
+
+  function handleUndoClear() {
+    if (!undoSnapshot) return;
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(undoSnapshot));
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    undoTimerRef.current = null;
+    setUndoSnapshot(null);
     load();
   }
 
@@ -316,24 +478,10 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
         {sidebar && <span className={styles.bellLabel}>Notifications</span>}
         {unreadCount > 0 && <span className={styles.badge}>{unreadCount > 9 ? '9+' : unreadCount}</span>}
       </button>
-      {open && (sidebar ? (
-        createPortal(
-          <NotificationPanel
-            panelRef={panelRef}
-            panelId={panelId}
-            panelTitleId={panelTitleId}
-            notifications={notifications}
-            unreadCount={unreadCount}
-            onClose={closePanel}
-            onRemove={handleRemove}
-            onMarkAllRead={handleMarkAllRead}
-            onClearAll={handleClearAll}
-            onScan={forceScan}
-            sidebar
-          />,
-          document.body,
-        )
-      ) : (
+      <span className={styles.srOnly} aria-live="polite">
+        {unreadCount > 0 ? `${unreadCount} unread notifications` : 'No unread notifications'}
+      </span>
+      {open && createPortal(
         <NotificationPanel
           panelRef={panelRef}
           panelId={panelId}
@@ -342,11 +490,20 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
           unreadCount={unreadCount}
           onClose={closePanel}
           onRemove={handleRemove}
+          onMarkRead={handleMarkRead}
           onMarkAllRead={handleMarkAllRead}
-          onClearAll={handleClearAll}
+          onRequestClear={handleRequestClear}
+          onConfirmClear={handleConfirmClear}
+          onCancelClear={handleCancelClear}
+          onUndoClear={handleUndoClear}
+          clearConfirm={clearConfirm}
+          undoCount={undoSnapshot?.length ?? 0}
           onScan={forceScan}
-        />
-      ))}
+          sidebar={sidebar}
+          panelStyle={sidebar ? undefined : panelStyle}
+        />,
+        document.body,
+      )}
     </div>
   );
 });

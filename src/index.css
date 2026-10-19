@@ -7,13 +7,12 @@
 }
 
 :root {
-  --bg: #07111f;
   --bg-elevated: rgba(16, 26, 42, 0.92);
   --bg-card: rgba(13, 21, 34, 0.9);
   --bg-card-strong: rgba(20, 31, 49, 0.96);
   --text: #f5f7fb;
   --text-muted: #9fb0c7;
-  --text-dim: #6f819d;
+  --text-dim: #8296b3;
   --border: rgba(167, 189, 219, 0.14);
   --border-strong: rgba(167, 189, 219, 0.22);
   --accent: #7dd3fc;
@@ -22,6 +21,8 @@
   --green: #22c55e;
   --radius: 16px;
   --radius-sm: 12px;
+  --radius-xs: 8px;
+  --nav-height: 56px;
 
   /* Typography: Plus Jakarta Sans for headlines/labels, Inter for body. */
   --font-headline: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -33,12 +34,21 @@
        --green-solid for solid fills like badges/dots).
      - Never hardcode #f5c518/#4ade80/#22c55e/#16a34a outside this block. */
   --gold-text: #f5c518;
+  --gold-fill: rgba(245, 197, 24, 0.14);
+  --gold-border: rgba(245, 197, 24, 0.35);
   --green-text: #4ade80;
-  --green-solid: #16a34a;
+  --green-solid: #15803d;
+  --green-fill: rgba(22, 163, 74, 0.16);
+  --green-border: rgba(22, 163, 74, 0.45);
   --danger: #f87171;
   --danger-strong: #ef4444;
   --ink: #03111e;
   --surface-1: #141f31;
+
+  /* Rating badge text - fixed brand colors, readable on the dark badge
+     surfaces in both themes. */
+  --rating-imdb: #f5c518;
+  --rating-tmdb: #fde047;
 
   /* z-index scale */
   --z-nav: 100;
@@ -57,7 +67,6 @@
   /* Surface overlays (subtle white highlights on dark backgrounds) */
   --surface-overlay: rgba(255, 255, 255, 0.04);
   --surface-overlay-hover: rgba(255, 255, 255, 0.08);
-  --surface-overlay-active: rgba(255, 255, 255, 0.12);
 
   /* Body background gradients */
   --bg-gradient-start: #091120;
@@ -68,13 +77,12 @@
 
 /* Light theme - opt in with <html data-theme="light"> */
 [data-theme='light'] {
-  --bg: #f2f5fa;
   --bg-elevated: rgba(255, 255, 255, 0.94);
   --bg-card: rgba(255, 255, 255, 0.95);
   --bg-card-strong: #ffffff;
   --text: #0f172a;
   --text-muted: #475569;
-  --text-dim: #64748b;
+  --text-dim: #5b6b82;
   --border: rgba(15, 23, 42, 0.14);
   --border-strong: rgba(15, 23, 42, 0.22);
   --accent: #0284c7;
@@ -91,7 +99,6 @@
 
   --surface-overlay: rgba(15, 23, 42, 0.04);
   --surface-overlay-hover: rgba(15, 23, 42, 0.08);
-  --surface-overlay-active: rgba(15, 23, 42, 0.12);
 
   --bg-gradient-start: #e8edf5;
   --bg-gradient-end: #d4dce8;
