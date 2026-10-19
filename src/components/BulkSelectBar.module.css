@@ -67,7 +67,8 @@
 }
 
 /* Shared selection checkbox for both Watch Later and Last Seen cards. One
-   corner (top-right) and one class so the two pages cannot drift apart. */
+   corner (top-right, replacing the per-card remove button in select mode)
+   and one class so the two pages cannot drift apart. */
 .selectBox {
   position: absolute;
   top: 0.5rem;
@@ -76,8 +77,8 @@
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.5);
   background: rgba(8, 12, 22, 0.6);

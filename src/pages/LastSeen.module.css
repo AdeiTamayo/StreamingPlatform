@@ -7,16 +7,15 @@
 }
 
 .last-seen-controls .custom-select-trigger {
-  height: 2.5rem;
   box-sizing: border-box;
-  padding: 0 0.9rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   font-size: 0.8rem;
   font-weight: 500;
-  min-height: 0;
+  min-height: 42px;
   transition: border-color 0.18s ease, background 0.18s ease;
 }
 
@@ -31,9 +30,9 @@
 }
 
 .last-seen-search {
-  height: 2.5rem;
+  min-height: 42px;
   box-sizing: border-box;
-  padding: 0 0.95rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
@@ -53,22 +52,70 @@
 .last-seen-clear-btn {
   display: inline-flex;
   align-items: center;
-  height: 2.5rem;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 42px;
   box-sizing: border-box;
-  padding: 0 0.95rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text-dim);
   font-size: 0.8rem;
   font-weight: 500;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .last-seen-clear-btn:hover {
   background: rgba(125, 211, 252, 0.1);
   color: var(--text);
+}
+
+.last-seen-clear-btn.active {
+  background: rgba(125, 211, 252, 0.12);
+  color: var(--accent);
+  border-color: rgba(125, 211, 252, 0.35);
+}
+
+.last-seen-sort-dir-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.last-seen-sort-dir-btn:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+.last-seen-sort-dir-btn:focus-visible,
+.last-seen-clear-btn:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.last-seen-select-btn {
+  margin-left: auto;
+  min-width: 42px;
+  padding: 0.5rem;
 }
 
 .last-seen-series-poster {
@@ -245,4 +292,34 @@
 .last-seen-detail-title {
   font-size: 1rem;
   font-weight: 700;
+}
+
+/* touch devices have no hover affordance, so the tiny remove/view controls
+   need a full-size target to stay tappable. */
+@media (hover: none) and (pointer: coarse) {
+  .ls-remove {
+    width: 44px;
+    height: 44px;
+  }
+
+  .last-seen-card .last-seen-view-btn {
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .last-seen-search {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .last-seen-controls {
+    gap: 0.4rem;
+  }
+
+  .last-seen-detail-header {
+    flex-wrap: wrap;
+  }
 }

@@ -9,23 +9,27 @@ import {
   getSeriesWatchedFlag,
   unmarkSeriesWatched,
 } from "../api/storage";
-import { imageUrl, safeImageUrl } from "../api/tmdb";
+import { safeImageUrl } from "../api/tmdb";
 import CollectionSkeleton from "../components/CollectionSkeleton";
 import FilterDropdown from "../components/FilterDropdown";
 import Pagination from "../components/Pagination";
 import CloseIcon from "../components/CloseIcon";
 import TypeToggle from "../components/TypeToggle";
+import SelectIcon from "../components/SelectIcon";
+import SortDirectionIcon from "../components/SortDirectionIcon";
+import BulkSelectBar from "../components/BulkSelectBar";
+import useBulkSelect from "../components/useBulkSelect";
+import bulkStyles from "../components/BulkSelectBar.module.css";
 import { useToast } from "../components/useToast";
 import type { LastSeenItem } from "../types";
 import styles from "./LastSeen.module.css";
 
-const MOVIES_PER_PAGE = 20;
-const SERIES_PER_PAGE = 20;
+const ITEMS_PER_PAGE = 21;
 
 const TYPE_TABS = [
   { value: "all", label: "All" },
   { value: "movies", label: "Movies" },
-  { value: "tv", label: "Series" },
+  { value: "tv", label: "TV Shows" },
 ];
 
 interface SeriesGroup {
@@ -34,6 +38,31 @@ interface SeriesGroup {
   poster: string | null;
   latestTs: number;
   episodes: LastSeenItem[];
+}
+
+type LastSeenEntry =
+  | {
+      kind: "series";
+      key: string;
+      group: SeriesGroup;
+      title: string;
+      ts: number;
+      episodes: number;
+      year: string;
+    }
+  | {
+      kind: "movie";
+      key: string;
+      item: LastSeenItem;
+      title: string;
+      ts: number;
+      episodes: number;
+      year: string;
+    };
+
+function metaYear(meta: Record<string, unknown> | null | undefined): string {
+  const year = meta?.year;
+  return year == null ? "" : String(year);
 }
 
 function formatEpisodeLabel(item: LastSeenItem): string {
@@ -46,15 +75,23 @@ function watchedEpisodeCount(group: SeriesGroup): number {
   return group.episodes.filter((e: LastSeenItem) => e.season && e.episode).length;
 }
 
+function seriesKey(id: number | string): string {
+  return `tv-${String(id)}`;
+}
+
+function movieKey(storageKey: string): string {
+  return `movie-${storageKey}`;
+}
+
 export default function LastSeen() {
   const [items, setItems] = useState<LastSeenItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("recent");
   const [filterType, setFilterType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [moviePage, setMoviePage] = useState(0);
-  const [seriesPage, setSeriesPage] = useState(0);
+  const [page, setPage] = useState(0);
   const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const toast = useToast();
 
   useEffect(() => {
@@ -63,7 +100,7 @@ export default function LastSeen() {
     setLoading(false);
   }, []);
 
-  const { series, movies } = useMemo(() => {
+  const { series, movies, combined } = useMemo(() => {
     const seriesMap = new Map<string, SeriesGroup>();
     const movieItems: LastSeenItem[] = [];
 
@@ -93,20 +130,26 @@ export default function LastSeen() {
       }
     });
 
-    let groupedSeries: SeriesGroup[] = Array.from(seriesMap.values())
-      .sort((a, b) => (b.latestTs || 0) - (a.latestTs || 0))
+    // Every field has an ascending base comparator; the direction toggle
+    // flips it so each field can be read newest-first or reversed.
+    const dir = sortDir === "asc" ? 1 : -1;
+
+    const groupedSeries: SeriesGroup[] = Array.from(seriesMap.values())
+      .sort((a, b) => dir * ((a.latestTs || 0) - (b.latestTs || 0)))
       .map((group: SeriesGroup) => ({
         ...group,
         episodes: group.episodes.sort((a, b) => (b.ts || 0) - (a.ts || 0)),
       }));
 
     let sortedMovies = [...movieItems].sort(
-      (a, b) => (b.ts || 0) - (a.ts || 0),
+      (a, b) => dir * ((a.ts || 0) - (b.ts || 0)),
     );
+
+    let filteredSeries = groupedSeries;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      groupedSeries = groupedSeries.filter((s: SeriesGroup) =>
+      filteredSeries = filteredSeries.filter((s: SeriesGroup) =>
         s.title.toLowerCase().includes(q),
       );
       sortedMovies = sortedMovies.filter((m: LastSeenItem) =>
@@ -114,21 +157,50 @@ export default function LastSeen() {
       );
     }
 
-    if (sortBy === "title") {
-      groupedSeries.sort((a, b) => a.title.localeCompare(b.title));
-      sortedMovies.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-    } else if (sortBy === "episodes") {
-      groupedSeries.sort((a, b) => b.episodes.length - a.episodes.length);
-    } else if (sortBy === "year") {
-      sortedMovies.sort((a: LastSeenItem, b: LastSeenItem) =>
-        (b.meta?.year || "")
-          .toString()
-          .localeCompare((a.meta?.year || "").toString()),
-      );
+    const seriesEntries: LastSeenEntry[] = filteredSeries.map(
+      (group): LastSeenEntry => ({
+        kind: "series",
+        key: seriesKey(group.id),
+        group,
+        title: group.title,
+        ts: group.latestTs,
+        episodes: group.episodes.length,
+        year: metaYear(group.episodes[0]?.meta),
+      }),
+    );
+    const movieEntries: LastSeenEntry[] = sortedMovies.map(
+      (item): LastSeenEntry => ({
+        kind: "movie",
+        key: movieKey(item.storageKey),
+        item,
+        title: item.title || `Movie ${item.id}`,
+        ts: item.ts || 0,
+        episodes: 0,
+        year: metaYear(item.meta),
+      }),
+    );
+
+    let combined = [...seriesEntries, ...movieEntries].sort((a, b) => {
+      if (sortBy === "title") return dir * a.title.localeCompare(b.title);
+      if (sortBy === "episodes") return dir * (a.episodes - b.episodes);
+      if (sortBy === "year") return dir * a.year.localeCompare(b.year);
+      return dir * ((a.ts || 0) - (b.ts || 0));
+    });
+
+    if (filterType === "movies") {
+      combined = combined.filter((e) => e.kind === "movie");
+    } else if (filterType === "tv") {
+      combined = combined.filter((e) => e.kind === "series");
     }
 
-    return { series: groupedSeries, movies: sortedMovies };
-  }, [items, sortBy, searchQuery]);
+    return { series: groupedSeries, movies: sortedMovies, combined };
+  }, [items, sortBy, sortDir, searchQuery, filterType]);
+
+  // Reset to the first page whenever the visible ordering/contents change,
+  // otherwise a filter could leave the user stranded past the last page.
+  useEffect(() => {
+    setPage(0);
+  }, [filterType, searchQuery, sortBy, sortDir]);
 
   // Derived from the live grouped list so removals inside the detail view
   // stay in sync instead of showing a stale snapshot.
@@ -141,31 +213,17 @@ export default function LastSeen() {
     [series, selectedSeriesId],
   );
 
-  const totalMoviePages = Math.max(
-    1,
-    Math.ceil(movies.length / MOVIES_PER_PAGE),
-  );
-  const safeMoviePage = Math.min(moviePage, totalMoviePages - 1);
-  const visibleMovies = movies.slice(
-    safeMoviePage * MOVIES_PER_PAGE,
-    (safeMoviePage + 1) * MOVIES_PER_PAGE,
+  const totalPages = Math.max(1, Math.ceil(combined.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(page, totalPages - 1);
+  const visibleEntries = combined.slice(
+    safePage * ITEMS_PER_PAGE,
+    (safePage + 1) * ITEMS_PER_PAGE,
   );
 
   // When no search filter is active, "Remove all" must operate on the full
   // unfiltered list - not just the currently paginated slice, which would
   // silently leave most of the history behind.
   const filterActive = !!searchQuery.trim();
-  const removeTargets = filterActive ? visibleMovies : movies;
-
-  const totalSeriesPages = Math.max(
-    1,
-    Math.ceil(series.length / SERIES_PER_PAGE),
-  );
-  const safeSeriesPage = Math.min(seriesPage, totalSeriesPages - 1);
-  const visibleSeries = series.slice(
-    safeSeriesPage * SERIES_PER_PAGE,
-    (safeSeriesPage + 1) * SERIES_PER_PAGE,
-  );
 
   function handleRemove(item: LastSeenItem) {
     let removed = false;
@@ -186,7 +244,7 @@ export default function LastSeen() {
     if (removed) toast?.("Removed from history");
   }
 
-   function handleRemoveShow(showId: string | number) {
+  function handleRemoveShow(showId: string | number) {
     clearShowHistory(showId);
     setItems(getLastSeen());
     if (selectedSeriesId && String(selectedSeriesId) === String(showId)) {
@@ -196,16 +254,14 @@ export default function LastSeen() {
   }
 
   // Removes every movie in the current view - all of them when unfiltered,
-  // or just the search matches when a filter is active. Pagination never
-  // limits the scope, so page 1 of 3 no longer leaves pages 2-3 behind. With
-  // a filter active the clear-all shortcut is skipped: `movies` is already
-  // filtered then, so `targets.length >= movies.length` would be trivially
-  // true and hand control to the wipe-everything path.
+  // or just the search matches when a filter is active. `movies` is already
+  // narrowed by the search query, and pagination never limits the scope, so
+  // page 1 of 3 does not leave pages 2-3 behind.
   function handleRemoveAllMovies() {
     if (!filterActive) {
       clearAllMoviesWatched();
     } else {
-      for (const item of removeTargets) {
+      for (const item of movies) {
         markUnwatched("movie", item.id);
         clearProgress("movie", item.id);
       }
@@ -213,25 +269,78 @@ export default function LastSeen() {
     setItems(getLastSeen());
     toast?.(
       filterActive
-        ? `${removeTargets.length} movie${removeTargets.length === 1 ? "" : "s"} removed from history`
+        ? `${movies.length} movie${movies.length === 1 ? "" : "s"} removed from history`
         : "All watched movies removed from history",
     );
   }
 
+  // Keys are prefixed so a single selected set can hold series and movies at
+  // once, and the removal handler can tell them apart again.
+  function handleRemoveSelected(keys: string[]) {
+    let removed = 0;
+    for (const key of keys) {
+      if (key.startsWith("tv-")) {
+        const showId = key.slice(3);
+        clearShowHistory(showId);
+        removed += 1;
+        if (selectedSeriesId && String(selectedSeriesId) === showId) {
+          setSelectedSeriesId(null);
+        }
+      } else if (key.startsWith("movie-")) {
+        const storageKey = key.slice(6);
+        const item = items.find(
+          (i: LastSeenItem) =>
+            i.type === "movie" && i.storageKey === storageKey,
+        );
+        if (item) {
+          markUnwatched("movie", item.id);
+          clearProgress("movie", item.id);
+          removed += 1;
+        }
+      }
+    }
+    setItems(getLastSeen());
+    if (removed > 0) toast?.(`${removed} removed from history`);
+  }
+
+  const visibleKeys = useMemo(
+    () => visibleEntries.map((entry) => entry.key),
+    [visibleEntries],
+  );
+
+  const {
+    selectMode,
+    selectedKeys,
+    confirmingBulkRemove,
+    selectedCount,
+    toggleSelectMode,
+    toggleKey,
+    selectPage,
+    clearSelection,
+    requestRemove,
+    keepSelection,
+    removeSelected,
+  } = useBulkSelect({
+    visibleKeys,
+    onRemove: handleRemoveSelected,
+  });
+
   function showSeriesEpisodes(show: SeriesGroup) {
     setSelectedSeriesId(String(show.id));
-    setMoviePage(0);
-    setSeriesPage(0);
+    setPage(0);
   }
 
   function backToSeries() {
     setSelectedSeriesId(null);
   }
 
-  const showSeriesSection = filterType === "all" || filterType === "tv";
   const showMoviesSection = filterType === "all" || filterType === "movies";
   const hasActiveFilter =
-    filterType !== "all" || sortBy !== "recent" || searchQuery.trim();
+    filterType !== "all" ||
+    sortBy !== "recent" ||
+    sortDir !== "desc" ||
+    searchQuery.trim();
+  const hasNoMatches = combined.length === 0 && items.length > 0;
 
   return (
     <div className="page">
@@ -270,93 +379,206 @@ export default function LastSeen() {
               <FilterDropdown
                 value={sortBy}
                 options={[
-                  { value: "recent", label: "Most recent" },
-                  { value: "title", label: "Title A-Z" },
+                  { value: "recent", label: "Date added" },
+                  { value: "title", label: "Title" },
                   { value: "episodes", label: "Most episodes" },
                   { value: "year", label: "Year" },
                 ]}
-                placeholder="Sort by"
-                onSelect={setSortBy}
+                placeholder="Date added"
+                onSelect={(v: string) => {
+                  setSortBy(v);
+                  setSortDir(v === "title" ? "asc" : "desc");
+                }}
               />
+              <button
+                className={styles.lastSeenSortDirBtn}
+                onClick={() =>
+                  setSortDir((d) => (d === "desc" ? "asc" : "desc"))
+                }
+                title={`Sort ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
+                aria-label={`Sort direction: ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
+              >
+                <SortDirectionIcon direction={sortDir} />
+              </button>
               {hasActiveFilter && (
                 <button
                   className={styles.lastSeenClearBtn}
                   onClick={() => {
                     setFilterType("all");
                     setSortBy("recent");
+                    setSortDir("desc");
                     setSearchQuery("");
                     setSelectedSeriesId(null);
-                    setSeriesPage(0);
+                    setPage(0);
                   }}
                 >
                   Clear filters
                 </button>
               )}
+              <button
+                className={`${styles.lastSeenClearBtn} ${styles.lastSeenSelectBtn} ${selectMode ? styles.active : ""}`}
+                onClick={toggleSelectMode}
+                aria-pressed={selectMode}
+                aria-label={selectMode ? "Done" : "Select"}
+                title={selectMode ? "Exit selection" : "Select multiple titles"}
+              >
+                <SelectIcon />
+              </button>
             </div>
 
-            {showSeriesSection && !selectedSeries && series.length > 0 && (
+            {selectMode && (
+              <BulkSelectBar
+                selectedCount={selectedCount}
+                confirming={confirmingBulkRemove}
+                onSelectPage={visibleKeys.length > 0 ? selectPage : undefined}
+                onClear={clearSelection}
+                onRequestRemove={requestRemove}
+                onKeep={keepSelection}
+                onConfirmRemove={removeSelected}
+              />
+            )}
+
+            {!selectedSeries && hasNoMatches && (
+              <div className="empty-state">
+                <h3>No matches</h3>
+                <p>
+                  No titles match your current filters. Try a different search
+                  or clear the filters.
+                </p>
+              </div>
+            )}
+
+            {!selectedSeries && combined.length > 0 && (
               <>
-                <h3 className="sub-section-title">
-                  TV Series ({series.length})
-                </h3>
                 <div className="media-grid">
-                  {visibleSeries.map((show) => (
-                    <div
-                      key={show.id}
-                      className={`media-card ${styles.lastSeenCard}`}
-                    >
-                      <Link
-                        to={`/tv/${show.id}`}
-                        className={styles.lastSeenCardLink}
-                      >
-                        <div className="media-card-poster">
-                          <img
-                            src={
-                              show.poster
-                                ? imageUrl(show.poster)
-                                : imageUrl(null)
-                            }
-                            alt={show.title}
-                            loading="lazy"
+                  {visibleEntries.map((entry) => {
+                    if (entry.kind === "series") {
+                      const show = entry.group;
+                      const key = entry.key;
+                      const body = (
+                        <>
+                          <div className="media-card-poster">
+                            <img
+                              src={safeImageUrl(show.poster)}
+                              alt={show.title}
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="media-card-info">
+                            <h3>{show.title}</h3>
+                            <span className="media-card-year">
+                              {show.episodes.length === 1 &&
+                              !show.episodes[0].season
+                                ? "Watched"
+                                : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
+                            </span>
+                          </div>
+                        </>
+                      );
+                      return (
+                        <div
+                          key={entry.key}
+                          className={`media-card ${styles.lastSeenCard}`}
+                        >
+                          {selectMode && (
+                            <input
+                              type="checkbox"
+                              className={bulkStyles.selectBox}
+                              checked={selectedKeys.has(key)}
+                              onChange={() => toggleKey(key)}
+                              aria-label={`Select ${show.title}`}
+                            />
+                          )}
+                          <Link
+                            to={`/tv/${show.id}`}
+                            className={styles.lastSeenCardLink}
+                          >
+                            {body}
+                          </Link>
+                          {!selectMode && (
+                            <button
+                              className={styles.lastSeenViewBtn}
+                              onClick={() => showSeriesEpisodes(show)}
+                            >
+                              View
+                            </button>
+                          )}
+                          {!selectMode && (
+                            <button
+                              className="wl-remove"
+                              onClick={() => handleRemoveShow(show.id)}
+                              title="Remove all episodes"
+                            >
+                              <CloseIcon />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    const item = entry.item;
+                    const key = entry.key;
+                    return (
+                      <div key={entry.key} className="media-card">
+                        {selectMode && (
+                          <input
+                            type="checkbox"
+                            className={bulkStyles.selectBox}
+                            checked={selectedKeys.has(key)}
+                            onChange={() => toggleKey(key)}
+                            aria-label={`Select ${item.title || `Movie ${item.id}`}`}
                           />
-                        </div>
-                        <div className="media-card-info">
-                          <h3>{show.title}</h3>
-                          <span className="media-card-year">
-                            {show.episodes.length === 1 && !show.episodes[0].season
-                              ? "Watched"
-                              : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
-                          </span>
-                        </div>
-                      </Link>
-                      <button
-                        className={styles.lastSeenViewBtn}
-                        onClick={() => showSeriesEpisodes(show)}
-                      >
-                        View
-                      </button>
-                      <button
-                        className="wl-remove"
-                        onClick={() => handleRemoveShow(show.id)}
-                        title="Remove all episodes"
-                      >
-                        <CloseIcon />
-                      </button>
-                    </div>
-                  ))}
+                        )}
+                        <Link to={`/movie/${item.id}`}>
+                          <div className="media-card-poster">
+                            <img
+                              src={safeImageUrl(item.meta?.poster)}
+                              alt={item.title || ""}
+                              loading="lazy"
+                            />
+                          </div>
+                          <div className="media-card-info">
+                            <h3>{item.title || `Movie ${item.id}`}</h3>
+                            {entry.year && (
+                              <span className="media-card-year">
+                                {entry.year}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
+                        {!selectMode && (
+                          <button
+                            className="wl-remove"
+                            onClick={() => handleRemove(item)}
+                            title="Remove"
+                          >
+                            <CloseIcon />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-                {totalSeriesPages > 1 && (
+                {showMoviesSection && movies.length > 0 && (
+                  <button
+                    className="watch-toggle danger"
+                    onClick={handleRemoveAllMovies}
+                  >
+                    Remove all
+                  </button>
+                )}
+                {totalPages > 1 && (
                   <Pagination
-                    page={safeSeriesPage + 1}
-                    totalPages={totalSeriesPages}
-                    onChange={(p) => setSeriesPage(p - 1)}
+                    page={safePage + 1}
+                    totalPages={totalPages}
+                    onChange={(p) => setPage(p - 1)}
                     style={{ marginTop: "1rem" }}
                   />
                 )}
               </>
             )}
 
-            {showSeriesSection && selectedSeries && (
+            {selectedSeries && (
               <>
                 <div className={styles.lastSeenDetailHeader}>
                   <button
@@ -374,7 +596,7 @@ export default function LastSeen() {
                     <div className="last-seen-series-title-wrap">
                       {selectedSeries.poster && (
                         <img
-                          src={imageUrl(selectedSeries.poster)}
+                          src={safeImageUrl(selectedSeries.poster)}
                           alt={selectedSeries.title}
                           className={styles.lastSeenSeriesPoster}
                         />
@@ -435,53 +657,6 @@ export default function LastSeen() {
                   </div>
                 </div>
               </>
-            )}
-
-            {showMoviesSection && movies.length > 0 && (
-              <section className="section">
-                <h3 className="sub-section-title">Movies ({movies.length})</h3>
-                <div className="media-grid">
-                  {visibleMovies.map((item) => (
-                    <div key={item.storageKey} className="media-card">
-                      <Link to={`/movie/${item.id}`}>
-                        <div className="media-card-poster">
-                          <img
-                            src={safeImageUrl(item.meta?.poster)}
-                            alt={item.title || ""}
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="media-card-info">
-                          <h3>{item.title || `Movie ${item.id}`}</h3>
-                        </div>
-                      </Link>
-                      <button
-                        className="wl-remove"
-                        onClick={() => handleRemove(item)}
-                        title="Remove"
-                      >
-                        <CloseIcon />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                {movies.length > 0 && (
-                  <button
-                    className="watch-toggle danger"
-                    onClick={handleRemoveAllMovies}
-                  >
-                    Remove all
-                  </button>
-                )}
-                {totalMoviePages > 1 && (
-                  <Pagination
-                    page={safeMoviePage + 1}
-                    totalPages={totalMoviePages}
-                    onChange={(p) => setMoviePage(p - 1)}
-                    style={{ marginTop: "1rem" }}
-                  />
-                )}
-              </section>
             )}
           </>
         )}

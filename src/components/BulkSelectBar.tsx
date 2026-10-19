@@ -3,7 +3,8 @@ import styles from "./BulkSelectBar.module.css";
 interface BulkSelectBarProps {
   selectedCount: number;
   confirming: boolean;
-  onSelectPage: () => void;
+  /** Omitted when there is nothing selectable on the current page. */
+  onSelectPage?: () => void;
   onClear: () => void;
   onRequestRemove: () => void;
   onKeep: () => void;
@@ -31,13 +32,15 @@ export default function BulkSelectBar({
           ? "No titles selected"
           : `${selectedCount} selected`}
       </span>
-      <button
-        className={styles.selectAction}
-        onClick={onSelectPage}
-        title="Select every title on this page"
-      >
-        Select page
-      </button>
+      {onSelectPage && (
+        <button
+          className={styles.selectAction}
+          onClick={onSelectPage}
+          title="Select every title on this page"
+        >
+          Select page
+        </button>
+      )}
       <button
         className={styles.selectAction}
         onClick={onClear}
