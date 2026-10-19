@@ -135,12 +135,60 @@
   margin-top: 1.2rem;
 }
 
+/* Standard action pill shared by every button on the page. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: .45rem .9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-overlay-hover);
+  color: var(--text);
+  font-size: .8rem;
+  font-weight: 600;
+  transition: background .2s, border-color .2s, opacity .2s, color .2s;
+}
+
+.pill:hover:not(:disabled) {
+  background: rgba(125, 211, 252, .12);
+  border-color: rgba(125, 211, 252, .2);
+}
+
+.pill:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.pillDanger {
+  border-color: rgba(239, 68, 68, .35);
+  color: var(--danger-strong);
+}
+
+.pillDanger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, .15);
+  border-color: rgba(239, 68, 68, .5);
+}
+
+/* Off-screen file pickers must stay programmatically clickable. */
+.fileInput {
+  display: none;
+}
+
 /* ------------------------- */
 /* Storage */
 /* ------------------------- */
 
 .storageHeader {
   margin-bottom: 1.5rem;
+}
+
+.storageError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .9rem;
 }
 
 .storageTotal {
@@ -238,22 +286,49 @@
 .dangerText {
   color: var(--text-muted);
   line-height: 1.6;
-  margin: 0;
+  margin: 0 0 1rem;
 }
 
-.confirmBox {
+/* ------------------------- */
+/* Confirm dialog */
+/* ------------------------- */
+
+.dialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
   display: flex;
-  flex-direction: column;
-  gap: .8rem;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 6, 12, .72);
+  backdrop-filter: blur(6px);
 }
 
-.confirmBox h4 {
-  margin: 0;
+.dialog {
+  width: min(420px, 100%);
+  padding: 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--bg-card-strong);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .5);
 }
 
-.confirmBox p {
-  margin: 0;
+.dialog h4 {
+  margin: 0 0 .5rem;
+  font-size: 1rem;
+}
+
+.dialog p {
+  margin: 0 0 1.25rem;
   color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
 }
 
 /* ------------------------- */
@@ -267,7 +342,7 @@
   }
 
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .backupGrid {
@@ -281,6 +356,10 @@
 
   .card {
     padding: 1rem;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
   }
 
   .row {

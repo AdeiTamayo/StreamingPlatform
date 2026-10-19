@@ -87,6 +87,19 @@ export default function Settings() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabaseFileInputRef = useRef<HTMLInputElement>(null);
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const clearTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef(false);
+
+  async function loadUsage() {
+    try {
+      setUsage(await getStorageUsage());
+      setUsageError(false);
+    } catch {
+      setUsageError(true);
+    }
+  }
 
   useEffect(() => {
     document.title = "Settings - StreamFlow";
@@ -97,15 +110,65 @@ export default function Settings() {
     setStats(getStats());
     setQueueSize(getQueueSize());
   }, []);
+
+  useEffect(() => {
+    if (!confirm) {
+      if (restoreFocusRef.current) {
+        restoreFocusRef.current = false;
+        clearTriggerRef.current?.focus();
+      }
+      return;
+    }
+
+    cancelBtnRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        restoreFocusRef.current = true;
+        setConfirm(false);
+        return;
+      }
+      if (e.key !== "Tab" || !confirmDialogRef.current) return;
+
+      const focusables = Array.from(
+        confirmDialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+
+      if (focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [confirm]);
+
+  function openConfirm() {
+    restoreFocusRef.current = false;
+    setConfirm(true);
+  }
+
+  function closeConfirm() {
+    restoreFocusRef.current = true;
+    setConfirm(false);
+  }
+
   async function clearCache() {
     await clearTMDBCache();
 
-    try {
-      setUsage(await getStorageUsage());
-      setUsageError(false);
-    } catch {
-      setUsageError(true);
-    }
+    await loadUsage();
 
     toast?.("TMDB cache cleared");
   }
@@ -115,14 +178,9 @@ export default function Settings() {
 
     await clearTMDBCache();
 
-    setConfirm(false);
+    closeConfirm();
 
-    try {
-      setUsage(await getStorageUsage());
-      setUsageError(false);
-    } catch {
-      setUsageError(true);
-    }
+    await loadUsage();
     setStats(getStats());
     setQueueSize(getQueueSize());
 
@@ -164,12 +222,7 @@ export default function Settings() {
 
         const count = importData(data, "merge");
 
-        try {
-          setUsage(await getStorageUsage());
-          setUsageError(false);
-        } catch {
-          setUsageError(true);
-        }
+        await loadUsage();
         setStats(getStats());
         setQueueSize(getQueueSize());
 
@@ -253,23 +306,22 @@ export default function Settings() {
             <Card title="Account">
               <div className={styles.account}>
                 <div className={styles.avatar}>
-                  {user?.email?.charAt(0).toUpperCase() ?? "?"}
+                  {user?.email?.[0]?.toUpperCase()}
                 </div>
 
                 <div className={styles.accountInfo}>
-                  <h4>{user?.email ?? "Not signed in"}</h4>
+                  <h4>{user?.email}</h4>
                   <span>Cloud account</span>
                 </div>
               </div>
 
-              <Row label="Status" value={user ? "Connected" : "Offline"} />
+              <Row label="Status" value="Connected" />
 
               <div className={styles.actions}>
                 <button
-                  className="watch-toggle danger"
+                  className={styles.pill}
                   onClick={signOut}
-                  disabled={!user}
-                  title={user ? "Sign out" : "Not signed in"}
+                  title="Sign out"
                 >
                   Sign Out
                 </button>
@@ -313,12 +365,12 @@ export default function Settings() {
                   <h4 className={styles.backupTitle}>Local</h4>
 
                   <div className={styles.actions}>
-                    <button className="watch-toggle" onClick={handleExport}>
+                    <button className={styles.pill} onClick={handleExport}>
                       Export
                     </button>
 
                     <button
-                      className="watch-toggle"
+                      className={styles.pill}
                       onClick={() => fileInputRef.current?.click()}
                     >
                       Import
@@ -330,7 +382,7 @@ export default function Settings() {
                     type="file"
                     accept=".json"
                     onChange={handleImport}
-                    style={{ display: "none" }}
+                    className={styles.fileInput}
                   />
                 </div>
 
@@ -339,14 +391,14 @@ export default function Settings() {
 
                   <div className={styles.actions}>
                     <button
-                      className="watch-toggle"
+                      className={styles.pill}
                       onClick={handleSupabaseExport}
                     >
                       Export
                     </button>
 
                     <button
-                      className="watch-toggle"
+                      className={styles.pill}
                       onClick={() => supabaseFileInputRef.current?.click()}
                     >
                       Import
@@ -358,7 +410,7 @@ export default function Settings() {
                     type="file"
                     accept=".json"
                     onChange={handleSupabaseImport}
-                    style={{ display: "none" }}
+                    className={styles.fileInput}
                   />
                 </div>
               </div>
@@ -370,7 +422,12 @@ export default function Settings() {
           <div className={styles.column}>
             <Card title="Storage">
               {usageError ? (
-                <div className={styles.value}>Storage usage unavailable</div>
+                <div className={styles.storageError}>
+                  <div className={styles.value}>Storage usage unavailable</div>
+                  <button className={styles.pill} onClick={loadUsage}>
+                    Retry
+                  </button>
+                </div>
               ) : (
                 usage && (
                 <>
@@ -415,7 +472,7 @@ export default function Settings() {
                     label="TMDB Cache"
                     value={formatBytes(usage.breakdown.cache)}
                   >
-                    <button className="watch-toggle" onClick={clearCache}>
+                    <button className={styles.pill} onClick={clearCache}>
                       Clear
                     </button>
                   </Row>
@@ -446,44 +503,61 @@ export default function Settings() {
             </Card>
 
             <Card title="Danger Zone">
-              {!confirm ? (
-                <>
-                  <p className={styles.dangerText}>
-                    Remove every local watch history, progress, cache and watch
-                    later list.
-                  </p>
+              <p className={styles.dangerText}>
+                Remove every local watch history, progress, cache and watch
+                later list.
+              </p>
 
-                  <button
-                    className="watch-toggle danger"
-                    onClick={() => setConfirm(true)}
-                  >
-                    Clear Local Data
-                  </button>
-                </>
-              ) : (
-                <div className={styles.confirmBox}>
-                  <h4>This action cannot be undone.</h4>
-
-                  <p>All local information will be permanently removed.</p>
-
-                  <div className={styles.actions}>
-                    <button className="watch-toggle danger" onClick={clearAll}>
-                      Delete Everything
-                    </button>
-
-                    <button
-                      className="watch-toggle"
-                      onClick={() => setConfirm(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
+              <button
+                ref={clearTriggerRef}
+                className={`${styles.pill} ${styles.pillDanger}`}
+                onClick={openConfirm}
+              >
+                Clear Local Data
+              </button>
             </Card>
           </div>
         </div>
       </section>
+
+      {confirm && (
+        <div
+          className={styles.dialogOverlay}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeConfirm();
+          }}
+        >
+          <div
+            ref={confirmDialogRef}
+            className={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-clear-title"
+            tabIndex={-1}
+          >
+            <h4 id="confirm-clear-title">This action cannot be undone.</h4>
+
+            <p>All local information will be permanently removed.</p>
+
+            <div className={styles.dialogActions}>
+              <button
+                className={`${styles.pill} ${styles.pillDanger}`}
+                onClick={clearAll}
+              >
+                Delete Everything
+              </button>
+
+              <button
+                ref={cancelBtnRef}
+                className={styles.pill}
+                onClick={closeConfirm}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

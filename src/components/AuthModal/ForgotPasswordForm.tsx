@@ -14,6 +14,8 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
+  const errorId = 'forgot-form-error';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
@@ -46,7 +48,7 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
           If an account exists for <strong>{email.trim()}</strong>, a password reset link has been
           sent. Check your inbox.
         </p>
-        <button type="button" className={styles.button} onClick={onSwitchToLogin}>
+        <button type="button" className={styles.button} onClick={onSwitchToLogin} autoFocus>
           Back to Sign In
         </button>
       </div>
@@ -66,10 +68,13 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
           autoComplete="email"
           autoFocus
           required
+          disabled={submitting}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
         />
       </label>
 
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
 
       <button type="submit" className={styles.button} disabled={submitting}>
         {submitting ? 'Sending…' : 'Send Reset Link'}
@@ -77,7 +82,7 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
 
       <p className={styles.switchRow}>
         Remembered your password?{' '}
-        <button type="button" className={styles.linkBtn} onClick={onSwitchToLogin}>
+        <button type="button" className={styles.linkBtn} onClick={onSwitchToLogin} disabled={submitting}>
           Sign in
         </button>
       </p>

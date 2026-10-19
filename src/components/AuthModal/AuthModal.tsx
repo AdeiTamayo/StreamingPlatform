@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import CloseIcon from '../CloseIcon';
 import LoginForm from './LoginForm';
 import RegisterForm from './RegisterForm';
 import ForgotPasswordForm from './ForgotPasswordForm';
@@ -15,6 +16,12 @@ const MODE_TITLES: Record<AuthMode, { title: string; subtitle: string }> = {
   register: { title: 'Create Account', subtitle: 'Sync your watch history across devices.' },
   forgot: { title: 'Reset Password', subtitle: 'We will email you a link to reset it.' },
 };
+
+function getFocusable(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => el.offsetParent !== null || el === document.activeElement,
+  );
+}
 
 export default function AuthModal() {
   const { isAuthModalOpen, closeAuthModal } = useAuth();
@@ -37,16 +44,14 @@ export default function AuthModal() {
       }
       if (e.key !== 'Tab' || !modalRef.current) return;
 
-      const focusables = Array.from(
-        modalRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
-      ).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      const focusables = getFocusable(modalRef.current);
 
       if (focusables.length === 0) return;
 
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
 
-      if (e.shiftKey && document.activeElement === first) {
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === modalRef.current)) {
         e.preventDefault();
         last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
@@ -55,14 +60,34 @@ export default function AuthModal() {
       }
     };
 
+    // Keep focus inside the dialog even if something moves it out (e.g. a
+    // browser autofill or an off-dialog control grabbing focus).
+    const handleFocusIn = (e: FocusEvent) => {
+      if (!modalRef.current) return;
+      if (!modalRef.current.contains(e.target as Node)) {
+        const focusables = getFocusable(modalRef.current);
+        (focusables[0] ?? modalRef.current).focus();
+      }
+    };
+
     document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('focusin', handleFocusIn);
 
     return () => {
       document.body.style.overflow = '';
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('focusin', handleFocusIn);
       triggerRef.current?.focus();
     };
   }, [isAuthModalOpen, closeAuthModal]);
+
+  // On open (and whenever the mode changes) land focus on the first field,
+  // falling back to the dialog itself if the current view has no field.
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const target = modalRef.current?.querySelector<HTMLElement>('input, textarea, select');
+    (target ?? modalRef.current)?.focus();
+  }, [isAuthModalOpen, mode]);
 
   if (!isAuthModalOpen) return null;
 
@@ -87,12 +112,9 @@ export default function AuthModal() {
           type="button"
           className={styles.closeBtn}
           onClick={closeAuthModal}
-          aria-label="Close sign in dialog"
+          aria-label={`Close ${title} dialog`}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M18 6L6 18" />
-            <path d="M6 6l12 12" />
-          </svg>
+          <CloseIcon size={18} />
         </button>
 
         <h2 className={styles.title} id="auth-modal-title">
