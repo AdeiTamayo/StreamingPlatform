@@ -132,6 +132,18 @@ export const watchedRepository = {
     }
   },
 
+  async getAllStrict(userId: string): Promise<WatchedRow[]> {
+    const { data } = await withRetry(async () => {
+      const res = await requireSupabase().from('watched')
+        .select('*')
+        .eq('user_id', userId)
+        .order('watched_at', { ascending: false });
+      if (res.error) throw res.error;
+      return res;
+    }, READ_RETRY);
+    return data ?? [];
+  },
+
   async clearShowHistory(userId: string, tmdbId: number): Promise<void> {
     try {
       await withRetry(async () => {

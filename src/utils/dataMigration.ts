@@ -16,6 +16,12 @@ import {
   PROGRESS_INDEX_KEY,
   SEARCH_HISTORY_MAX,
 } from '../api/storage';
+import { getPendingOperations } from './offlineQueue';
+import {
+  reconcileProgressToRemote,
+  reconcileWatchedToRemote,
+  reconcileWatchLaterToRemote,
+} from '../api/storage';
 
 // Per-user flag: a global flag skips the upload for a second account on the
 // same browser, silently losing that account's pre-login rows.
@@ -270,17 +276,25 @@ function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<
 }
 
 async function downloadSupabaseData(userId: string): Promise<void> {
+  // Strict fetches: null means failure/timeout so we can skip reconcile.
   const [watchedRows, wlRows, searchRows, progressRows] = await Promise.all([
-    watchedRepository.getAll(userId).catch(() => []),
-    watchLaterRepository.getAll(userId).catch(() => []),
+    watchedRepository.getAllStrict(userId).catch(() => null),
+    watchLaterRepository.getAllStrict(userId).catch(() => null),
     searchHistoryRepository.getAll(userId).catch(() => []),
-    withDeadline(progressRepository.getAll(userId).catch(() => []), PROGRESS_DOWNLOAD_TIMEOUT_MS, []),
+    withDeadline(progressRepository.getAllStrict(userId).catch(() => null), PROGRESS_DOWNLOAD_TIMEOUT_MS, null),
   ]);
 
-  if (watchedRows.length > 0) {
+  // Track remote keys for reconcile.
+  const remoteWatchedKeys = new Set<string>();
+  const remoteProgressKeys = new Set<string>();
+  const remoteWLItemKeys = new Set<string>();
+  const remoteWLEpisodeKeys = new Set<string>();
+
+  if (watchedRows && watchedRows.length > 0) {
     const watchedIndex: string[] = [];
     for (const row of watchedRows) {
       const key = watchedKey(row.media_type, row.tmdb_id, row.season, row.episode);
+      remoteWatchedKeys.add(key);
       if (!localStorage.getItem(key)) {
         setLocalWatchedKey(key, {
           type: row.media_type,
@@ -297,7 +311,7 @@ async function downloadSupabaseData(userId: string): Promise<void> {
     if (watchedIndex.length > 0) mergeIntoIndex(WATCHED_INDEX_KEY, 'watched:', watchedIndex);
   }
 
-  if (wlRows.length > 0) {
+  if (wlRows && wlRows.length > 0) {
     const existingItems = getLegacyWatchLaterRaw();
     const items = wlRows
       .filter((r) => r.season == null && r.episode == null)
@@ -312,6 +326,8 @@ async function downloadSupabaseData(userId: string): Promise<void> {
 
     const merged = [...existingItems];
     for (const item of items) {
+      const token = `${item.type}:${String(item.id)}`;
+      remoteWLItemKeys.add(token);
       const exists = merged.some((m) => m.type === item.type && String(m.id) === String(item.id));
       if (!exists) merged.push(item);
     }
@@ -320,6 +336,7 @@ async function downloadSupabaseData(userId: string): Promise<void> {
     for (const row of wlRows) {
       if (row.season != null && row.episode != null) {
         const key = `${EP_WL_PREFIX}${row.tmdb_id}-S${row.season}E${row.episode}`;
+        remoteWLEpisodeKeys.add(key);
         if (!localStorage.getItem(key)) {
           localStorage.setItem(key, JSON.stringify({
             showId: row.tmdb_id,
@@ -334,10 +351,11 @@ async function downloadSupabaseData(userId: string): Promise<void> {
     }
   }
 
-  if (progressRows.length > 0) {
+  if (progressRows && progressRows.length > 0) {
     const progressKeys: string[] = [];
     for (const row of progressRows) {
       const key = progressKey(row.media_type, row.tmdb_id, row.season, row.episode);
+      remoteProgressKeys.add(key);
       if (!localStorage.getItem(key)) {
         localStorage.setItem(key, JSON.stringify({
           type: row.media_type,
@@ -363,6 +381,20 @@ async function downloadSupabaseData(userId: string): Promise<void> {
       }
     }
     localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(merged.slice(0, SEARCH_HISTORY_MAX)));
+  }
+
+  // Remote-authoritative reconcile: drop local rows deleted on another device.
+  // Only when (a) the user's data has been migrated (flag set), (b) the fetch
+  // actually succeeded (rows !== null), and (c) there are no pending offline
+  // writes that could be stomped.
+  const migrated = localStorage.getItem(migrationFlagKey(userId)) === 'true';
+  const pending = getPendingOperations().some((op) =>
+    ['progress', 'watched', 'watch_later'].includes(op.table)
+  );
+  if (migrated && !pending) {
+    if (watchedRows) reconcileWatchedToRemote(remoteWatchedKeys);
+    if (progressRows) reconcileProgressToRemote(remoteProgressKeys);
+    if (wlRows) reconcileWatchLaterToRemote(remoteWLItemKeys, remoteWLEpisodeKeys);
   }
 }
 

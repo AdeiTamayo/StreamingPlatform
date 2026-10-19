@@ -273,6 +273,10 @@ export function getQueueSize(): number {
   return getQueue().length;
 }
 
+export function getPendingOperations(): QueuedOperation[] {
+  return getQueue();
+}
+
 export function clearOfflineQueue(): void {
   localStorage.removeItem(OFFLINE_QUEUE_KEY);
 }

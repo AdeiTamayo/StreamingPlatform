@@ -55,6 +55,18 @@ export const progressRepository = {
     }
   },
 
+  async getAllStrict(userId: string): Promise<ProgressRow[]> {
+    const { data } = await withRetry(async () => {
+      const res = await requireSupabase().from('progress')
+        .select('*')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+      if (res.error) throw res.error;
+      return res;
+    }, READ_RETRY);
+    return data ?? [];
+  },
+
   async remove(userId: string, mediaType: MediaType, tmdbId: number, season?: number | null, episode?: number | null): Promise<void> {
     try {
       await withRetry(async () => {

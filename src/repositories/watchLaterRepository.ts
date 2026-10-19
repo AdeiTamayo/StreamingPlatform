@@ -63,6 +63,18 @@ export const watchLaterRepository = {
     }
   },
 
+  async getAllStrict(userId: string): Promise<WatchLaterRow[]> {
+    const { data } = await withRetry(async () => {
+      const res = await requireSupabase().from('watch_later')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      if (res.error) throw res.error;
+      return res;
+    }, READ_RETRY);
+    return data ?? [];
+  },
+
   async removeEpisode(userId: string, tmdbId: number, season: number, episode: number): Promise<void> {
     try {
       await withRetry(async () => {

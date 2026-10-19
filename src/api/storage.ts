@@ -49,6 +49,17 @@ let currentUserId: string | null = null;
 const PROGRESS_REMOTE_SYNC_MS = 60_000;
 const progressRemoteSyncedAt = new Map<string, number>();
 
+// Keys written locally during this tab session. The sign-in reconcile treats
+// the cloud as authoritative for deletions (so removing something on another
+// device propagates here), but must never drop a row the user just created
+// locally while its upload is still in flight or parked in the offline queue.
+export const sessionModifiedKeys = {
+  progress: new Set<string>(),
+  watched: new Set<string>(),
+  watchLater: new Set<string>(),
+  episodeWatchLater: new Set<string>(),
+};
+
 export function setCurrentUserId(userId: string | null): void {
   currentUserId = userId;
   progressRemoteSyncedAt.clear();
@@ -189,6 +200,7 @@ export function isWatched(type: MediaType, id: string | number, season?: number 
 export function markWatched(type: MediaType, id: string | number, title: string, season?: number | null, episode?: number | null, meta?: Record<string, unknown>): void {
   const data: WatchedData = { type, id, title, season: season ?? undefined, episode: episode ?? undefined, watchedAt: Date.now(), ...(meta ? { meta } : {}) };
   const key = watchedKey(type, id, season, episode);
+  sessionModifiedKeys.watched.add(key);
   if (safeWrite(key, JSON.stringify(data))) {
     addToWatchedIndex(key);
   }
@@ -266,6 +278,7 @@ export function getSeriesWatchedShows(): Array<{ id: string; title: string; post
 export function markSeriesWatched(showId: string | number, showName: string, poster: string, source: 'explicit' | 'auto' = 'explicit'): void {
   const meta = { title: showName, poster, source };
   const key = watchedKey('tv', showId, null, null);
+  sessionModifiedKeys.watched.add(key);
   if (safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, watchedAt: Date.now(), meta }))) {
     addToWatchedIndex(key);
   }
@@ -372,6 +385,9 @@ export async function clearShowHistory(showId: string | number): Promise<void> {
 
   if (currentUserId) {
     await watchedRepository.clearShowHistory(currentUserId, Number(showId));
+    // Also drop the remote Continue Watching rows for the show, otherwise the
+    // next sync re-downloads them (as cloudOnly) and they reappear.
+    await progressRepository.clearShow(currentUserId, Number(showId));
   }
 }
 
@@ -396,6 +412,7 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
 export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>, duration?: number): void {
   const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(duration ? { duration } : {}), ...(meta ? { meta } : {}) };
   const key = progressKey(type, id, season, episode);
+  sessionModifiedKeys.progress.add(key);
   try {
     localStorage.setItem(key, JSON.stringify(data));
     addToProgressIndex(key);
@@ -456,6 +473,7 @@ export function addWatchLater(type: MediaType, id: string | number, title: strin
   const list = getWatchLater().filter((item: WatchLaterItem) => !(item.type === type && String(item.id) === String(id)));
   list.push({ type, id, title, year, poster, addedAt: Date.now() });
   safeWrite(WL_KEY, JSON.stringify(list));
+  sessionModifiedKeys.watchLater.add(`${type}:${String(id)}`);
 
   if (currentUserId && isSyncableId(id)) {
     watchLaterRepository.add({
@@ -607,6 +625,7 @@ function pruneEpisodeWatchLater(): void {
 
 export function addEpisodeWatchLater(showId: string | number, season: number, episode: number, showTitle: string): void {
   const key = `${EP_WL_PREFIX}${showId}-S${season}E${episode}`;
+  sessionModifiedKeys.episodeWatchLater.add(key);
   if (safeWrite(key, JSON.stringify({ showId, season, episode, showTitle, addedAt: Date.now() }))) {
     addToIndex(key, EP_WL_INDEX_KEY, EP_WL_PREFIX);
   }
@@ -662,6 +681,7 @@ export function markSeasonWatched(showId: string | number, seasonNumber: number,
   for (let i = 1; i <= episodeCount; i++) {
     const key = watchedKey('tv', showId, seasonNumber, i);
     if (localStorage.getItem(key)) continue;
+    sessionModifiedKeys.watched.add(key);
     if (!safeWrite(key, JSON.stringify({ type: 'tv', id: showId, title: showName, season: seasonNumber, episode: i, watchedAt: Date.now(), meta }))) {
       continue;
     }
@@ -751,7 +771,73 @@ export async function clearAllMoviesWatched(): Promise<void> {
 
   if (currentUserId) {
     await watchedRepository.clearAllMovies(currentUserId);
+    await progressRepository.clearAllMovies(currentUserId);
   }
+}
+
+// --- Sign-in reconcile helpers -------------------------------------------
+// Once a user's data has been uploaded, the cloud is authoritative for
+// deletions: a row removed on another device must disappear here too. These
+// helpers drop local keys the server snapshot no longer contains, while
+// protecting (a) keys written in this session (in-flight/queued uploads) and
+// (b) local-only keys whose id is not syncable (movie slugs).
+
+function isSyncableLocalId(id: string | number | null | undefined): boolean {
+  return id != null && Number.isFinite(Number(id));
+}
+
+export function reconcileProgressToRemote(remoteKeys: Set<string>): void {
+  const keep: string[] = [];
+  for (const k of getProgressIndex()) {
+    const parsed = parseProgressKey(k);
+    if (!parsed || !isSyncableLocalId(parsed.id) || remoteKeys.has(k) || sessionModifiedKeys.progress.has(k)) {
+      keep.push(k);
+      continue;
+    }
+    localStorage.removeItem(k);
+    progressRemoteSyncedAt.delete(k);
+  }
+  saveIndex(PROGRESS_INDEX_KEY, keep);
+}
+
+export function reconcileWatchedToRemote(remoteKeys: Set<string>): void {
+  const keep: string[] = [];
+  for (const k of getWatchedIndex()) {
+    const parsed = parseWatchedKey(k);
+    if (!parsed || !isSyncableLocalId(parsed.id) || remoteKeys.has(k) || sessionModifiedKeys.watched.has(k)) {
+      keep.push(k);
+      continue;
+    }
+    localStorage.removeItem(k);
+  }
+  saveIndex(WATCHED_INDEX_KEY, keep);
+}
+
+export function reconcileWatchLaterToRemote(remoteItemKeys: Set<string>, remoteEpisodeKeys: Set<string>): void {
+  const current = getWatchLater();
+  const kept = current.filter((item) => {
+    const token = `${item.type}:${String(item.id)}`;
+    return !isSyncableLocalId(item.id) || remoteItemKeys.has(token) || sessionModifiedKeys.watchLater.has(token);
+  });
+  if (kept.length !== current.length) safeWrite(WL_KEY, JSON.stringify(kept));
+
+  const keepEpisodes: string[] = [];
+  for (const k of getIndex(EP_WL_INDEX_KEY, EP_WL_PREFIX)) {
+    const rawId = k.slice(EP_WL_PREFIX.length).split('-S')[0];
+    if (!isSyncableLocalId(rawId) || remoteEpisodeKeys.has(k) || sessionModifiedKeys.episodeWatchLater.has(k)) {
+      keepEpisodes.push(k);
+      continue;
+    }
+    localStorage.removeItem(k);
+  }
+  saveIndex(EP_WL_INDEX_KEY, keepEpisodes);
+}
+
+function markIndicesAsSessionModified(): void {
+  for (const k of getWatchedIndex()) sessionModifiedKeys.watched.add(k);
+  for (const k of getProgressIndex()) sessionModifiedKeys.progress.add(k);
+  for (const item of getWatchLater()) sessionModifiedKeys.watchLater.add(`${item.type}:${String(item.id)}`);
+  for (const k of getIndex(EP_WL_INDEX_KEY, EP_WL_PREFIX)) sessionModifiedKeys.episodeWatchLater.add(k);
 }
 
 export function getSearchHistory(): string[] {
@@ -919,6 +1005,9 @@ export function importData(data: Record<string, unknown>, mode: 'merge' | 'repla
   // Imported watched/progress/epwl keys must be reflected in the indices or
   // they stay invisible to LastSeen/Stats/ContinueWatching.
   rebuildIndices();
+  // Imported rows are locally authoritative for this session so the sign-in
+  // reconcile cannot delete them before they are uploaded.
+  markIndicesAsSessionModified();
   return imported;
 }
 
@@ -965,7 +1054,7 @@ export function getStats(): Stats {
   return { moviesWatched, episodesWatched, seriesWatched, watchLaterCount: wl.length + epWl.length };
 }
 
-export function clearAllData(): void {
+export async function clearAllData(): Promise<void> {
   const keysToRemove: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -976,6 +1065,17 @@ export function clearAllData(): void {
   keysToRemove.forEach((k) => localStorage.removeItem(k));
   clearOfflineQueue();
   void clearTMDBCache();
+
+  // Mirror the wipe to the cloud, otherwise the next sign-in re-downloads
+  // everything and the user sees their "cleared" library reappear.
+  if (currentUserId) {
+    await Promise.all([
+      watchedRepository.clearAll(currentUserId),
+      watchLaterRepository.clearAll(currentUserId),
+      searchHistoryRepository.clearAll(currentUserId),
+      progressRepository.clearAll(currentUserId),
+    ]);
+  }
 }
 
 export function getVideoSource(): string {

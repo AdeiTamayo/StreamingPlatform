@@ -467,8 +467,10 @@ export default function LastSeen() {
                           <div className="media-card-info">
                             <h3>{show.title}</h3>
                             <span className="media-card-year">
-                              {show.episodes.length === 1 &&
-                              !show.episodes[0].season
+                              {show.episodes.some((e) => e.source === "progress")
+                                ? "Resume"
+                                : show.episodes.length === 1 &&
+                                  !show.episodes[0].season
                                 ? "Watched"
                                 : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
                             </span>
@@ -539,7 +541,10 @@ export default function LastSeen() {
                           </div>
                           <div className="media-card-info">
                             <h3>{item.title || `Movie ${item.id}`}</h3>
-                            {entry.year && (
+                            {item.source === "progress" && (
+                              <span className="media-card-year resume-badge">Resume</span>
+                            )}
+                            {entry.year && item.source !== "progress" && (
                               <span className="media-card-year">
                                 {entry.year}
                               </span>
