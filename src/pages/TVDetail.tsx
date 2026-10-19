@@ -14,6 +14,7 @@ import PersonList from '../components/PersonList';
 import MediaCarousel from '../components/MediaCarousel';
 import Duration from '../components/Duration';
 import DetailActions from '../components/DetailActions';
+import ViewModeToggle from '../components/ViewModeToggle';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { logDebug } from '../utils/logger';
@@ -67,6 +68,7 @@ export default function TVDetail() {
   const [watchedCount, setWatchedCount] = useState(0);
   const [watchedMap, setWatchedMap] = useState<Record<number, boolean>>({});
   const [episodes, setEpisodes] = useState<TMDBEpisode[]>([]);
+  const [episodesLoading, setEpisodesLoading] = useState(false);
   const [episodesError, setEpisodesError] = useState(false);
   const [episodeFetchTick, setEpisodeFetchTick] = useState(0);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -85,6 +87,13 @@ export default function TVDetail() {
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
+  // Last playback position reported by the embed - used to resume where the
+  // episode was left off after switching back from the trailer.
+  const lastTimeRef = useRef<number | null>(null);
+  // Mirrors playerOpen so the Back effect can tell whether a bare URL is a
+  // browser navigation (player was open) instead of the initial load.
+  const playerOpenRef = useRef(false);
+  const suppressUrlSyncRef = useRef(false);
   // Identifies the latest fetch so a superseded request's handlers (which can
   // settle after the effect for a new :id has started) never touch state -
   // otherwise the previous show is rendered under the new URL and its
@@ -103,6 +112,10 @@ export default function TVDetail() {
     }
     return map;
   }, [episodes]);
+  const currentEpisode = useMemo(
+    () => episodes.find((ep) => ep.episode_number === episode),
+    [episodes, episode],
+  );
   const seasonIdx = seasons.findIndex((s) => s.season_number === season);
   const hasPrev = episode > 1 || seasonIdx > 0;
   const hasNext = episodeCount > 0 && (episode < episodeCount || seasonIdx < seasons.length - 1);
@@ -188,25 +201,36 @@ export default function TVDetail() {
     if (!show || !id) return;
     const requestedSeason = Number(urlSeason);
     const requestedEpisode = Number(urlEpisode);
+    const targetSeason = seasons.find((s) => s.season_number === requestedSeason);
     const valid =
       Number.isInteger(requestedSeason) &&
       Number.isInteger(requestedEpisode) &&
       requestedSeason > 0 &&
       requestedEpisode > 0 &&
-      seasons.some((s) => s.season_number === requestedSeason);
+      !!targetSeason;
     if (!valid) return;
+    // A deep link past the end of the season would target a nonexistent
+    // episode - clamp it to the season's known episode count.
+    const maxEpisode = targetSeason?.episode_count || 0;
     setSeason(requestedSeason);
-    setEpisode(requestedEpisode);
+    setEpisode(maxEpisode > 0 ? Math.min(requestedEpisode, maxEpisode) : requestedEpisode);
     setPlayerOpen(true);
   }, [urlSeason, urlEpisode, show]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep the ref mirror in sync so the Back effect reads the latest value.
+  useEffect(() => {
+    playerOpenRef.current = playerOpen;
+  }, [playerOpen]);
 
   // Browser Back/Forward changes the URL without touching playerOpen, so
   // mirror it: landing on the bare /tv/{id} URL (no episode params) always
   // shows the episode list. This is why Back from an episode used to leave
-  // the player UI on screen.
+  // the player UI on screen. While the player was open the sync effect below
+  // would immediately re-add the params, so flag that one sync as suppressed.
   useEffect(() => {
     if (!show) return;
     if (Number(urlSeason) > 0 && Number(urlEpisode) > 0) return;
+    if (playerOpenRef.current) suppressUrlSyncRef.current = true;
     setPlayerOpen(false);
   }, [urlSeason, urlEpisode, show]);
 
@@ -217,6 +241,11 @@ export default function TVDetail() {
   // `replace` keeps Next/Prev from spamming history entries.
   useEffect(() => {
     if (!show || !playerOpen) return;
+    // Back cleared the params this commit - leave the bare URL alone.
+    if (suppressUrlSyncRef.current) {
+      suppressUrlSyncRef.current = false;
+      return;
+    }
     const next = new URLSearchParams(searchParams);
     if (next.get('season') === String(season) && next.get('episode') === String(episode)) return;
     next.set('season', String(season));
@@ -239,6 +268,8 @@ export default function TVDetail() {
     let cancelled = false;
     getImdbRating(imdbId, 'series').then((r) => {
       if (!cancelled) setImdbRating(r);
+    }).catch(() => {
+      if (!cancelled) setImdbRating(null);
     });
     return () => { cancelled = true; };
   }, [imdbId]);
@@ -430,6 +461,11 @@ export default function TVDetail() {
   useEffect(() => {
     if (!id || seasons.length === 0) return;
     setEpisodesError(false);
+    // Never keep the previous season's episodes around while the new one
+    // loads - names and ratings are derived from them.
+    setEpisodes([]);
+    setEpImdbRatings({});
+    setEpisodesLoading(true);
     const controller = new AbortController();
     getSeasonDetails(id, season, controller.signal)
       .then((data) => {
@@ -437,6 +473,9 @@ export default function TVDetail() {
       })
       .catch((err: Error) => {
         if (err?.name !== 'AbortError') setEpisodesError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setEpisodesLoading(false);
       });
     return () => controller.abort();
   }, [id, season, seasons.length, episodeFetchTick]);
@@ -578,12 +617,12 @@ export default function TVDetail() {
   }
 
   function handleProgress(currentTime: number, duration: number) {
+    lastTimeRef.current = currentTime;
     if (watchedRef.current || !show || !id) return;
-    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: episodes.find((item) => item.episode_number === episode)?.name }, duration || undefined);
+    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: currentEpisode?.name }, duration || undefined);
 
     // Runtime estimate: real duration when the embed reports one, else TMDB
     // metadata for the current episode/series.
-    const currentEpisode = episodes.find((item) => item.episode_number === episode);
     const tmdbRuntime = currentEpisode?.runtime || show?.episode_run_time?.[0] || null;
     const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
 
@@ -682,6 +721,7 @@ export default function TVDetail() {
   }, [id, season, episode]);
 
   function goPrev() {
+    markCurrentWatched();
     if (episode > 1) {
       setEpisode(episode - 1);
     } else if (seasonIdx > 0) {
@@ -708,6 +748,16 @@ export default function TVDetail() {
       setSeason(seasons[seasonIdx + 1].season_number);
       setEpisode(1);
     }
+  }
+
+  function switchMode(next: 'trailer' | 'player') {
+    // Returning from the trailer: resume the episode where it was left off
+    // instead of restarting at 0:00.
+    if (next === 'player' && showTrailer && lastTimeRef.current != null) {
+      setStartAt(lastTimeRef.current);
+      setRestartTick((t) => t + 1);
+    }
+    setShowTrailer(next === 'trailer');
   }
 
   function retry() {
@@ -802,18 +852,23 @@ export default function TVDetail() {
             <div className="detail-badges">
               {imdbId ? (
                 <a
-                  className="badge rating"
+                  className={`${styles.detailRating} badge rating rating-imdb`}
                   href={`https://www.imdb.com/title/${imdbId}/`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}` : 'Open on IMDb'}
+                  aria-label={imdbRating ? `IMDb rating ${imdbRating.rating} out of 10${imdbRating.votes ? `, ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{imdbRating ? imdbRating.rating : show.vote_average.toFixed(1)}</span>
                   {imdbRating?.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
               ) : show.vote_average != null ? (
-                <span className="badge rating">
+                <span
+                  className={`${styles.detailRating} badge rating rating-tmdb`}
+                  title={`TMDB rating ${show.vote_average.toFixed(1)}/10${show.vote_count ? ` \u00b7 ${formatVotes(String(show.vote_count))} votes` : ''}`}
+                  aria-label={`TMDB rating ${show.vote_average.toFixed(1)} out of 10${show.vote_count ? `, ${show.vote_count} votes` : ''}`}
+                >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{show.vote_average.toFixed(1)}</span>
                 </span>
@@ -822,18 +877,19 @@ export default function TVDetail() {
                 <span className="detail-meta-line">{metaNodes}</span>
               )}
             </div>
-            <DetailActions
-              inList={inWL}
-              watched={seriesWatched}
-              onToggleList={() => {
-                if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
-                else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
-              }}
-              onToggleWatched={toggleSeriesWatched}
-              shareTitle={show.name}
-              onToggleTrailer={trailerKey ? () => { setPlayerOpen(true); setShowTrailer((s: boolean) => !s); } : undefined}
-              trailerActive={showTrailer}
-            />
+            <div className={styles.headerActions}>
+              <DetailActions
+                inList={inWL}
+                watched={seriesWatched}
+                onToggleList={() => {
+                  if (inWL) { removeWatchLater('tv', safeId); setInWL(false); toast?.('Removed from Watch Later'); }
+                  else { addWatchLater('tv', safeId, show.name, year, imageUrl(show.poster_path)); setInWL(true); toast?.('Added to Watch Later'); }
+                }}
+                onToggleWatched={toggleSeriesWatched}
+                shareTitle={show.name}
+                onToggleTrailer={trailerKey && !playerOpen ? () => { setPlayerOpen(true); setShowTrailer(true); } : undefined}
+              />
+            </div>
             <p className="detail-overview">{show.overview}</p>
             {cast.length > 0 && (
               <div className="detail-cast"><strong>Cast:</strong> <PersonList people={cast} /></div>
@@ -852,19 +908,24 @@ export default function TVDetail() {
         <section className="section" aria-labelledby="watch-heading-tv">
           <div className={styles.watchHeader}>
             <h2 id="watch-heading-tv" className="section-title">Watch Now</h2>
-            {epImdbId ? (
-              <a
-                className="badge rating"
-                href={`https://www.imdb.com/title/${epImdbId}/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={epImdbRating ? `IMDb ${epImdbRating.rating}/10${epImdbRating.votes ? ` \u00b7 ${epImdbRating.votes} votes` : ''}` : 'Open this episode on IMDb'}
-              >
-                IMDb{epImdbRating ? ` ${epImdbRating.rating}` : ''}
-              </a>
-            ) : (episodes.find((ep) => ep.episode_number === episode)?.vote_average ?? 0) > 0 ? (
-              <span className="badge rating">TMDB {episodes.find((ep) => ep.episode_number === episode)!.vote_average.toFixed(1)}</span>
-            ) : null}
+            <div className={styles.watchHeaderActions}>
+              {epImdbId ? (
+                <a
+                  className="badge rating rating-imdb"
+                  href={`https://www.imdb.com/title/${epImdbId}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={epImdbRating ? `IMDb ${epImdbRating.rating}/10${epImdbRating.votes ? ` \u00b7 ${epImdbRating.votes} votes` : ''}` : 'Open this episode on IMDb'}
+                >
+                  IMDb{epImdbRating ? ` ${epImdbRating.rating}` : ''}
+                </a>
+              ) : currentEpisode && currentEpisode.vote_average > 0 ? (
+                <span className="badge rating rating-tmdb">TMDB {currentEpisode.vote_average.toFixed(1)}</span>
+              ) : null}
+              {trailerKey && (
+                <ViewModeToggle mode={showTrailer ? 'trailer' : 'player'} onChange={switchMode} />
+              )}
+            </div>
           </div>
           {showTrailer && trailerKey ? (
             <div className="trailer-wrapper">
@@ -884,11 +945,12 @@ export default function TVDetail() {
                 title={`${show.name} S${season}E${episode}`}
                 onProgress={handleProgress}
                 onEnded={handleEnded}
-                runtimeMinutes={episodes.find((item) => item.episode_number === episode)?.runtime || show.episode_run_time?.[0] || null}
+                runtimeMinutes={currentEpisode?.runtime || show.episode_run_time?.[0] || null}
                 startAt={startAt ?? undefined}
               />
             </div>
           )}
+          {!showTrailer && (
           <div className={styles.epNav}>
             <div className={styles.epNavStart}>
               <Link
@@ -947,13 +1009,7 @@ export default function TVDetail() {
               />
             </div>
           </div>
-          <div className={`${styles.seasonProgress} ${styles.hidden}`}>
-            <div className={styles.spBar} role="list" aria-label="Episode progress">
-              {episodeNums.map((ep) => (
-                <EpisodeDot key={ep} ep={ep} name={episodeNames.get(ep)} current={ep === episode} done={watchedMap[ep]} onClick={setEpisode} />
-              ))}
-            </div>
-          </div>
+          )}
         </section>
       ) : (
         <section className="section" aria-labelledby="episodes-heading">
@@ -1027,9 +1083,9 @@ export default function TVDetail() {
                           {ep.air_date && <span>{ep.air_date}</span>}
                           {ep.runtime && <span> &middot; {ep.runtime}m</span>}
                           {epImdbRatings[ep.episode_number] != null ? (
-                            <span> &middot; IMDb {epImdbRatings[ep.episode_number]?.rating}</span>
+                            <>{' \u00b7 '}<span className="badge rating rating-imdb">IMDb {epImdbRatings[ep.episode_number]?.rating}</span></>
                           ) : ep.vote_average > 0 ? (
-                            <span title={`TMDB rating ${ep.vote_average.toFixed(1)}/10`}> &middot; TMDB {ep.vote_average.toFixed(1)}</span>
+                            <>{' \u00b7 '}<span className="badge rating rating-tmdb" title={`TMDB rating ${ep.vote_average.toFixed(1)}/10`}>TMDB {ep.vote_average.toFixed(1)}</span></>
                           ) : null}
                         </div>
                         {ep.overview && <div className={styles.epOverview}>{ep.overview}</div>}
@@ -1044,7 +1100,7 @@ export default function TVDetail() {
                           aria-label={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
                           aria-pressed={isW}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
                         </button>
                         <button
                           type="button"
@@ -1054,14 +1110,18 @@ export default function TVDetail() {
                           aria-label={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
                           aria-pressed={isWL}
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
                         </button>
                       </span>
                     </div>
                     );
                   })}
                 </div>
-              ) : null}
+              ) : episodesLoading ? (
+                <div className="loading" role="status">Loading episodes...</div>
+              ) : (
+                <div className="loading">No episodes available.</div>
+              )}
             </>
           )}
         </section>

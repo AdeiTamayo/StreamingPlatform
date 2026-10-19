@@ -47,3 +47,61 @@
   background: rgba(255, 255, 255, 0.1);
   color: var(--text);
 }
+
+.header-actions :global(.detail-action-pill) {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  min-height: 42px;
+}
+
+.header-actions :global(.detail-action-icon) {
+  min-height: 42px;
+  min-width: 42px;
+}
+
+.header-actions :global(.detail-action-pill):focus-visible,
+.header-actions :global(.detail-action-icon):focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
+.header-actions :global(.detail-action-pill.active-saved) {
+  color: var(--gold-text);
+  background: rgba(245, 197, 24, 0.16);
+  border-color: rgba(245, 197, 24, 0.45);
+}
+
+.header-actions :global(.detail-action-pill.active-saved:hover) {
+  background: rgba(245, 197, 24, 0.24);
+}
+
+:global(.badge.rating.rating-imdb) {
+  color: #f5c518;
+}
+
+:global(.badge.rating.rating-tmdb) {
+  color: #fde047;
+}
+
+/* Detail header rating: inline star + value, no pill. */
+.detail-rating:global(.badge.rating) {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.detail-rating svg {
+  width: 11px;
+  height: 11px;
+}
+
+.detail-rating :global(.rating-votes) {
+  display: none;
+}
