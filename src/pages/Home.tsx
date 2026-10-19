@@ -4,6 +4,7 @@ import { getTrending, getPopularMovies, getPopularTV, getMovieGenres, getTVGenre
 import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../api/omdb';
 import MediaCard from '../components/MediaCard';
 import MediaCarousel from '../components/MediaCarousel';
+import CollectionSkeleton from '../components/CollectionSkeleton';
 import { getContinueWatching, clearProgress } from '../api/storage';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
@@ -78,6 +79,42 @@ function buildHighlights(
   });
 }
 
+function GenreCarousel({
+  highlights,
+  to,
+  headingId,
+  label,
+}: {
+  highlights: GenreHighlight[];
+  to: string;
+  headingId: string;
+  label: string;
+}) {
+  return (
+    <MediaCarousel className="genre-carousel" label={label} labelledBy={headingId}>
+      {highlights.map((g) => (
+        <Link
+          key={`${to}-${g.id}`}
+          to={`${to}?genre=${g.id}`}
+          className={styles.genreTile}
+          style={g.backdrop ? { backgroundImage: `url(${imageUrl(g.backdrop, 'w500')})` } : undefined}
+        >
+          <span className={styles.genreTileName}>{g.name}</span>
+          {g.title && <span className={styles.genreTileExample}>{g.title}</span>}
+        </Link>
+      ))}
+    </MediaCarousel>
+  );
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
 function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onRemove: (item: ContinueWatchingItem) => void; onRestart: (item: ContinueWatchingItem) => void }) {
   const label = (item.meta?.title as string) || `${item.type === 'movie' ? 'Movie' : 'Show'} ${item.id}`;
   const poster = item.meta?.poster as string | undefined;
@@ -86,7 +123,7 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
   const metaRuntime = (item.meta?.runtime as number) || null;
   const defaultRuntime = item.type === 'movie' ? 7200 : 2700;
   const runtimeSeconds = metaRuntime ? metaRuntime * 60 : defaultRuntime;
-  const pct = item.currentTime ? Math.min(99, Math.round((item.currentTime / runtimeSeconds) * 100)) : null;
+  const pct = !item.cloudOnly && item.currentTime > 0 ? Math.min(99, Math.round((item.currentTime / runtimeSeconds) * 100)) : null;
   const playTo = `/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`;
   const typeLabel = item.type === 'tv'
     ? `Series${item.season ? ` \u00b7 S${item.season}E${item.episode}` : ''}`
@@ -107,7 +144,14 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
           </span>
         </div>
         {pct !== null && (
-          <div className={styles.cwCardBar}>
+          <div
+            className={styles.cwCardBar}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={pct}
+            aria-label={`${label} progress`}
+          >
             <div className={styles.cwCardBarFill} style={{ width: `${pct}%` }} />
           </div>
         )}
@@ -129,7 +173,7 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
         </Link>
-        <button className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove from Continue Watching" aria-label={`Remove ${label} from Continue Watching`}>
+        <button type="button" className={styles.cwRemove} onClick={() => onRemove(item)} title="Remove from Continue Watching" aria-label={`Remove ${label} from Continue Watching`}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><line x1="5" y1="5" x2="19" y2="19" /><line x1="19" y1="5" x2="5" y2="19" /></svg>
         </button>
       </div>
@@ -142,9 +186,6 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [trendingType, setTrendingType] = useState<TrendingType>('all');
-  const [trendingItems, setTrendingItems] = useState<(TMDBMovie | TMDBSeries)[]>([]);
-  const [trendingLoading, setTrendingLoading] = useState(true);
-  const [trendingError, setTrendingError] = useState(false);
   const [movieGenres, setMovieGenres] = useState<TMDBGenre[]>([]);
   const [tvGenres, setTvGenres] = useState<TMDBGenre[]>([]);
   const [movieHighlights, setMovieHighlights] = useState<GenreHighlight[]>(MOVIE_GENRE_HIGHLIGHTS.map((g) => ({ ...g, backdrop: null, title: '' })));
@@ -159,26 +200,9 @@ export default function Home() {
   const { isAuthenticated, syncVersion } = useAuth();
 
   useEffect(() => {
-    document.title = 'StreamFlow';
+    document.title = 'Home - StreamFlow';
     setContinueWatching(getContinueWatching());
-    setLoading(true);
-    setError(false);
     const signal = getSignal();
-    getTrending('all', 1, signal)
-      .then((data) => {
-        if (signal.aborted) return;
-        setTrending((data as { results: (TMDBMovie | TMDBSeries)[] }).results || []);
-      })
-      .catch((err) => {
-        // Aborts (unmount or a re-fetch replacing this one) are not user-
-        // visible failures - the page is gone or a newer request owns state.
-        if (signal.aborted || (err as Error)?.name === 'AbortError') return;
-        setError(true);
-        toast?.('Failed to load trending');
-      })
-      .finally(() => {
-        if (!signal.aborted) setLoading(false);
-      });
     getMovieGenres(signal)
       .then((data) => setMovieGenres((data as { genres?: TMDBGenre[] })?.genres || []))
       .catch(() => {});
@@ -219,7 +243,7 @@ export default function Home() {
   // list length: using raw `trending.length` walked past the filtered list
   // (people removed) and blanked the hero for a full 6s tick.
   useEffect(() => {
-    if (heroItems.length < 2 || heroPaused) return;
+    if (heroItems.length < 2 || heroPaused || prefersReducedMotion()) return;
     const timer = setInterval(() => {
       setHeroIdx((i) => (i + 1) % heroItems.length);
     }, 6000);
@@ -236,12 +260,14 @@ export default function Home() {
   const heroFacts = [heroYear, heroType, heroGenreNames].filter(Boolean).join(' \u00b7 ');
 
   // IMDb rating for the current hero slide via OMDb, falling back to the
-  // TMDB vote average while (or if) no IMDb rating is available.
+  // TMDB vote average while (or if) no IMDb rating is available. The rating is
+  // cleared before each lookup so a previous slide's value can never linger.
   useEffect(() => {
     if (!hero) {
       setHeroImdbRating(null);
       return;
     }
+    setHeroImdbRating(null);
     const peek = peekOmdbRatingByTmdb(hero.id);
     if (peek.state !== 'fresh') {
       setHeroImdbRating(peek.rating);
@@ -253,30 +279,40 @@ export default function Home() {
       ? ((hero as TMDBMovie).release_date || '').slice(0, 4)
       : (hero as TMDBSeries).first_air_date?.slice(0, 4) || '';
     let cancelled = false;
-    getOmdbRatingByTitle(hero.id, title, year, isMovie ? 'movie' : 'series').then((r) => {
-      if (!cancelled) setHeroImdbRating(r);
-    });
+    getOmdbRatingByTitle(hero.id, title, year, isMovie ? 'movie' : 'series')
+      .then((r) => {
+        if (!cancelled) setHeroImdbRating(r);
+      })
+      .catch(() => {
+        if (!cancelled) setHeroImdbRating(null);
+      });
     return () => { cancelled = true; };
   }, [hero]);
 
-  // Trending grid: independent of the hero so switching type never disturbs
-  // the hero carousel.
+  // Single source for trending: the same results feed the hero rotation and
+  // the grid, so switching type never duplicates a request or splits the
+  // error/loading state in two.
   useEffect(() => {
     const controller = new AbortController();
     let cancelled = false;
-    setTrendingLoading(true);
-    setTrendingError(false);
+    setLoading(true);
+    setError(false);
     (async () => {
       try {
         const data = await getTrending(trendingType, 1, controller.signal) as { results?: (TMDBMovie | TMDBSeries)[] };
-        if (!cancelled) setTrendingItems(data.results || []);
+        if (!cancelled) setTrending(data.results || []);
       } catch (err) {
-        if (!cancelled && (err as Error)?.name !== 'AbortError') setTrendingError(true);
+        // Aborts (unmount or a re-fetch replacing this one) are not user-
+        // visible failures - the page is gone or a newer request owns state.
+        if (cancelled || (err as Error)?.name === 'AbortError') return;
+        setError(true);
+        toast?.('Failed to load trending');
       } finally {
-        if (!cancelled) setTrendingLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; controller.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trendingType]);
 
   function handleRemoveCW(item: ContinueWatchingItem) {
@@ -356,7 +392,7 @@ export default function Home() {
             <div className={styles.heroMeta}>
               {heroImdbRating ? (
                 <span
-                  className="badge rating"
+                  className={`badge rating rating-imdb ${styles.heroRating}`}
                   title={`IMDb ${heroImdbRating.rating}/10${heroImdbRating.votes ? ` \u00b7 ${heroImdbRating.votes} votes` : ''}${heroImdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${heroImdbRating.tomatoes}` : ''}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
@@ -364,9 +400,13 @@ export default function Home() {
                   {heroImdbRating.votes && <span className="rating-votes">({formatVotes(heroImdbRating.votes)})</span>}
                 </span>
               ) : hero.vote_average > 0 ? (
-                <span className="badge rating" title={`TMDB rating ${hero.vote_average.toFixed(1)}/10`}>
+                <span
+                  className={`badge rating rating-tmdb ${styles.heroRating}`}
+                  title={`TMDB rating ${hero.vote_average.toFixed(1)}/10${hero.vote_count ? ` \u00b7 ${hero.vote_count} votes` : ''}`}
+                >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{hero.vote_average.toFixed(1)}</span>
+                  {!!hero.vote_count && <span className="rating-votes">({formatVotes(String(hero.vote_count))})</span>}
                 </span>
               ) : null}
               {heroFacts && <span className={styles.heroFacts}>{heroFacts}</span>}
@@ -380,10 +420,11 @@ export default function Home() {
                 &#9654; Play
               </Link>
             </div>
-            <div className={styles.heroDots} aria-label="Featured items">
+            <div className={styles.heroDots} role="group" aria-label="Featured items">
               {heroItems.map((_, i) => (
                 <button
                   key={i}
+                  type="button"
                   aria-pressed={i === activeHeroIdx}
                   className={`${styles.heroDot} ${i === activeHeroIdx ? styles.active : ''}`}
                   onClick={() => setHeroIdx(i)}
@@ -396,15 +437,16 @@ export default function Home() {
       </section>
 
       {continueWatching.length > 0 && (
-        <section className="section">
+        <section className="section" aria-labelledby="continue-heading">
           <div className="section-header">
-            <h2 className="section-title">Continue Watching</h2>
-            <div className={styles.cwToggles} aria-label="Filter by type">
+            <h2 id="continue-heading" className="section-title">Continue Watching</h2>
+            <div className={styles.filterTabs} aria-label="Filter by type">
               {CW_TABS.map((t) => (
                 <button
                   key={t.key}
+                  type="button"
                   aria-pressed={cwFilter === t.key}
-                  className={`${styles.cwToggle} ${cwFilter === t.key ? styles.active : ''}`}
+                  className={`${styles.filterTab} ${cwFilter === t.key ? styles.active : ''}`}
                   onClick={() => setCwFilter(t.key)}
                 >
                   {t.label}
@@ -413,11 +455,19 @@ export default function Home() {
             </div>
           </div>
           {filteredCW.length > 0 ? (
-            <div className={styles.cwGrid}>
-              {filteredCW.map((item, i) => (
-                <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} onRestart={handleRestartCW} />
-              ))}
-            </div>
+            filteredCW.length > 1 ? (
+              <MediaCarousel className="cw-carousel" label="Continue Watching" labelledBy="continue-heading">
+                {filteredCW.map((item, i) => (
+                  <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} onRestart={handleRestartCW} />
+                ))}
+              </MediaCarousel>
+            ) : (
+              <div className={styles.cwGrid}>
+                {filteredCW.map((item, i) => (
+                  <CwCard key={`${item.type}-${item.id}-${item.episode || ''}-${i}`} item={item} onRemove={handleRemoveCW} onRestart={handleRestartCW} />
+                ))}
+              </div>
+            )
           ) : (
             <div className={styles.cwEmpty}>Nothing in this category</div>
           )}
@@ -427,12 +477,13 @@ export default function Home() {
       <section className="section" aria-labelledby="trending-heading">
         <div className="section-header">
           <h2 id="trending-heading" className="section-title">Trending This Week</h2>
-          <div className={styles.cwToggles} aria-label="Filter trending by type">
+          <div className={styles.filterTabs} aria-label="Filter trending by type">
             {TRENDING_TABS.map((t) => (
               <button
                 key={t.key}
+                type="button"
                 aria-pressed={trendingType === t.key}
-                className={`${styles.cwToggle} ${trendingType === t.key ? styles.active : ''}`}
+                className={`${styles.filterTab} ${trendingType === t.key ? styles.active : ''}`}
                 onClick={() => setTrendingType(t.key)}
               >
                 {t.label}
@@ -440,51 +491,43 @@ export default function Home() {
             ))}
           </div>
         </div>
-        {trendingLoading ? (
-          <div className="loading" role="status">Loading...</div>
-        ) : (trendingError || error) ? (
-          <div className="loading" role="alert">Failed to load trending. Check your connection.</div>
+        {loading ? (
+          <CollectionSkeleton variant="grid" count={12} />
+        ) : error ? (
+          <div className="empty-state" role="alert">
+            <h3>Couldn’t load trending</h3>
+            <p>Check your connection, then refresh the page.</p>
+          </div>
+        ) : playableTrending.length === 0 ? (
+          <div className="empty-state" role="status">
+            <h3>No trending titles right now</h3>
+            <p>Try a different filter or come back a little later.</p>
+          </div>
         ) : (
           <div className="media-grid">
-            {trendingItems
-              .filter((item) => (item as { media_type?: string }).media_type !== 'person')
-              .map((item) => (
-                <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
-              ))}
+            {playableTrending.map((item) => (
+              <MediaCard key={`${item.media_type}-${item.id}`} item={item} />
+            ))}
           </div>
         )}
       </section>
 
       <section className="section" aria-labelledby="genres-heading">
         <h2 id="genres-heading" className="section-title">Browse by genre</h2>
-        <h3 className="sub-section-title">Movies</h3>
-        <MediaCarousel className="genre-carousel">
-          {movieHighlights.map((g) => (
-            <Link
-              key={`movie-${g.id}`}
-              to={`/movies?genre=${g.id}`}
-              className={styles.genreTile}
-              style={g.backdrop ? { backgroundImage: `url(${imageUrl(g.backdrop, 'w500')})` } : undefined}
-            >
-              <span className={styles.genreTileName}>{g.name}</span>
-              {g.title && <span className={styles.genreTileExample}>{g.title}</span>}
-            </Link>
-          ))}
-        </MediaCarousel>
-        <h3 className="sub-section-title">TV Shows</h3>
-        <MediaCarousel className="genre-carousel">
-          {tvHighlights.map((g) => (
-            <Link
-              key={`tv-${g.id}`}
-              to={`/tv?genre=${g.id}`}
-              className={styles.genreTile}
-              style={g.backdrop ? { backgroundImage: `url(${imageUrl(g.backdrop, 'w500')})` } : undefined}
-            >
-              <span className={styles.genreTileName}>{g.name}</span>
-              {g.title && <span className={styles.genreTileExample}>{g.title}</span>}
-            </Link>
-          ))}
-        </MediaCarousel>
+        <h3 id="genres-movies-heading" className="sub-section-title">Movies</h3>
+        <GenreCarousel
+          highlights={movieHighlights}
+          to="/movies"
+          headingId="genres-movies-heading"
+          label="movie genres"
+        />
+        <h3 id="genres-tv-heading" className="sub-section-title">TV Shows</h3>
+        <GenreCarousel
+          highlights={tvHighlights}
+          to="/tv"
+          headingId="genres-tv-heading"
+          label="TV genres"
+        />
       </section>
     </div>
   );
