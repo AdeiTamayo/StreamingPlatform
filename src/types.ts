@@ -229,6 +229,7 @@ export interface ProgressData {
   episode?: number;
   duration?: number;
   meta?: Record<string, unknown>;
+  cloudOnly?: boolean;
 }
 
 export interface WatchedData {
@@ -262,6 +263,7 @@ export interface ContinueWatchingItem {
   currentTime: number;
   savedAt: number;
   meta?: Record<string, unknown> | null;
+  cloudOnly?: boolean;
 }
 
 export interface CalendarItem {

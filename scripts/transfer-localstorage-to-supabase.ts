@@ -125,7 +125,45 @@ async function main() {
   }
   console.log('Watched items transferred:', watchedIndex.length);
 
-  // Playback progress is local-only (no Supabase table) - skipped.
+  // Sync continue-watching metadata (media identity only, never playback time)
+  let progressCount = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('progress:')) continue;
+    try {
+      const data = JSON.parse(localStorage.getItem(key) || '{}');
+      const meta = data.meta || {};
+      const m_tv = key.match(/^progress:tv-(\\d+)-S(\\d+)E(\\d+)$/);
+      const m_movie = key.match(/^progress:movie-(.+)$/);
+      let row = null;
+      if (m_tv) {
+        row = {
+          user_id: userId, media_type: 'tv', tmdb_id: Number(m_tv[1]),
+          title: meta.title || data.title || '', poster: meta.poster || null,
+          season: Number(m_tv[2]), episode: Number(m_tv[3]),
+        };
+      } else if (m_movie) {
+        const tmdbId = Number(m_movie[1]);
+        if (!Number.isFinite(tmdbId)) { console.error('Progress error: non-numeric movie id', key); continue; }
+        row = {
+          user_id: userId, media_type: 'movie', tmdb_id: tmdbId,
+          title: meta.title || data.title || '', poster: meta.poster || null,
+          season: null, episode: null,
+        };
+      }
+      if (!row) continue;
+      let del = supabase.from('progress').delete()
+        .eq('user_id', userId).eq('media_type', row.media_type).eq('tmdb_id', row.tmdb_id);
+      del = row.season == null ? del.is('season', null) : del.eq('season', row.season);
+      del = row.episode == null ? del.is('episode', null) : del.eq('episode', row.episode);
+      const { error: delError } = await del;
+      if (delError) throw delError;
+      const { error } = await supabase.from('progress').insert(row);
+      if (error) throw error;
+      progressCount++;
+    } catch (e) { console.error('Progress error:', key, e); }
+  }
+  console.log('Progress items transferred:', progressCount);
 
   // Sync regular watch later (plain inserts; 23505 = already there, skipped)
   const wlItems = JSON.parse(localStorage.getItem('watchlater') || '[]');

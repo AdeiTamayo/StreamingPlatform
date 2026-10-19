@@ -1,16 +1,19 @@
 import type { MediaType } from '../types';
-import type { WatchedInsert } from '../types/database';
+import type { WatchedInsert, ProgressInsert } from '../types/database';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
+import { progressRepository } from '../repositories/progressRepository';
 import { logError } from './logger';
 import {
   watchedKey,
+  progressKey,
   WL_KEY,
   EP_WL_PREFIX,
   EP_WL_INDEX_KEY,
   SEARCH_HISTORY_KEY,
   WATCHED_INDEX_KEY,
+  PROGRESS_INDEX_KEY,
   SEARCH_HISTORY_MAX,
 } from '../api/storage';
 
@@ -84,6 +87,47 @@ function getLegacyWatched(): WatchedInsert[] {
     } catch {
       // Skip corrupt entries
     }
+  }
+  return items;
+}
+
+function getLegacyProgress(): ProgressInsert[] {
+  const items: ProgressInsert[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k || !k.startsWith('progress:')) continue;
+    try {
+      const data = JSON.parse(localStorage.getItem(k) || '{}');
+      const meta = (data.meta || {}) as Record<string, unknown>;
+      const title = (meta.title as string) || (data.title as string) || '';
+      const poster = typeof meta.poster === 'string' ? meta.poster : null;
+      const m = k.match(/^progress:tv-(\d+)-S(\d+)E(\d+)$/);
+      if (m) {
+        items.push({
+          user_id: '',
+          media_type: 'tv',
+          tmdb_id: Number(m[1]),
+          title,
+          poster,
+          season: Number(m[2]),
+          episode: Number(m[3]),
+        });
+      } else {
+        const mm = k.match(/^progress:movie-(.+)$/);
+        if (!mm) continue;
+        const tmdbId = finiteTmdbId(mm[1]);
+        if (tmdbId == null) continue;
+        items.push({
+          user_id: '',
+          media_type: 'movie',
+          tmdb_id: tmdbId,
+          title,
+          poster,
+          season: null,
+          episode: null,
+        });
+      }
+    } catch {}
   }
   return items;
 }
@@ -213,11 +257,24 @@ function mergeIntoIndex(indexKey: string, prefix: string, newKeys: string[]): vo
 // overwrite entries created locally while signed out. Each section writes
 // only what is missing locally, then merges the indices.
 
+const PROGRESS_DOWNLOAD_TIMEOUT_MS = 1200;
+
+function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(fallback); },
+    );
+  });
+}
+
 async function downloadSupabaseData(userId: string): Promise<void> {
-  const [watchedRows, wlRows, searchRows] = await Promise.all([
+  const [watchedRows, wlRows, searchRows, progressRows] = await Promise.all([
     watchedRepository.getAll(userId).catch(() => []),
     watchLaterRepository.getAll(userId).catch(() => []),
     searchHistoryRepository.getAll(userId).catch(() => []),
+    withDeadline(progressRepository.getAll(userId).catch(() => []), PROGRESS_DOWNLOAD_TIMEOUT_MS, []),
   ]);
 
   if (watchedRows.length > 0) {
@@ -275,6 +332,27 @@ async function downloadSupabaseData(userId: string): Promise<void> {
         }
       }
     }
+  }
+
+  if (progressRows.length > 0) {
+    const progressKeys: string[] = [];
+    for (const row of progressRows) {
+      const key = progressKey(row.media_type, row.tmdb_id, row.season, row.episode);
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, JSON.stringify({
+          type: row.media_type,
+          id: row.tmdb_id,
+          currentTime: 0,
+          savedAt: new Date(row.updated_at).getTime(),
+          season: row.season ?? undefined,
+          episode: row.episode ?? undefined,
+          meta: { title: row.title, poster: row.poster },
+          cloudOnly: true,
+        }));
+        progressKeys.push(key);
+      }
+    }
+    if (progressKeys.length > 0) mergeIntoIndex(PROGRESS_INDEX_KEY, 'progress:', progressKeys);
   }
 
   if (searchRows.length > 0) {
@@ -361,6 +439,20 @@ export const dataMigration = {
       } catch (err) {
         failed = true;
         logError('dataMigration.watched', err);
+      }
+    }
+
+    const progressItems = getLegacyProgress();
+    if (progressItems.length > 0) {
+      hasData = true;
+      try {
+        for (const item of progressItems) {
+          const result = await progressRepository.save({ ...item, user_id: userId });
+          if (result?.queued) failed = true;
+        }
+      } catch (err) {
+        failed = true;
+        logError('dataMigration.progress', err);
       }
     }
 

@@ -3,6 +3,7 @@ import { getTMDBCacheSize, clearTMDBCache } from './tmdbCache';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
+import { progressRepository } from '../repositories/progressRepository';
 import { syncOfflineQueue, initOfflineQueueSync, disposeOfflineQueueSync, clearOfflineQueue, setSyncUserId, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
 import { isValidTimezone, getSystemTimezone } from '../utils/calendar';
 import type { WatchedInsert } from '../types/database';
@@ -45,8 +46,12 @@ export const LOCAL_DATA_KEYS: string[] = [
 
 let currentUserId: string | null = null;
 
+const PROGRESS_REMOTE_SYNC_MS = 60_000;
+const progressRemoteSyncedAt = new Map<string, number>();
+
 export function setCurrentUserId(userId: string | null): void {
   currentUserId = userId;
+  progressRemoteSyncedAt.clear();
   // Scope queue replay to this user so another account's pending writes are
   // left queued instead of failing RLS under this session.
   setSyncUserId(userId);
@@ -388,16 +393,33 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
   return last;
 }
 
-// Playback progress is local-only (no Supabase table) - resume points and
-// Continue Watching never leave this browser.
 export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>, duration?: number): void {
   const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(duration ? { duration } : {}), ...(meta ? { meta } : {}) };
+  const key = progressKey(type, id, season, episode);
   try {
-    localStorage.setItem(progressKey(type, id, season, episode), JSON.stringify(data));
-    addToProgressIndex(progressKey(type, id, season, episode));
-    logDebug(`saveProgress key=${progressKey(type, id, season, episode)} currentTime=${currentTime}`);
+    localStorage.setItem(key, JSON.stringify(data));
+    addToProgressIndex(key);
+    logDebug(`saveProgress key=${key} currentTime=${currentTime}`);
   } catch (err) {
-    logDebug(`saveProgress FAILED key=${progressKey(type, id, season, episode)} err=${String(err)}`);
+    logDebug(`saveProgress FAILED key=${key} err=${String(err)}`);
+  }
+
+  const title = typeof meta?.title === 'string' ? meta.title : '';
+  if (currentUserId && isSyncableId(id) && title) {
+    const now = Date.now();
+    const last = progressRemoteSyncedAt.get(key);
+    if (last == null || now - last >= PROGRESS_REMOTE_SYNC_MS) {
+      progressRemoteSyncedAt.set(key, now);
+      progressRepository.save({
+        user_id: currentUserId,
+        media_type: type,
+        tmdb_id: Number(id),
+        title,
+        poster: typeof meta?.poster === 'string' ? meta.poster : null,
+        season: season ?? null,
+        episode: episode ?? null,
+      });
+    }
   }
 }
 
@@ -412,8 +434,14 @@ export function getProgress(type: string, id: string | number, season?: number |
 }
 
 export function clearProgress(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
-  localStorage.removeItem(progressKey(type, id, season, episode));
-  removeFromProgressIndex(progressKey(type, id, season, episode));
+  const key = progressKey(type, id, season, episode);
+  localStorage.removeItem(key);
+  removeFromProgressIndex(key);
+  progressRemoteSyncedAt.delete(key);
+
+  if (currentUserId && isSyncableId(id)) {
+    progressRepository.remove(currentUserId, type, Number(id), season, episode);
+  }
 }
 
 export function getWatchLater(): WatchLaterItem[] {
@@ -525,7 +553,8 @@ export function getContinueWatching(): ContinueWatchingItem[] {
     if (!p) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
-      if (!data || (data.currentTime as number) <= 30) continue;
+      const cloudOnly = data.cloudOnly === true;
+      if (!data || ((data.currentTime as number) <= 30 && !cloudOnly)) continue;
       const wKey = k.replace('progress:', 'watched:');
       if (localStorage.getItem(wKey)) continue;
       progressItems.push({
@@ -536,6 +565,7 @@ export function getContinueWatching(): ContinueWatchingItem[] {
         currentTime: data.currentTime as number,
         savedAt: data.savedAt as number,
         meta: (data.meta || null) as Record<string, unknown> | null,
+        cloudOnly: cloudOnly ? true : undefined,
       });
     } catch {}
   }

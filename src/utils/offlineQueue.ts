@@ -58,10 +58,10 @@ export function enqueueWrite(table: string, method: QueuedOperation['method'], d
   }
 }
 
-// Tables dropped as local-only (progress, settings by migration 003,
-// notifications by 004). Ops queued for them before the upgrade can never
-// succeed - drop them immediately instead of burning retry attempts.
-const DROPPED_TABLES = new Set(['progress', 'settings', 'notifications']);
+// Tables dropped as local-only (settings, notifications). Ops queued for them
+// before the upgrade can never succeed - drop them immediately instead of
+// burning retry attempts.
+const DROPPED_TABLES = new Set(['settings', 'notifications']);
 
 // Minimal contract of the Supabase filter-builder chains used below. The
 // table name is dynamic (a queued string), so the call site is asserted
@@ -80,6 +80,10 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
     switch (op.method) {
       case 'insert':
       case 'upsert': {
+        if (op.table === 'progress') {
+          const d = op.data as Record<string, unknown>;
+          if ((d.media_type !== 'movie' && d.media_type !== 'tv') || !Number.isFinite(Number(d.tmdb_id))) return true;
+        }
         const { error } = await requireSupabase().from(op.table as never)[op.method](op.data as never);
         if (error) throw error;
         return true;
@@ -115,7 +119,7 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
           }
           if (d.seriesOnly === true) {
             query = query.is('season', null).is('episode', null);
-          } else if (op.table === 'watch_later') {
+          } else if (op.table === 'watch_later' || op.table === 'progress') {
             // Series/movie-level rows have season/episode null; per-episode
             // rows have both set. Isolating them keeps removing a series
             // from Watch Later from wiping its saved episodes (and vice versa).

@@ -21,6 +21,12 @@ export interface Database {
         Update: SearchHistoryUpdate;
         Relationships: [];
       };
+      progress: {
+        Row: ProgressRow;
+        Insert: ProgressInsert;
+        Update: ProgressUpdate;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -114,4 +120,38 @@ export type SearchHistoryInsert = {
 
 export type SearchHistoryUpdate = {
   query?: string;
+}
+
+export type ProgressRow = {
+  id: string;
+  user_id: string;
+  media_type: 'movie' | 'tv';
+  tmdb_id: number;
+  title: string;
+  poster: string | null;
+  season: number | null;
+  episode: number | null;
+  updated_at: string;
+}
+
+export type ProgressInsert = {
+  id?: string;
+  user_id: string;
+  media_type: 'movie' | 'tv';
+  tmdb_id: number;
+  title?: string;
+  poster?: string | null;
+  season?: number | null;
+  episode?: number | null;
+  updated_at?: string;
+}
+
+export type ProgressUpdate = {
+  media_type?: 'movie' | 'tv';
+  tmdb_id?: number;
+  title?: string;
+  poster?: string | null;
+  season?: number | null;
+  episode?: number | null;
+  updated_at?: string;
 }

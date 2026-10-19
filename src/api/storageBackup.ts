@@ -3,12 +3,13 @@ import { dataMigration } from '../utils/dataMigration';
 import { watchedRepository } from '../repositories/watchedRepository';
 import { watchLaterRepository } from '../repositories/watchLaterRepository';
 import { searchHistoryRepository } from '../repositories/searchHistoryRepository';
-import type { WatchedInsert, WatchLaterInsert, SearchHistoryInsert } from '../types/database';
+import { progressRepository } from '../repositories/progressRepository';
+import type { WatchedInsert, WatchLaterInsert, SearchHistoryInsert, ProgressInsert } from '../types/database';
 
 export interface SupabaseBackupData {
   watched: WatchedInsert[];
   // Kept optional so backups exported before migrations 003/004 still import.
-  progress?: unknown[];
+  progress?: ProgressInsert[];
   watchLater: WatchLaterInsert[];
   notifications?: unknown[];
   searchHistory: SearchHistoryInsert[];
@@ -18,10 +19,11 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
   const userId = getCurrentUserId();
   if (!userId) return null;
 
-  const [watched, watchLater, searchHistory] = await Promise.all([
+  const [watched, watchLater, searchHistory, progress] = await Promise.all([
     watchedRepository.getAll(userId),
     watchLaterRepository.getAll(userId),
     searchHistoryRepository.getAll(userId),
+    progressRepository.getAll(userId),
   ]);
 
   return {
@@ -49,6 +51,15 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
       user_id: userId,
       query: r.query,
     })),
+    progress: progress.map((r) => ({
+      user_id: userId,
+      media_type: r.media_type,
+      tmdb_id: r.tmdb_id,
+      title: r.title,
+      poster: r.poster,
+      season: r.season,
+      episode: r.episode,
+    })),
   };
 }
 
@@ -57,6 +68,7 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
 export function isSupabaseBackupEmpty(data: SupabaseBackupData): boolean {
   return (
     (data.watched?.length ?? 0) === 0 &&
+    (data.progress?.length ?? 0) === 0 &&
     (data.watchLater?.length ?? 0) === 0 &&
     (data.searchHistory?.length ?? 0) === 0
   );
@@ -71,6 +83,12 @@ export async function importSupabaseData(data: SupabaseBackupData): Promise<bool
   if ((data.watched?.length ?? 0) > 0) {
     const batch = (data.watched ?? []).map((item) => ({ ...item, user_id: userId }));
     operations.push(watchedRepository.markBatch(batch));
+  }
+
+  if ((data.progress?.length ?? 0) > 0) {
+    for (const item of data.progress ?? []) {
+      operations.push(progressRepository.save({ ...item, user_id: userId }));
+    }
   }
 
   if ((data.watchLater?.length ?? 0) > 0) {

@@ -3,12 +3,12 @@
 -- watched / watch_later unique indexes.
 --
 -- Tables: watched, watch_later, search_history.
--- Playback progress, the video source preference, and episode notifications
--- are local-only, so any legacy progress / settings / notifications tables
+-- Continue-watching metadata (media identity only, never playback time) is
+-- added by migration 003. The video source preference and episode
+-- notifications are local-only, so any legacy settings / notifications tables
 -- from older revisions are dropped first (no-op on fresh projects).
 
 -- 0. DROP LEGACY LOCAL-ONLY TABLES
-drop table if exists public.progress cascade;
 drop table if exists public.settings cascade;
 drop table if exists public.notifications cascade;
 
