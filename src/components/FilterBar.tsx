@@ -1,4 +1,5 @@
 import FilterDropdown from './FilterDropdown';
+import './FilterBar.module.css';
 import type { FilterOption } from '../types';
 
 interface FilterBarProps {
@@ -27,7 +28,7 @@ export default function FilterBar({
     onClearFilters,
 }: FilterBarProps) {
     return (
-        <div className="filter-row" aria-label="Quick filters">
+        <div className="filter-row" role="group" aria-label="Quick filters">
             <div className="filter-control">
                 <span className="filter-control-label">Country</span>
                 <FilterDropdown value={countryValue} options={countryOptions} placeholder="All countries" onSelect={onCountryChange} />
@@ -37,9 +38,9 @@ export default function FilterBar({
                 <FilterDropdown value={genreValue} options={genreOptions} placeholder="All genres" onSelect={onGenreChange} />
             </div>
             {hasActiveFilters && (
-                <button className="filter-clear-btn" onClick={onClearFilters} title="Clear all filters" aria-label="Clear all filters">Clear</button>
+                <button type="button" className="filter-clear-btn" onClick={onClearFilters} title="Clear all filters" aria-label="Clear all filters">Clear</button>
             )}
-            <button className="more-filters-toggle" onClick={onToggleShowMore} aria-expanded={showMore} aria-label={showMore ? 'Hide more filters' : 'Show more filters'}>
+            <button type="button" className="more-filters-toggle" onClick={onToggleShowMore} aria-expanded={showMore} aria-label={showMore ? 'Hide more filters' : 'Show more filters'}>
                 {showMore ? 'Hide filters' : 'More filters'}
                 <span className={`cs-arrow ${showMore ? 'open' : ''}`} aria-hidden="true">&#9662;</span>
             </button>

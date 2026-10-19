@@ -1,0 +1,47 @@
+/* Module overrides for FilterBar's shared controls. shared.css is owned by the
+   design system and intentionally left untouched, so the 42px control height
+   and the chip/validation styling live here instead.
+
+   42px control pill: the search input next to the filter row must match the
+   height of the dropdown triggers and the "More filters" pill. */
+:global(.search-bar .search-input),
+:global(.filter-row .custom-select-trigger),
+:global(.filter-row .more-filters-toggle) {
+  min-height: 42px;
+}
+
+/* Removable filter chips: shared.css styles `.filter-chip` as a static badge,
+   so add the interactive affordances here. */
+:global(.filter-chip) {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+:global(.filter-chip:hover) {
+  background: rgba(125, 211, 252, 0.2);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+:global(.filter-chip span[aria-hidden='true']) {
+  font-size: 0.9em;
+  line-height: 1;
+  opacity: 0.75;
+}
+
+/* Inline validation + "stepped back" hints shown by the browse page. */
+:global(.filter-error) {
+  flex-basis: 100%;
+  margin: 0;
+  color: #fca5a5;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+:global(.page-hint) {
+  margin: 0.75rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}

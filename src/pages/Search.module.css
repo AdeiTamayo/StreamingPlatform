@@ -3,10 +3,24 @@
   margin-bottom: 1rem;
 }
 
-.search-form {
+.search-form-row {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .search-form-row {
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    flex: 1 1 100%;
+  }
+
+  .search-submit-btn {
+    flex: 1 1 100%;
+  }
 }
 
 .search-suggest {
@@ -32,34 +46,32 @@
   padding: 0.35rem 0.6rem 0.25rem;
 }
 
-.search-suggest-row {
+.search-suggest-body {
   display: flex;
-  align-items: center;
-  gap: 0.15rem;
-  border-radius: 8px;
-  transition: background 0.15s ease;
+  align-items: flex-start;
 }
 
-.search-suggest-row:hover,
-.search-suggest-row.sugg-active {
-  background: rgba(125, 211, 252, 0.1);
+.search-suggest-list {
+  flex: 1;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .search-suggest-item {
-  flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  text-align: left;
-  padding: 0.55rem 0.6rem;
-  border: 0;
+  height: 2.4rem;
+  padding: 0 0.6rem;
   border-radius: 8px;
-  background: transparent;
   color: var(--text-muted);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .search-suggest-item span {
@@ -68,32 +80,31 @@
   white-space: nowrap;
 }
 
-.search-suggest-row:hover .search-suggest-item,
-.search-suggest-row.sugg-active .search-suggest-item {
+.search-suggest-item:hover,
+.search-suggest-item.sugg-active {
+  background: rgba(125, 211, 252, 0.1);
   color: var(--text);
 }
 
+.search-suggest-remove-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: 0.3rem;
+}
+
 .search-suggest-remove {
-  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 1.5rem;
-  height: 1.5rem;
-  margin-right: 0.3rem;
+  height: 2.4rem;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-dim);
   cursor: pointer;
-  opacity: 0;
   transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.search-suggest-row:hover .search-suggest-remove,
-.search-suggest-row.sugg-active .search-suggest-remove,
-.search-suggest-remove:focus-visible {
-  opacity: 1;
 }
 
 .search-suggest-remove:hover {
@@ -101,9 +112,28 @@
   color: var(--danger);
 }
 
+.search-suggest-remove:focus-visible {
+  opacity: 1;
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: -2px;
+}
+
+/* Only hide the remove controls on devices that can reveal them on hover.
+   Touch devices keep them visible so history is still editable. */
+@media (hover: hover) {
+  .search-suggest-remove {
+    opacity: 0;
+  }
+
+  .search-suggest-body:hover .search-suggest-remove {
+    opacity: 1;
+  }
+}
+
 .search-input {
   flex: 1;
   min-width: 0;
+  min-height: 42px;
   padding: 0.65rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -123,14 +153,20 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.search-input:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
 .search-submit-btn {
   flex-shrink: 0;
-  padding: 0.6rem 1.2rem;
+  min-height: 42px;
+  padding: 0.45rem 0.9rem;
   border-radius: 999px;
   border: 1px solid rgba(125, 211, 252, 0.3);
   background: rgba(125, 211, 252, 0.12);
   color: var(--text);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s, transform 0.2s;
@@ -141,33 +177,65 @@
   transform: translateY(-1px);
 }
 
-.search-tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin-bottom: 1rem;
+.search-submit-btn:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
 }
 
-.search-tab {
-  padding: 0.4rem 0.85rem;
+.search-filter-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* The quick-filter row sits beside the toggle; give the expanded panel more
+   breathing room below it. */
+.search-more-filters {
+  margin-top: 1.5rem;
+  /* Full-bleed: the expanded filter row spans the whole viewport width while
+     its controls stay aligned with the page's content gutters. */
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  padding-left: max(1rem, calc(50vw - 640px));
+  padding-right: max(1rem, calc(50vw - 640px));
+}
+
+/* Status copy (loading / neutral) styled by the module rather than the
+   globally shared `.loading` class. */
+.search-status {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.search-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0.45rem 0.9rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-overlay);
-  color: var(--text-muted);
+  color: var(--text);
   font-size: 0.8rem;
   font-weight: 600;
+  font-family: inherit;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
-.search-tab:hover {
-  background: rgba(125, 211, 252, 0.1);
-  color: var(--text);
+.search-retry:hover {
+  background: rgba(125, 211, 252, 0.12);
+  border-color: rgba(125, 211, 252, 0.2);
 }
 
-.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-  color: var(--ink);
-  border-color: transparent;
+.search-retry:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
 }
 
 /* Recent-search recovery inside the no-results state. A vertical list of
@@ -218,6 +286,7 @@
 .search-recovery-label {
   flex: 1;
   min-width: 0;
+  min-height: 42px;
   display: flex;
   align-items: center;
   gap: 0.55rem;
@@ -236,6 +305,12 @@
 .search-recovery-row:hover .search-recovery-label,
 .search-recovery-row:focus-within .search-recovery-label {
   color: var(--text);
+}
+
+.search-recovery-label:focus-visible,
+.search-recovery-remove:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
 }
 
 .search-recovery-label span {
@@ -269,8 +344,7 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.search-recovery-remove:hover,
-.search-recovery-remove:focus-visible {
+.search-recovery-remove:hover {
   background: rgba(248, 113, 113, 0.2);
   color: var(--danger);
 }
@@ -280,10 +354,41 @@
   margin-bottom: 1rem;
 }
 
+.search-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
 .search-history-title {
   font-size: 0.78rem;
   color: var(--text-dim);
-  margin-bottom: 0.4rem;
+}
+
+.search-history-clear {
+  min-height: 42px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-overlay);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.search-history-clear:hover {
+  background: rgba(125, 211, 252, 0.1);
+  color: var(--text);
+}
+
+.search-history-clear:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
 }
 
 .search-history-list {
@@ -317,6 +422,12 @@
   transition: color 0.18s ease;
 }
 
+.search-history-label:focus-visible,
+.search-history-remove:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+}
+
 .search-history-chip:hover .search-history-label {
   color: var(--text);
 }
@@ -340,20 +451,81 @@
   color: var(--danger);
 }
 
+/* People returned by the multi-search, linked to their credits page. */
+.search-people {
+  margin-top: 1.25rem;
+}
+
+.search-people-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0.5rem;
+}
+
+.person-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.4rem;
+  vertical-align: bottom;
+}
+
+.person-list-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.person-list-item:not(:last-child)::after {
+  content: ',';
+  margin-left: 0.1rem;
+  color: var(--text-dim);
+}
+
+.person-list-link {
+  display: inline-block;
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.person-list-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
+.person-list-link:focus-visible {
+  outline: 2px solid rgba(125, 211, 252, 0.7);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .search-suggest,
-  .search-suggest-row,
   .search-suggest-item,
   .search-suggest-remove,
   .search-input,
   .search-submit-btn,
-  .search-tab,
+  .search-retry,
   .search-recovery-row,
   .search-recovery-label,
   .search-recovery-remove,
+  .search-history-clear,
   .search-history-chip,
   .search-history-label,
-  .search-history-remove {
+  .search-history-remove,
+  .person-list-link {
     animation: none;
     transition: none;
   }

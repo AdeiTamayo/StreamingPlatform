@@ -1,21 +1,75 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { searchMulti, searchMovies, searchTV, getPersonCredits } from '../api/tmdb';
+import { searchMulti, searchMovies, searchTV, getPersonCredits, getMovieGenres, getTVGenres, getCountries, getLanguages } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
+import PersonList from '../components/PersonList';
+import FilterBar from '../components/FilterBar';
+import FilterDropdown from '../components/FilterDropdown';
+import DatePickerField from '../components/DatePickerField';
+import TypeToggle from '../components/TypeToggle';
+import type { PersonListPerson } from '../components/PersonList';
 import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
-import type { TMDBMovie, TMDBSeries, TMDBPersonCredits } from '../types';
+import type { TMDBMovie, TMDBSeries, TMDBPersonCredits, TMDBGenre, TMDBCountry, TMDBLanguage, FilterOption } from '../types';
 import styles from './Search.module.css';
 
-const TABS: { key: string; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'movie', label: 'Movies' },
-  { key: 'tv', label: 'TV Shows' },
+const TYPE_TABS: { value: string; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'movie', label: 'Movies' },
+  { value: 'tv', label: 'TV Shows' },
+];
+
+const MOVIE_SORT_OPTIONS: FilterOption[] = [
+  { value: 'popularity.desc', label: 'Popularity' },
+  { value: 'vote_average.desc', label: 'Rating' },
+  { value: 'primary_release_date.desc', label: 'Release date (newest)' },
+  { value: 'primary_release_date.asc', label: 'Release date (oldest)' },
+  { value: 'original_title.asc', label: 'Title A-Z' },
+];
+
+const TV_SORT_OPTIONS: FilterOption[] = [
+  { value: 'popularity.desc', label: 'Popularity' },
+  { value: 'vote_average.desc', label: 'Rating' },
+  { value: 'first_air_date.desc', label: 'Release date (newest)' },
+  { value: 'first_air_date.asc', label: 'Release date (oldest)' },
+  { value: 'original_name.asc', label: 'Name A-Z' },
+];
+
+const YEAR_OPTIONS: FilterOption[] = [
+  { value: '', label: 'Any year' },
+  ...Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map((y) => ({ value: String(y), label: String(y) })),
 ];
 
 // TMDB pages are 20 items; person credits use the same page size client-side.
 const PAGE_SIZE = 20;
+
+function isPersonResult(item: unknown): item is { id: number; name: string } {
+  const candidate = item as { media_type?: string; name?: unknown };
+  return candidate.media_type === 'person' && typeof candidate.name === 'string';
+}
+
+function dateOf(item: TMDBMovie | TMDBSeries): string {
+  return (item as TMDBMovie).release_date || (item as TMDBSeries).first_air_date || '';
+}
+
+function titleOf(item: TMDBMovie | TMDBSeries): string {
+  return (item as TMDBMovie).title || (item as TMDBSeries).name || '';
+}
+
+function makeComparator(sortBy: string): (a: TMDBMovie | TMDBSeries, b: TMDBMovie | TMDBSeries) => number {
+  switch (sortBy) {
+    case 'popularity.desc': return (a, b) => (b.popularity || 0) - (a.popularity || 0);
+    case 'vote_average.desc': return (a, b) => (b.vote_average || 0) - (a.vote_average || 0);
+    case 'primary_release_date.desc':
+    case 'first_air_date.desc': return (a, b) => dateOf(b).localeCompare(dateOf(a));
+    case 'primary_release_date.asc':
+    case 'first_air_date.asc': return (a, b) => dateOf(a).localeCompare(dateOf(b));
+    case 'original_title.asc':
+    case 'original_name.asc': return (a, b) => titleOf(a).localeCompare(titleOf(b));
+    default: return () => 0;
+  }
+}
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,13 +83,54 @@ export default function Search() {
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [history, setHistory] = useState<string[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeSugg, setActiveSugg] = useState(-1);
   const { getSignal } = useAbortController();
 
-  useEffect(() => { document.title = `Search: ${query} - StreamFlow`; }, [query]);
+  // Browse-style filters, applied client-side to the search results.
+  const [genresMovie, setGenresMovie] = useState<TMDBGenre[]>([]);
+  const [genresTv, setGenresTv] = useState<TMDBGenre[]>([]);
+  const [countries, setCountries] = useState<TMDBCountry[]>([]);
+  const [languages, setLanguages] = useState<TMDBLanguage[]>([]);
+  const [country, setCountry] = useState('');
+  const [genreFilter, setGenreFilter] = useState('');
+  const [year, setYear] = useState('');
+  const [sortBy, setSortBy] = useState('');
+  const [releaseDateFrom, setReleaseDateFrom] = useState('');
+  const [releaseDateUntil, setReleaseDateUntil] = useState('');
+  const [language, setLanguage] = useState('');
+  const [voteCount, setVoteCount] = useState('');
+  const [voteInput, setVoteInput] = useState('');
+  const [showMore, setShowMore] = useState(false);
+  const [pageHint, setPageHint] = useState('');
+
+  useEffect(() => {
+    if (personId) {
+      document.title = query.trim()
+        ? `Movies & TV featuring ${query.trim()} - StreamFlow`
+        : 'Movies & TV shows - StreamFlow';
+    } else if (query.trim()) {
+      document.title = `Search: ${query.trim()} - StreamFlow`;
+    } else {
+      document.title = 'Search - StreamFlow';
+    }
+  }, [query, personId]);
   useEffect(() => { setHistory(getSearchHistory()); }, []);
+
+  useEffect(() => {
+    getMovieGenres().then((data: { genres: TMDBGenre[] }) => setGenresMovie(data.genres || [])).catch(() => {});
+    getTVGenres().then((data: { genres: TMDBGenre[] }) => setGenresTv(data.genres || [])).catch(() => {});
+    getCountries().then((data) => setCountries(data as TMDBCountry[])).catch(() => {});
+    getLanguages().then((data) => setLanguages(data as TMDBLanguage[])).catch(() => {});
+  }, []);
+
+  // Debounce the min-votes input so typing doesn't re-filter on every key.
+  useEffect(() => {
+    const t = setTimeout(() => setVoteCount(voteInput.replace(/\D/g, '').slice(0, 6)), 400);
+    return () => clearTimeout(t);
+  }, [voteInput]);
 
   useEffect(() => {
     if (!personId) return;
@@ -58,7 +153,7 @@ export default function Search() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [personId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [personId, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Remembers what was last fetched so a query/tab change resets to page 1
   // instead of firing one request with the stale page and a second right
@@ -92,7 +187,7 @@ export default function Search() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [personId, query, page, tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [personId, query, page, tab, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (personId) return;
@@ -110,6 +205,11 @@ export default function Search() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reset to the first page whenever a browse filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [country, genreFilter, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount]);
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const q = input.trim();
@@ -123,6 +223,11 @@ export default function Search() {
 
   function handleRemoveHistory(q: string) {
     removeSearchHistory(q);
+    setHistory(getSearchHistory());
+  }
+
+  function handleClearHistory() {
+    history.forEach((q) => removeSearchHistory(q));
     setHistory(getSearchHistory());
   }
 
@@ -162,28 +267,135 @@ export default function Search() {
     } else if (e.key === 'Enter' && activeSugg >= 0 && activeSugg < suggestions.length) {
       e.preventDefault();
       handleHistoryClick(suggestions[activeSugg]);
+    } else if (e.key === 'Delete' && activeSugg >= 0 && activeSugg < suggestions.length) {
+      e.preventDefault();
+      handleRemoveHistory(suggestions[activeSugg]);
     }
   }
 
-  const filtered = personId
+  // Query results split by kind: people have no detail page, so they are
+  // surfaced separately and linked to the credits search route.
+  const people: PersonListPerson[] = !personId && tab === 'all'
+    ? (results as unknown[]).filter(isPersonResult).map((p) => ({ id: p.id, name: p.name }))
+    : [];
+  const filteredMedia = personId
     ? tab === 'all'
       ? results
       : results.filter((item) => (item as { media_type?: string }).media_type === tab)
     : tab === 'all'
       ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
       : results;
+
+  // --- Browse-style filter options -----------------------------------------
+  const genreNames = Array.from(new Set([...genresMovie, ...genresTv].map((g) => g.name))).sort();
+  const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genreNames.map((name) => ({ value: name, label: name }))];
+  const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
+  const languageOptions: FilterOption[] = [{ value: '', label: 'Original language' }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
+  const sortOptions = tab === 'tv' ? TV_SORT_OPTIONS : MOVIE_SORT_OPTIONS;
+  const sortOptionList: FilterOption[] = [{ value: '', label: 'Sort by' }, ...sortOptions];
+
+  const filtersActive = !!(country || genreFilter || year || sortBy || releaseDateFrom || releaseDateUntil || language || voteCount);
+
+  function genreIdFor(name: string, mediaType: string): number | undefined {
+    const list = mediaType === 'tv' ? genresTv : genresMovie;
+    return list.find((g) => g.name === name)?.id;
+  }
+
+  const refinedMedia = (() => {
+    if (!filtersActive) return filteredMedia;
+    const list = filteredMedia.filter((item) => {
+      const mt = (item as { media_type?: string }).media_type || tab;
+      if (country && !(((item as { origin_country?: string[] }).origin_country) || []).includes(country)) return false;
+      if (language && item.original_language !== language) return false;
+      const date = dateOf(item);
+      if (year && date.slice(0, 4) !== year) return false;
+      if (releaseDateFrom && (!date || date < releaseDateFrom)) return false;
+      if (releaseDateUntil && (!date || date > releaseDateUntil)) return false;
+      if (voteCount && (item.vote_count || 0) < Number(voteCount)) return false;
+      if (genreFilter) {
+        const gid = genreIdFor(genreFilter, mt);
+        if (gid == null || !(item.genre_ids || []).includes(gid)) return false;
+      }
+      return true;
+    });
+    if (sortBy) list.sort(makeComparator(sortBy));
+    return list;
+  })();
+
+  const isEmpty = refinedMedia.length === 0 && people.length === 0;
+  const refinedEmpty = refinedMedia.length === 0;
   // Person credits come back unpaginated - slice them client-side to match
-  // the page size the query search gets from TMDB.
-  const displayTotalPages = personId ? Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)) : totalPages;
+  // the page size the query search gets from TMDB. Client-side refinement of a
+  // server page scales the advertised page count so the pager doesn't promise
+  // empty tail pages.
+  const displayTotalPages = personId
+    ? Math.max(1, Math.ceil(refinedMedia.length / PAGE_SIZE))
+    : filtersActive && results.length > 0
+      ? Math.max(1, Math.round(totalPages * (refinedMedia.length / results.length)))
+      : totalPages;
   const safePage = Math.min(page, displayTotalPages);
-  const visible = personId ? filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : filtered;
+  const visible = personId ? refinedMedia.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : refinedMedia;
+
+  // Refinement can leave the current server page empty; step back one page and
+  // surface a hint so a search never strands the user on a blank page.
+  useEffect(() => {
+    if (personId || !filtersActive || loading || error) return;
+    if (refinedEmpty && page > 1) {
+      setPage(page - 1);
+      setPageHint(`No matches on page ${page}. Showing an earlier page.`);
+    } else if (pageHint && (!refinedEmpty || page === 1)) {
+      setPageHint('');
+    }
+  }, [personId, filtersActive, loading, error, refinedEmpty, page, pageHint]);
+
+  const activeFilters = [
+    country ? { key: 'country', label: `Country: ${countryOptions.find((o) => o.value === country)?.label || country}` } : null,
+    genreFilter ? { key: 'genre', label: `Genre: ${genreFilter}` } : null,
+    year ? { key: 'year', label: `Year: ${year}` } : null,
+    sortBy ? { key: 'sortBy', label: `Sort: ${sortOptionList.find((o) => o.value === sortBy)?.label || sortBy}` } : null,
+    releaseDateFrom ? { key: 'from', label: `From: ${releaseDateFrom}` } : null,
+    releaseDateUntil ? { key: 'until', label: `Until: ${releaseDateUntil}` } : null,
+    language ? { key: 'language', label: `Language: ${languageOptions.find((o) => o.value === language)?.label || language}` } : null,
+    voteCount ? { key: 'votes', label: `Min votes: ${voteCount}` } : null,
+  ].filter((filter): filter is { key: string; label: string } => filter !== null);
+
+  function removeFilter(key: string) {
+    switch (key) {
+      case 'country': setCountry(''); break;
+      case 'genre': setGenreFilter(''); break;
+      case 'year': setYear(''); break;
+      case 'sortBy': setSortBy(''); break;
+      case 'from': setReleaseDateFrom(''); break;
+      case 'until': setReleaseDateUntil(''); break;
+      case 'language': setLanguage(''); break;
+      case 'votes': setVoteCount(''); setVoteInput(''); break;
+      default: break;
+    }
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setCountry('');
+    setGenreFilter('');
+    setYear('');
+    setSortBy('');
+    setReleaseDateFrom('');
+    setReleaseDateUntil('');
+    setLanguage('');
+    setVoteCount('');
+    setVoteInput('');
+    setPage(1);
+  }
+
+  const dateRangeInvalid = !!releaseDateFrom && !!releaseDateUntil && releaseDateFrom > releaseDateUntil;
+  const showFilterUi = !!query.trim() || !!personId;
 
   return (
     <div className="page">
       <section className="section">
         <h2 className="section-title">{personId ? (query ? `Movies & TV featuring "${query}"` : 'Movies & TV shows') : query ? `Search Results for "${query}"` : 'Search'}</h2>
         <div className={styles.searchBoxWrap}>
-          <form className={styles.searchForm} role="search" onSubmit={handleSubmit}>
+          <form className={styles.searchFormRow} role="search" onSubmit={handleSubmit}>
             <input
               ref={inputRef}
               type="search"
@@ -192,6 +404,7 @@ export default function Search() {
               aria-label="Search"
               autoComplete="off"
               role="combobox"
+              aria-autocomplete="list"
               aria-expanded={showSuggestions}
               aria-controls="search-suggest-list"
               aria-activedescendant={activeSugg >= 0 ? `search-sugg-${activeSugg}` : undefined}
@@ -204,58 +417,123 @@ export default function Search() {
             <button type="submit" className={styles.searchSubmitBtn}>Search</button>
           </form>
           {showSuggestions && (
-            <div className={styles.searchSuggest} role="listbox" aria-label="Recent searches" id="search-suggest-list">
-              <div className={styles.searchSuggestLabel}>Recent searches</div>
-              {suggestions.map((q, qi) => (
-                <div key={q} className={`${styles.searchSuggestRow} ${qi === activeSugg ? styles.suggActive : ""}`}>
-                  <button
-                    type="button"
-                    role="option"
-                    id={`search-sugg-${qi}`}
-                    aria-selected={qi === activeSugg}
-                    className={styles.searchSuggestItem}
-                    // mousedown fires before blur: prevent the default so the
-                    // input keeps focus and the click is not swallowed.
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleHistoryClick(q)}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="9" />
-                      <polyline points="12 7 12 12 15.5 14" />
-                    </svg>
-                    <span>{q}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.searchSuggestRemove}
-                    aria-label={`Remove "${q}" from search history`}
-                    title="Remove from history"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleRemoveHistory(q)}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
+            <div className={styles.searchSuggest}>
+              <div className={styles.searchSuggestLabel} id="search-suggest-label">Recent searches</div>
+              <div className={styles.searchSuggestBody}>
+                <ul
+                  role="listbox"
+                  aria-labelledby="search-suggest-label"
+                  id="search-suggest-list"
+                  className={styles.searchSuggestList}
+                >
+                  {suggestions.map((q, qi) => (
+                    <li
+                      key={q}
+                      role="option"
+                      id={`search-sugg-${qi}`}
+                      aria-selected={qi === activeSugg}
+                      className={`${styles.searchSuggestItem} ${qi === activeSugg ? styles.suggActive : ''}`}
+                      // mousedown fires before blur: prevent the default so the
+                      // input keeps focus and the click is not swallowed.
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleHistoryClick(q)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <polyline points="12 7 12 12 15.5 14" />
+                      </svg>
+                      <span>{q}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className={styles.searchSuggestRemoveCol}>
+                  {suggestions.map((q) => (
+                    <button
+                      key={`remove-${q}`}
+                      type="button"
+                      className={styles.searchSuggestRemove}
+                      aria-label={`Remove "${q}" from search history`}
+                      title="Remove from history"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => handleRemoveHistory(q)}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
-        <div className={styles.searchTabs} aria-label="Search categories">
-          {TABS.map((t) => (
-            <button key={t.key} aria-pressed={tab === t.key} className={`${styles.searchTab} ${tab === t.key ? styles.active : ''}`} onClick={() => setTab(t.key)}>{t.label}</button>
-          ))}
+        <div className={styles.searchFilterHeader}>
+          <TypeToggle
+            value={tab}
+            options={TYPE_TABS}
+            onChange={(value) => { setTab(value); setPage(1); }}
+            ariaLabel="Search categories"
+          />
+          {showFilterUi && (
+            <FilterBar
+              countryValue={country}
+              genreValue={genreFilter}
+              showMore={showMore}
+              onToggleShowMore={() => setShowMore((s) => !s)}
+              onCountryChange={(value) => { setCountry(value); setPage(1); }}
+              onGenreChange={(value) => { setGenreFilter(value); setPage(1); }}
+              countryOptions={countryOptions}
+              genreOptions={genreOptions}
+              hasActiveFilters={filtersActive}
+              onClearFilters={clearFilters}
+            />
+          )}
         </div>
+        {showFilterUi && (
+          <>
+            {showMore && (
+              <div className={`more-filters-panel ${styles.searchMoreFilters}`} aria-label="Additional filters">
+                <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} /></div>
+                <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} /></div>
+                <div className="filter-control"><span className="filter-control-label">Year</span><FilterDropdown value={year} options={YEAR_OPTIONS} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} /></div>
+                <div className="filter-control"><span className="filter-control-label">Sort results</span><FilterDropdown value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} /></div>
+                <div className="filter-control"><span className="filter-control-label">Language</span><FilterDropdown value={language} options={languageOptions} placeholder="Original language" onSelect={(value) => { setLanguage(value); setPage(1); }} /></div>
+                <label className="filter-control"><span className="filter-control-label">Minimum votes</span><input className="filter-number-input" type="number" min="0" inputMode="numeric" placeholder="Any amount" aria-label="Minimum votes" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></label>
+                {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
+              </div>
+            )}
+            {activeFilters.length > 0 && (
+              <div className="active-filters" aria-label="Active filters">
+                <span className="active-filters-label">Active filters</span>
+                {activeFilters.map((filter) => (
+                  <button
+                    type="button"
+                    className="filter-chip"
+                    key={filter.key}
+                    onClick={() => removeFilter(filter.key)}
+                    aria-label={`Remove filter: ${filter.label}`}
+                  >
+                    {filter.label}
+                    <span aria-hidden="true">&times;</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
         {!query && !searchFocused && history.length > 0 && (
           <div className={styles.searchHistory}>
-            <div className={styles.searchHistoryTitle}>Recent searches</div>
+            <div className={styles.searchHistoryHeader}>
+              <div className={styles.searchHistoryTitle}>Recent searches</div>
+              <button type="button" className={styles.searchHistoryClear} onClick={handleClearHistory}>Clear all</button>
+            </div>
             <div className={styles.searchHistoryList}>
               {history.map((q) => (
                 <span key={q} className={styles.searchHistoryChip}>
-                  <button className={styles.searchHistoryLabel} onClick={() => handleHistoryClick(q)}>{q}</button>
+                  <button type="button" className={styles.searchHistoryLabel} onClick={() => handleHistoryClick(q)}>{q}</button>
                   <button
+                    type="button"
                     className={styles.searchHistoryRemove}
                     aria-label={`Remove "${q}" from search history`}
                     title="Remove from history"
@@ -271,90 +549,119 @@ export default function Search() {
             </div>
           </div>
         )}
+        {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
         {error ? (
-          <div className="loading" role="alert">Search failed. Check your connection.</div>
-        ) : loading ? (
-          <div className="loading" role="status">Searching...</div>
-        ) : !personId && !query.trim() ? (
-          <div className="loading" role="status">Type above to search movies and TV shows</div>
-        ) : filtered.length === 0 ? (
-          <div className="empty-state">
-            <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
-            <p>
-              Check the spelling, try fewer words, or start from one of these
-              instead.
-            </p>
+          <div className="empty-state" role="alert">
+            <h3>Search failed</h3>
+            <p>Check your connection and try again.</p>
             <div className="empty-state-actions">
-              <Link to="/" className="empty-state-action">
-                Browse Trending
-              </Link>
-              <Link to="/movies" className="empty-state-action">
-                Movies
-              </Link>
-              <Link to="/tv" className="empty-state-action">
-                TV Shows
-              </Link>
+              <button type="button" className={styles.searchRetry} onClick={() => setRetryKey((n) => n + 1)}>
+                Retry
+              </button>
             </div>
-{recoverySearches.length > 0 && (
-              <div className={styles.searchRecovery}>
-                <div className={styles.searchRecoveryTitle}>
-                  Or try one of your recent searches
-                </div>
-                <ul className={styles.searchRecoveryList}>
-                  {recoverySearches.map((q) => (
-                    <li key={q} className={styles.searchRecoveryRow}>
-                      <button
-                        className={styles.searchRecoveryLabel}
-                        onClick={() => handleHistoryClick(q)}
-                        title={`Search again for "${q}"`}
-                      >
-                        <svg
-                          className={styles.searchRecoveryIcon}
-                          width="13"
-                          height="13"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden="true"
-                        >
-                          <circle cx="11" cy="11" r="8" />
-                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                        <span>{q}</span>
-                      </button>
-                      <button
-                        className={styles.searchRecoveryRemove}
-                        aria-label={`Remove "${q}" from search history`}
-                        title="Remove from history"
-                        onClick={() => handleRemoveHistory(q)}
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
+        ) : loading ? (
+          <div className={styles.searchStatus} role="status">Searching...</div>
+        ) : !personId && !query.trim() ? (
+          <div className={styles.searchStatus}>Type above to search movies and TV shows</div>
+        ) : isEmpty ? (
+          filtersActive && results.length > 0 ? (
+            <div className="empty-state" role="status">
+              <h3>No matches for these filters</h3>
+              <p>Try removing a filter or widening the search.</p>
+              <div className="empty-state-actions">
+                <button type="button" className="empty-state-action" onClick={clearFilters}>Clear filters</button>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">
+              <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
+              <p>
+                Check the spelling, try fewer words, or start from one of these
+                instead.
+              </p>
+              <div className="empty-state-actions">
+                <Link to="/" className="empty-state-action">
+                  Browse Trending
+                </Link>
+                <Link to="/movies" className="empty-state-action">
+                  Movies
+                </Link>
+                <Link to="/tv" className="empty-state-action">
+                  TV Shows
+                </Link>
+              </div>
+              {recoverySearches.length > 0 && (
+                <div className={styles.searchRecovery}>
+                  <div className={styles.searchRecoveryTitle}>
+                    Or try one of your recent searches
+                  </div>
+                  <ul className={styles.searchRecoveryList}>
+                    {recoverySearches.map((q) => (
+                      <li key={q} className={styles.searchRecoveryRow}>
+                        <button
+                          type="button"
+                          className={styles.searchRecoveryLabel}
+                          onClick={() => handleHistoryClick(q)}
+                          title={`Search again for "${q}"`}
+                        >
+                          <svg
+                            className={styles.searchRecoveryIcon}
+                            width="13"
+                            height="13"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                          <span>{q}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.searchRecoveryRemove}
+                          aria-label={`Remove "${q}" from search history`}
+                          title="Remove from history"
+                          onClick={() => handleRemoveHistory(q)}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )
         ) : (
           <>
-            <div className="media-grid">
-              {visible.map((item) => (
-                <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
-              ))}
-            </div>
+            {visible.length > 0 && (
+              <div className="media-grid">
+                {visible.map((item) => (
+                  <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
+                ))}
+              </div>
+            )}
+            {people.length > 0 && (
+              <div className={styles.searchPeople}>
+                <h3 className={styles.searchPeopleTitle}>People</h3>
+                <PersonList people={people} />
+              </div>
+            )}
             {displayTotalPages > 1 && (
               <Pagination
                 page={safePage}
                 totalPages={displayTotalPages}
                 onChange={setPage}
-                label={`Page ${safePage} of ${displayTotalPages}${filtered.length === 0 && results.length > 0 ? ' (no results on this page)' : ''}`}
+                label={`Page ${safePage} of ${displayTotalPages}`}
               />
             )}
           </>

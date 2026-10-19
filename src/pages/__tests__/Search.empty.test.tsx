@@ -15,6 +15,10 @@ vi.mock('../../api/tmdb', () => ({
   getPersonCredits: vi.fn().mockResolvedValue({ cast: [], crew: [] }),
   getTVExternalIds: vi.fn().mockResolvedValue({}),
   getImdbRating: vi.fn().mockResolvedValue(null),
+  getMovieGenres: vi.fn().mockResolvedValue({ genres: [] }),
+  getTVGenres: vi.fn().mockResolvedValue({ genres: [] }),
+  getCountries: vi.fn().mockResolvedValue([]),
+  getLanguages: vi.fn().mockResolvedValue([]),
   imageUrl: (path: string | null) => path || 'placeholder',
 }));
 

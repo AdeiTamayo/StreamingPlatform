@@ -19,19 +19,21 @@ export default function TypeToggle({
   className = '',
 }: TypeToggleProps) {
   return (
-    <div className={`type-toggle ${className}`.trim()} role="tablist" aria-label={ariaLabel}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="tab"
-          aria-selected={value === option.value}
-          className={`type-toggle-btn${value === option.value ? ' active' : ''}`}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className={`type-toggle ${className}`.trim()} role="group" aria-label={ariaLabel}>
+      {options.map((option) => {
+        const active = value === option.value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={active}
+            className={`type-toggle-btn${active ? ' active' : ''}`}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
