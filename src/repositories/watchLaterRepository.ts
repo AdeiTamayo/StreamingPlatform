@@ -80,4 +80,18 @@ export const watchLaterRepository = {
       enqueueWrite('watch_later', 'delete', { userId, mediaType: 'tv', tmdbId, season, episode });
     }
   },
+
+  async clearAll(userId: string): Promise<void> {
+    try {
+      await withRetry(async () => {
+        const res = await requireSupabase().from('watch_later')
+          .delete()
+          .eq('user_id', userId);
+        if (res.error) throw res.error;
+        return res;
+      });
+    } catch {
+      enqueueWrite('watch_later', 'delete', { userId });
+    }
+  },
 };

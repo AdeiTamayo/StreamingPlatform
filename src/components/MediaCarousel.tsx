@@ -32,6 +32,8 @@ export default function MediaCarousel({
   const onWheel = useCallback((e: WheelEvent) => {
     const el = trackRef.current;
     if (!el) return;
+    // Let browser zoom gestures through (ctrl+wheel / trackpad pinch).
+    if (e.ctrlKey) return;
     if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
     const max = el.scrollWidth - el.clientWidth;
     if (max <= 0) return;

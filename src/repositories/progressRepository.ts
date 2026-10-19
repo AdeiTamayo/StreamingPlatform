@@ -80,4 +80,38 @@ export const progressRepository = {
       enqueueWrite('progress', 'delete', { userId });
     }
   },
+
+  // Removes every track of a show (all seasons/episodes), unlike `remove`
+  // which isolates a single season/episode pair. Used when the show is removed
+  // from history so its remote rows cannot resurrect in Continue Watching.
+  async clearShow(userId: string, tmdbId: number): Promise<void> {
+    try {
+      await withRetry(async () => {
+        const res = await requireSupabase().from('progress')
+          .delete()
+          .eq('user_id', userId)
+          .eq('media_type', 'tv')
+          .eq('tmdb_id', tmdbId);
+        if (res.error) throw res.error;
+        return res;
+      });
+    } catch {
+      enqueueWrite('progress', 'delete', { userId, mediaType: 'tv', tmdbId, allTracks: true });
+    }
+  },
+
+  async clearAllMovies(userId: string): Promise<void> {
+    try {
+      await withRetry(async () => {
+        const res = await requireSupabase().from('progress')
+          .delete()
+          .eq('user_id', userId)
+          .eq('media_type', 'movie');
+        if (res.error) throw res.error;
+        return res;
+      });
+    } catch {
+      enqueueWrite('progress', 'delete', { userId, mediaType: 'movie', allTracks: true });
+    }
+  },
 };

@@ -135,6 +135,7 @@ function NotificationPanel({
         className={`${styles.overlay}${sidebar ? ` ${styles.sidebarOverlay}` : ''}`}
         onClick={onClose}
         aria-hidden="true"
+        data-click-outside-ignore
       />
       <div
         ref={panelRef}
@@ -146,6 +147,7 @@ function NotificationPanel({
         tabIndex={-1}
         style={panelStyle}
         onKeyDown={handleKeyDown}
+        data-click-outside-ignore
       >
         <div className={styles.header}>
           <h3 id={panelTitleId} className={styles.headerTitle}>Notifications</h3>
@@ -359,7 +361,13 @@ const Notifications = memo(function Notifications({ sidebar }: { sidebar?: boole
   useEffect(() => {
     if (open) {
       wasOpenRef.current = true;
-      const t = setTimeout(() => panelRef.current?.focus(), 0);
+      const t = setTimeout(() => {
+        // Focus the first control, not the container: the focus trap only
+        // guards the first/last focusables, so focusing the container let a
+        // Shift+Tab slip out of the modal.
+        const target = getFocusable(panelRef.current)[0] ?? panelRef.current;
+        target?.focus();
+      }, 0);
       return () => clearTimeout(t);
     }
     if (wasOpenRef.current) {

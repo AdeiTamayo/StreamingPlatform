@@ -98,4 +98,18 @@ export const searchHistoryRepository = {
       // Silently fail for pruning
     }
   },
+
+  async clearAll(userId: string): Promise<void> {
+    try {
+      await withRetry(async () => {
+        const res = await requireSupabase().from('search_history')
+          .delete()
+          .eq('user_id', userId);
+        if (res.error) throw res.error;
+        return res;
+      });
+    } catch {
+      enqueueWrite('search_history', 'delete', { userId });
+    }
+  },
 };

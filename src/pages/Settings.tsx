@@ -174,7 +174,7 @@ export default function Settings() {
   }
 
   async function clearAll() {
-    clearAllData();
+    await clearAllData();
 
     await clearTMDBCache();
 

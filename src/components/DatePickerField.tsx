@@ -74,6 +74,12 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
   );
   const yearRangeStart = Math.floor(viewDate.getFullYear() / 20) * 20;
   const weekdays = getWeekdays();
+  // Clamp the roving tab stop to the current grid: month navigation can shrink
+  // the grid (e.g. a 4-week February), and an out-of-range index would leave
+  // the day grid with no tab stop at all.
+  const activeCellIndex = view === 'day'
+    ? Math.min(focusedCellIndex, calendarGrid.cells.length - 1)
+    : focusedCellIndex;
 
   function selectDate(date: Date) {
     onChange(formatISODate(date));
@@ -256,7 +262,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                     onKeyDown={(e) => handleCellKeyDown(e, index, cell)}
                     aria-pressed={cell.isSelected}
                     aria-label={cell.accessibleLabel}
-                    tabIndex={index === focusedCellIndex ? 0 : -1}
+                    tabIndex={index === activeCellIndex ? 0 : -1}
                   >
                     {cell.dayNumber}
                   </button>

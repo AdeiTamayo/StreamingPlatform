@@ -632,14 +632,19 @@ export default function WatchLater() {
   // Stored deduped (raw TMDB dates, never display buckets) so the snapshot
   // self-heals instead of preserving duplicates.
   useEffect(() => {
-    if (calendarHasLoaded) writeCalendarCache(dedupeCalendarItems(calendarItems));
-  }, [calendarItems, calendarHasLoaded]);
+    if (calendarHasLoaded && !calendarError) {
+      writeCalendarCache(dedupeCalendarItems(calendarItems));
+    }
+  }, [calendarItems, calendarHasLoaded, calendarError]);
 
   // Load releases on demand: first time the calendar view or the upcoming
-  // list is requested. The calendar grid itself renders immediately.
+  // list is requested, and once on mount when the library is non-empty so the
+  // collapsed "Upcoming releases" panel reflects real data instead of a stale
+  // cache (which could wrongly render "No upcoming releases").
   useEffect(() => {
+    const hasLibrary = items.length > 0 || epItems.length > 0;
     if (
-      (view === "calendar" || showUpcoming) &&
+      (view === "calendar" || showUpcoming || hasLibrary) &&
       !calendarHasLoaded &&
       !loadingCalendar
     ) {
@@ -648,6 +653,8 @@ export default function WatchLater() {
   }, [
     view,
     showUpcoming,
+    items.length,
+    epItems.length,
     calendarHasLoaded,
     loadingCalendar,
     loadCalendarItems,
@@ -882,12 +889,19 @@ export default function WatchLater() {
   // the search query narrows them by show title.
   const visibleEpItems = useMemo(() => {
     if (filterType === "movies") return [];
+    let list = epItems;
+    if (hideUnreleasedPosters) {
+      list = list.filter(
+        (i: EpisodeWatchLaterItem) =>
+          !unreleasedKeys.has(`tv-${String(i.showId)}`),
+      );
+    }
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return epItems;
-    return epItems.filter((i: EpisodeWatchLaterItem) =>
+    if (!q) return list;
+    return list.filter((i: EpisodeWatchLaterItem) =>
       (i.showTitle || "").toLowerCase().includes(q),
     );
-  }, [epItems, filterType, searchQuery]);
+  }, [epItems, filterType, searchQuery, hideUnreleasedPosters, unreleasedKeys]);
 
   const listPages = Math.max(1, Math.ceil(sortedItems.length / ITEMS_PER_PAGE));
   const epListPages = Math.max(

@@ -117,7 +117,10 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
             const escaped = String(d.query).replace(/[\\%_]/g, (m) => `\\${m}`);
             query = query.ilike('query', escaped);
           }
-          if (d.seriesOnly === true) {
+          if (d.allTracks === true) {
+            // Whole-title removal: delete every season/episode row too, so no
+            // filters are added beyond user/media/tmdb_id.
+          } else if (d.seriesOnly === true) {
             query = query.is('season', null).is('episode', null);
           } else if (op.table === 'watch_later' || op.table === 'progress') {
             // Series/movie-level rows have season/episode null; per-episode

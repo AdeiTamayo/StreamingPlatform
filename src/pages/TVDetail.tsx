@@ -74,6 +74,8 @@ export default function TVDetail() {
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
   const [imdbRating, setImdbRating] = useState<ImdbRating | null>(null);
+  const [imdbResolved, setImdbResolved] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [imdbId, setImdbId] = useState<string | null>(null);
   const [epImdbId, setEpImdbId] = useState<string | null>(null);
   const [epImdbRating, setEpImdbRating] = useState<ImdbRating | null>(null);
@@ -193,7 +195,7 @@ export default function TVDetail() {
       .finally(() => {
         if (requestId === requestIdRef.current) setLoading(false);
       });
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deep links (?season=&episode=) switch the selected episode without
   // refetching the show.
@@ -266,10 +268,15 @@ export default function TVDetail() {
       return;
     }
     let cancelled = false;
+    setImdbResolved(false);
     getImdbRating(imdbId, 'series').then((r) => {
-      if (!cancelled) setImdbRating(r);
+      if (cancelled) return;
+      setImdbRating(r);
+      setImdbResolved(true);
     }).catch(() => {
-      if (!cancelled) setImdbRating(null);
+      if (cancelled) return;
+      setImdbRating(null);
+      setImdbResolved(true);
     });
     return () => { cancelled = true; };
   }, [imdbId]);
@@ -760,23 +767,11 @@ export default function TVDetail() {
     setShowTrailer(next === 'trailer');
   }
 
+  // Re-run the whole load through the fetch effect (metadata, external ids,
+  // trailer, seasons) - a bare re-fetch here used to leave the trailer control
+  // and season/episode init missing after a successful retry.
   function retry() {
-    if (!id) return;
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(false);
-    getTVDetail(id, getSignal())
-      .then((data) => {
-        if (requestId !== requestIdRef.current) return;
-        setShow(data as TMDBSeries);
-      })
-      .catch((err: Error) => {
-        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
-        setError(true);
-      })
-      .finally(() => {
-        if (requestId === requestIdRef.current) setLoading(false);
-      });
+    setRetryKey((k) => k + 1);
   }
 
   if (!id) return <div className="page"><div className="loading">Show not found</div></div>;
@@ -850,20 +845,20 @@ export default function TVDetail() {
           <div className="detail-meta">
             <h1>{show.name} <span className="year">({endYear ? `${year}-${endYear}` : year})</span></h1>
             <div className="detail-badges">
-              {imdbId ? (
+              {imdbId && imdbRating ? (
                 <a
                   className={`${styles.detailRating} badge rating rating-imdb`}
                   href={`https://www.imdb.com/title/${imdbId}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={imdbRating ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}` : 'Open on IMDb'}
-                  aria-label={imdbRating ? `IMDb rating ${imdbRating.rating} out of 10${imdbRating.votes ? `, ${imdbRating.votes} votes` : ''}` : 'Open on IMDb'}
+                  title={`IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}`}
+                  aria-label={`IMDb rating ${imdbRating.rating} out of 10${imdbRating.votes ? `, ${imdbRating.votes} votes` : ''}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
-                  <span className="rating-source">{imdbRating ? imdbRating.rating : show.vote_average.toFixed(1)}</span>
-                  {imdbRating?.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
+                  <span className="rating-source">{imdbRating.rating}</span>
+                  {imdbRating.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
-              ) : show.vote_average != null ? (
+              ) : (!imdbId || imdbResolved) && show.vote_average != null ? (
                 <span
                   className={`${styles.detailRating} badge rating rating-tmdb`}
                   title={`TMDB rating ${show.vote_average.toFixed(1)}/10${show.vote_count ? ` \u00b7 ${formatVotes(String(show.vote_count))} votes` : ''}`}
@@ -871,6 +866,7 @@ export default function TVDetail() {
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{show.vote_average.toFixed(1)}</span>
+                  {show.vote_count > 0 && <span className="rating-votes">({formatVotes(String(show.vote_count))})</span>}
                 </span>
               ) : null}
               {metaNodes.length > 0 && (

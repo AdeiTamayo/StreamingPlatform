@@ -43,6 +43,7 @@ export default function MovieDetail() {
   const [imdbRating, setImdbRating] = useState<ImdbRating | null>(null);
   const [imdbResolved, setImdbResolved] = useState(false);
   const [videoSource, setVideoSource] = useState(getVideoSource());
+  const [retryKey, setRetryKey] = useState(0);
   const watchedRef = useRef(false);
   const autoWatchedRef = useRef(false);
   const lastTimeRef = useRef<number | null>(null);
@@ -67,6 +68,14 @@ export default function MovieDetail() {
   useEffect(() => {
     refreshFromStorage();
   }, [isAuthenticated, syncVersion, refreshFromStorage]);
+
+  // Keep the ref - read by the progress/auto-watch handlers - in step with the
+  // state. Without this, unmarking a watched movie leaves the ref `true`, so
+  // progress stops being saved for the rest of the session (and the movie
+  // never re-enters Continue Watching).
+  useEffect(() => {
+    watchedRef.current = watched;
+  }, [watched]);
 
   useEffect(() => {
     if (!id) return;
@@ -98,7 +107,7 @@ export default function MovieDetail() {
       .finally(() => {
         if (requestId === requestIdRef.current) setLoading(false);
       });
-  }, [id, refreshFromStorage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, refreshFromStorage, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const imdbId = movie?.imdb_id;
@@ -261,23 +270,11 @@ export default function MovieDetail() {
     setShowTrailer(next === 'trailer');
   }
 
+  // Re-run the whole load through the fetch effect (metadata, trailer, IMDb,
+  // progress refs). A bare re-fetch here used to leave the trailer control and
+  // other derived state missing after a successful retry.
   function retry() {
-    if (!id) return;
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
-    getMovieDetail(id, getSignal())
-      .then((data) => {
-        if (requestId !== requestIdRef.current) return;
-        setMovie(data as TMDBMovie);
-      })
-      .catch((err: Error) => {
-        if (err?.name === 'AbortError' || requestId !== requestIdRef.current) return;
-        setError(/404/.test(err?.message ?? '') ? 'notfound' : 'transient');
-      })
-      .finally(() => {
-        if (requestId === requestIdRef.current) setLoading(false);
-      });
+    setRetryKey((k) => k + 1);
   }
 
   if (loading) return <div className="page"><div className="loading" role="status">Loading...</div></div>;
