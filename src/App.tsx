@@ -38,12 +38,15 @@ export default function App() {
     // After a route change (not the initial load), move focus to the new
     // page's content so keyboard/screen-reader users don't stay parked on
     // whatever link or control triggered the navigation.
+    // Only real navigations (pathname changes) do this: in-page filter/search
+    // state lives in the query string, and stealing focus on every keystroke
+    // would blur the search input after the first character.
     if (isFirstNav.current) {
       isFirstNav.current = false;
       return;
     }
     mainRef.current?.focus({ preventScroll: true });
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   useEffect(() => {
     let ticking = false;

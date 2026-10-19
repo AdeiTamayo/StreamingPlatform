@@ -1,0 +1,26 @@
+/* Browse-page layout: the quick-filter row and the in-page search share one
+   line, with the search pushed to the right end. The expanded "more filters"
+   panel renders on the row below this one. */
+.browse-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.browse-search {
+  flex: 0 1 18rem;
+  min-width: 12rem;
+  margin-left: auto;
+}
+
+.browse-more-filters {
+  margin-top: 0.25rem;
+  /* Full-bleed: the expanded filter row spans the whole viewport width while
+     its controls stay aligned with the page's content gutters. */
+  margin-left: calc(-50vw + 50%);
+  margin-right: calc(-50vw + 50%);
+  padding-left: max(1rem, calc(50vw - 640px));
+  padding-right: max(1rem, calc(50vw - 640px));
+}

@@ -30,12 +30,15 @@ export default function useSearchFilter(fetchFn: FetchFn, deps: Record<string, s
   useEffect(() => {
     if (fetchRef.current) clearTimeout(fetchRef.current);
     const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(false);
+    // The loading flag is flipped inside the debounce window, not before it:
+    // while the user is still typing the previous results stay put instead of
+    // the grid blinking back to skeletons on every keystroke.
     // The getSignal() call below aborts any still-in-flight request, so a
     // slow old-filter response can never overwrite the newer results
     // (backed up by the requestId guard on resolve).
     fetchRef.current = setTimeout(() => {
+      setLoading(true);
+      setError(false);
       fetchFnRef.current(page, { query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount }, getSignal())
         .then((data) => {
           if (requestId !== requestIdRef.current) return;
