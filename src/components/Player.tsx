@@ -20,10 +20,10 @@ const FALLBACK_MAX_SECONDS = 3 * 60 * 60;
 interface PlayerProps {
   src: string;
   title: string;
-  onProgress: (currentTime: number, duration: number) => void;
+  /** Playback (probably) started - record the title in Continue Watching. */
+  onWatching: () => void;
   onEnded: () => void;
   runtimeMinutes: number | null;
-  startAt?: number;
 }
 
 interface PlayerState {
@@ -32,22 +32,22 @@ interface PlayerState {
   ended: boolean;
 }
 
-const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMinutes, startAt = 0 }: PlayerProps) {
+const Player = memo(function Player({ src, title, onWatching, onEnded, runtimeMinutes }: PlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const savedOnProgress = useRef(onProgress);
+  const savedOnWatching = useRef(onWatching);
   const savedOnEnded = useRef(onEnded);
 
   // Keep latest callbacks without re-subscribing listeners on every render.
   useEffect(() => {
-    savedOnProgress.current = onProgress;
-  }, [onProgress]);
+    savedOnWatching.current = onWatching;
+  }, [onWatching]);
   useEffect(() => {
     savedOnEnded.current = onEnded;
   }, [onEnded]);
 
   // Mutable playback state - kept out of React state so ticks/messages
-  // don't cause re-renders. Starts at the resume point when provided.
-  const state = useRef<PlayerState>({ currentTime: startAt || 0, duration: 0, ended: false });
+  // don't cause re-renders. Only used to guess completion; never persisted.
+  const state = useRef<PlayerState>({ currentTime: 0, duration: 0, ended: false });
 
   const fallbackIntervalRef = useRef<ReturnType<typeof setInterval>>(null);
   const graceTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -83,9 +83,11 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
   const startWallClockFallback = useCallback(() => {
     if (fallbackIntervalRef.current || state.current.ended) return;
 
+    // The embed is (presumably) autoplaying, so the title is now being watched.
+    savedOnWatching.current?.();
+
     fallbackIntervalRef.current = setInterval(() => {
       state.current.currentTime += 10;
-      savedOnProgress.current?.(state.current.currentTime, state.current.duration);
 
       const runtime = runtimeMinutesRef.current;
       if (runtime) {
@@ -118,6 +120,9 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
     function handleMessage(e: MessageEvent) {
       const isSameWindow = e.source === iframeRef.current?.contentWindow;
       if (!isSameWindow) return;
+
+      // Late ticks after completion must not re-open the watching entry.
+      if (state.current.ended) return;
 
       // Origin is logged, not enforced — the embed may redirect internally
       // (vidsrc.fyi -> whatever actually hosts the player) and the window
@@ -160,8 +165,8 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
       if (event === 'time' || event === 'play' || event === 'pause') {
         if (typeof currentTime === 'number') {
           state.current.currentTime = currentTime;
-          savedOnProgress.current?.(currentTime, state.current.duration);
         }
+        if (event === 'time' || event === 'play') savedOnWatching.current?.();
 
         // Duration-based completion check, in case "complete" never fires
         // (some players stop emitting events right at the very end). Only
@@ -182,7 +187,7 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
 
   // --- reset state + arm grace period whenever the video changes ---
   useEffect(() => {
-    state.current = { currentTime: startAt || 0, duration: 0, ended: false };
+    state.current = { currentTime: 0, duration: 0, ended: false };
     clearFallbackTimers();
 
     // Give the embed a window to start sending real events before
@@ -190,7 +195,7 @@ const Player = memo(function Player({ src, title, onProgress, onEnded, runtimeMi
     graceTimerRef.current = setTimeout(startWallClockFallback, POSTMESSAGE_GRACE_MS);
 
     return clearFallbackTimers;
-  }, [src, startAt, clearFallbackTimers, startWallClockFallback]);
+  }, [src, clearFallbackTimers, startWallClockFallback]);
 
   return (
     <div className={styles.playerWrapper}>

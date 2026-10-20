@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { getMovieDetail, imageUrl } from '../api/tmdb';
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
-import { isWatched, markWatched, markUnwatched, saveProgress, getProgress, clearProgress, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource, setVideoSource as persistVideoSource } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, markWatching, clearWatching, isInWatchLater, addWatchLater, removeWatchLater, getVideoSource, setVideoSource as persistVideoSource } from '../api/storage';
 import Player from '../components/Player';
 import MediaCard from '../components/MediaCard';
 import FilterDropdown from '../components/FilterDropdown';
@@ -15,13 +15,10 @@ import DetailActions from '../components/DetailActions';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
-import { logDebug } from '../utils/logger';
 import { formatVotes } from '../utils/format';
 import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
 import styles from './MovieDetail.module.css';
-
-const AUTO_WATCH_REMAINING_SECONDS = 120;
 
 export default function MovieDetail() {
   const { id: rawId } = useParams<{ id: string }>();
@@ -33,9 +30,7 @@ export default function MovieDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<'transient' | 'notfound' | null>(null);
   const [watched, setWatched] = useState(false);
-  const [startAt, setStartAt] = useState<number | null>(null);
-  // Bumped on every Restart click so the player remounts from 0:00 even
-  // when there was no saved position (key would otherwise be unchanged).
+  // Bumped on every Restart click so the player remounts from 0:00.
   const [restartTick, setRestartTick] = useState(0);
   const [inWL, setInWL] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
@@ -45,8 +40,9 @@ export default function MovieDetail() {
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [retryKey, setRetryKey] = useState(0);
   const watchedRef = useRef(false);
-  const autoWatchedRef = useRef(false);
-  const lastTimeRef = useRef<number | null>(null);
+  // True once this playback session finished/was marked watched, so stray
+  // player ticks can't re-add it to Continue Watching.
+  const finishedRef = useRef(false);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
   // Identifies the latest fetch so a superseded request's handlers (which can
   // resolve after the effect for a new :id has already started) never touch
@@ -60,8 +56,6 @@ export default function MovieDetail() {
     if (!id) return;
     setWatched(isWatched('movie', id));
     setInWL(isInWatchLater('movie', id));
-    const prog = getProgress('movie', id);
-    setStartAt(prog?.currentTime || null);
     watchedRef.current = isWatched('movie', id);
   }, [id]);
 
@@ -89,7 +83,7 @@ export default function MovieDetail() {
     setImdbRating(null);
     setImdbResolved(false);
     refreshFromStorage();
-    autoWatchedRef.current = false;
+    finishedRef.current = false;
     setTrailerKey(null);
     setShowTrailer(false);
     getMovieDetail(id, getSignal())
@@ -164,12 +158,11 @@ export default function MovieDetail() {
       e.preventDefault();
       if (watched) {
         markUnwatched('movie', id);
-        clearProgress('movie', id);
         setWatched(false);
         toast?.('Removed from watched');
       } else {
+        finishedRef.current = true;
         markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
-        clearProgress('movie', id);
         setWatched(true);
         toast?.('Marked as watched');
       }
@@ -183,31 +176,21 @@ export default function MovieDetail() {
   const safeId = id;
 
   function autoMarkWatched() {
-    if (!movie || watchedRef.current || autoWatchedRef.current) return;
-    autoWatchedRef.current = true;
+    if (!movie || finishedRef.current) return;
+    finishedRef.current = true;
     markWatched('movie', safeId, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
-    clearProgress('movie', safeId);
     watchedRef.current = true;
     setWatched(true);
-    // Deliberately not resetting startAt: the stored progress is already
-    // cleared, and flipping startAt to null rewrites the Player key and the
-    // embed URL - which unmounts the iframe and replays the finished film
-    // from 0:00 while the credits roll.
   }
 
-  function handleProgress(currentTime: number, duration: number) {
-    lastTimeRef.current = currentTime;
-    if (watchedRef.current || !movie) return;
-    saveProgress('movie', safeId, currentTime, null, null, { title: movie?.title, poster: movie?.poster_path, backdrop: movie?.backdrop_path }, duration || undefined);
-    const tmdbRuntime = movie.runtime || null;
-    const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
-
-    logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds}`);
-
-    if (!runtimeSeconds) return;
-    const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
-    if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
-      autoMarkWatched();
+  function handleWatching() {
+    if (!movie || finishedRef.current) return;
+    markWatching('movie', safeId, null, null, { title: movie.title, poster: movie.poster_path, backdrop: movie.backdrop_path });
+    // Starting a watched movie is a rewatch: markWatching dropped the watched
+    // mark, so keep the header badge in step.
+    if (watchedRef.current) {
+      watchedRef.current = false;
+      setWatched(false);
     }
   }
 
@@ -237,12 +220,11 @@ export default function MovieDetail() {
     if (!movie || !id) return;
     if (watched) {
       markUnwatched('movie', id);
-      clearProgress('movie', id);
       setWatched(false);
       toast?.('Removed from watched');
     } else {
+      finishedRef.current = true;
       markWatched('movie', id, movie.title, null, null, { title: movie.title, poster: movie.poster_path });
-      clearProgress('movie', id);
       setWatched(true);
       toast?.('Marked as watched');
     }
@@ -261,12 +243,6 @@ export default function MovieDetail() {
   }
 
   function switchMode(next: 'trailer' | 'player') {
-    // Returning from the trailer: resume the film where it was left off
-    // instead of restarting at 0:00.
-    if (next === 'player' && showTrailer && lastTimeRef.current != null) {
-      setStartAt(lastTimeRef.current);
-      setRestartTick((t) => t + 1);
-    }
     setShowTrailer(next === 'trailer');
   }
 
@@ -293,7 +269,7 @@ export default function MovieDetail() {
   );
   if (!movie) return <div className="page"><div className="loading">Movie not found</div></div>;
 
-  const embedUrl = getMovieEmbedUrl(safeId, videoSource, startAt ?? undefined);
+  const embedUrl = getMovieEmbedUrl(safeId, videoSource);
   const backdrop = imageUrl(movie.backdrop_path, 'original');
   const year = (movie.release_date || '').slice(0, 4);
   const cast: TMDBCastMember[] = movie.credits?.cast?.slice(0, 8) || [];
@@ -339,7 +315,7 @@ export default function MovieDetail() {
                   <span className="rating-source">{imdbRating.rating}</span>
                   {imdbRating.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
-              ) : (!movie.imdb_id || imdbResolved) && movie.vote_average != null ? (
+              ) : (!movie.imdb_id || imdbResolved) && movie.vote_average > 0 ? (
                 <span
                   className={`${styles.detailRating} badge rating rating-tmdb`}
                   title={`TMDB rating ${movie.vote_average.toFixed(1)}/10${movie.vote_count ? ` \u00b7 ${formatVotes(String(movie.vote_count))} votes` : ''}`}
@@ -402,17 +378,14 @@ export default function MovieDetail() {
               />
             </div>
           ) : (
-            // startAt restores the last known position when returning from the
-            // trailer, instead of restarting the film at 0:00 mid-watch.
             <div ref={playerWrapRef} className="player-fs-wrap">
               <Player
-                key={`${startAt !== null ? 'resume' : 'fresh'}-${restartTick}`}
+                key={restartTick}
                 src={embedUrl}
                 title={movie.title}
-                onProgress={handleProgress}
+                onWatching={handleWatching}
                 onEnded={handleEnded}
                 runtimeMinutes={movie.runtime ?? null}
-                startAt={startAt ?? undefined}
               />
             </div>
           )}
@@ -423,7 +396,7 @@ export default function MovieDetail() {
               <button
                 type="button"
                 className={styles.iconBtn}
-                onClick={() => { setStartAt(null); clearProgress('movie', safeId); setRestartTick((t) => t + 1); }}
+                onClick={() => { finishedRef.current = false; clearWatching('movie', safeId); setRestartTick((t) => t + 1); }}
                 title="Restart from the beginning"
                 aria-label="Restart from the beginning"
               >

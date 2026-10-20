@@ -220,14 +220,15 @@ export interface EpisodeWatchLaterItem {
   addedAt: number;
 }
 
+// A "being watched" marker (see Continue Watching). It deliberately carries no
+// playback position: the embed never reports a reliable one, so only the fact
+// that the user started the title is persisted.
 export interface ProgressData {
   type: MediaType;
   id: number | string;
-  currentTime: number;
   savedAt: number;
   season?: number;
   episode?: number;
-  duration?: number;
   meta?: Record<string, unknown>;
   cloudOnly?: boolean;
 }
@@ -250,8 +251,6 @@ export interface LastSeenItem {
   season: number | null;
   episode: number | null;
   ts: number;
-  source: 'watched' | 'progress';
-  currentTime?: number;
   meta?: Record<string, unknown> | null;
 }
 
@@ -260,7 +259,6 @@ export interface ContinueWatchingItem {
   id: number | string;
   season: number | null;
   episode: number | null;
-  currentTime: number;
   savedAt: number;
   meta?: Record<string, unknown> | null;
   cloudOnly?: boolean;

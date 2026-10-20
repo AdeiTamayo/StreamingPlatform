@@ -58,13 +58,11 @@ describe('vidsrc', () => {
     }
   });
 
-  it('passes a start time only to providers that support one', () => {
-    expect(getMovieEmbedUrl(1, 'vidsrc', 120)).toContain('&t=120');
-    expect(getMovieEmbedUrl(1, 'embos', 120)).toContain('&t=120');
-    // These ignore an unknown parameter entirely rather than sending it.
-    expect(getMovieEmbedUrl(1, '2embed', 120)).not.toContain('t=120');
-    expect(getMovieEmbedUrl(1, 'nontongo', 120)).not.toContain('t=120');
-    expect(getMovieEmbedUrl(1, '2embedskin', 120)).not.toContain('t=120');
+  it('never sends a start-time parameter', () => {
+    for (const key of SOURCE_KEYS) {
+      expect(getMovieEmbedUrl(550, key)).not.toMatch(/[?&]t=/);
+      expect(getTVEmbedUrl(1399, 1, 1, key)).not.toMatch(/[?&]t=/);
+    }
   });
 
   // The chosen source is read from localStorage and is user-writable through

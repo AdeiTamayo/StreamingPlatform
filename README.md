@@ -1,6 +1,6 @@
 # StreamFlow
 
-A personal streaming web app built with React and TypeScript. Browse movies and TV shows using TMDB metadata, watch via embedded players, and track your viewing progress. Everything works locally with no sign-up required, and an optional Supabase account syncs your library, watch history, and continue-watching list across devices.
+A personal streaming web app built with React and TypeScript. Browse movies and TV shows using TMDB metadata, watch via embedded players, and keep track of what you're watching. Everything works locally with no sign-up required, and an optional Supabase account syncs your library, watch history, and continue-watching list across devices.
 
 ## Screenshots
 
@@ -87,12 +87,12 @@ flowchart TD
 ### Browsing & Watching
 - **Browse** movies and TV shows with filters (genre, country, year, date range, sort order, original language, minimum vote count), on both movie and TV pages
 - **Search** across movies, TV shows, and people
-- **Watch** content via embedded video player with resume playback
+- **Watch** content via embedded video player
 - **IMDb ratings** (OMDb) shown on cards, detail pages, and per episode; falls back to TMDB ratings where unavailable
-- **Continue Watching** tracks progress and shows unfinished content on the home page, each card with two actions:
-  - **Restart** (↺) clears the saved position and reopens the same episode/movie from 0:00
+- **Continue Watching** shows titles you have started watching but not finished, each card with two actions:
+  - **Restart** (↺) drops the watching flag and resets the player to the beginning
   - **Remove** (×) drops it from Continue Watching without touching the watched mark
-  - **Cross-device** (signed in) syncs the metadata — which titles you're partway through, not how far — so the list follows you between devices, while the resume position stays local to each browser
+  - **Cross-device** (signed in) syncs which titles you're partway through — no playback position is stored locally or remotely, so every device starts from the beginning
 - **Decision badges** on detail pages so you can tell what to do next without reading:
   - Series status — `Ended` or `Ongoing`
   - New episodes — `N new`, unwatched episodes of the current season that aired in the last 7 days
@@ -132,7 +132,7 @@ flowchart TD
 ### Accounts & Sync (optional)
 - **Guest mode** — browse, search, and watch everything with no account; personal features (Watch Later, Last Seen, Notifications, Settings) prompt a sign-in
 - **Sign In / Register** via a global modal (forgot-password flow included) with focus trap, scroll lock, and Escape/outside-click to close
-- **Cloud sync** — watched marks, watch later, search history, and Continue Watching metadata (which titles you're partway through — never the playback position) sync to Supabase with Row Level Security (playback position, video source, and notifications stay local-only)
+- **Cloud sync** — watched marks, watch later, search history, and Continue Watching metadata (which titles you're partway through) sync to Supabase with Row Level Security (video source and notifications stay local-only; playback position is never stored)
 - **Local-first storage** — every write goes to localStorage instantly and to Supabase in the background; the app is fully functional offline or without Supabase configured
 - **Offline resilience** — failed sync writes are queued and retried with exponential backoff
 - **One-time migration** — after signing in, local data is uploaded to the cloud and the app continues reading from localStorage
@@ -142,7 +142,7 @@ flowchart TD
 - **Last Seen** view your watch history grouped by series
 - **Actionable empty states** — Watch Later, Last Seen, and Search all explain what the screen is for and link somewhere useful (Browse Movies, Explore TV Shows, Browse Trending) instead of showing a dead end
 - **Unified player controls** — movie and episode players use the same icon bar, with a Restart control that remounts the player from 0:00
-- **Settings** — card-based sections for account, default video source, calendar timezone, storage (clear history / progress / watch later / TMDB cache / offline queue), statistics, backup, and a danger zone
+- **Settings** — card-based sections for account, default video source, calendar timezone, storage (clear history / watching flags / watch later / TMDB cache / offline queue), statistics, backup, and a danger zone
 - **Error boundary** catches render crashes with retry button and error logging
 - **Back to top** floating button appears after scrolling down
 - **Accessibility** ARIA roles, labels, skip-to-content link, keyboard navigation, screen reader announcements, tooltips on every decision badge
@@ -159,7 +159,7 @@ flowchart TD
 - [VidSrc](https://vidsrc.fyi) for video embeds
 - [Supabase](https://supabase.com) for optional authentication and cloud sync (Postgres + RLS)
 - CSS Modules for scoped styling
-- localStorage for local user data (watched marks, progress, watch later lists)
+- localStorage for local user data (watched marks, watching flags, watch later lists)
 - IndexedDB for TMDB API response cache (larger quota than localStorage)
 - [Vitest](https://vitest.dev) for unit and component tests (jsdom, mocked externals)
 - [oxlint](https://oxc.rs) for linting, with `react/rules-of-hooks` and `react/exhaustive-deps` enabled
@@ -227,7 +227,7 @@ Output goes to the `dist/` directory.
 npm run test
 ```
 
-321 tests across 31 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze and Supabase calls are mocked, so the suite never touches the network.
+323 tests across 31 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze and Supabase calls are mocked, so the suite never touches the network.
 
 ```bash
 npm run typecheck  # tsc -b (also covers vite.config.ts and scripts/)
@@ -277,7 +277,7 @@ src/
     AuthModal/          # Global sign-in modal: Login, Register, ForgotPassword forms
     ProtectedRoute/     # Gates personal pages behind auth, opens modal for guests
     AccountButton/      # "Sign In" CTA for guests
-    Player.tsx          # Video player with progress tracking
+    Player.tsx          # Video player with watching/completion detection
     MediaCard.tsx       # Poster card with rating and action buttons
     RatingBadge.tsx     # Shared IMDb-or-TMDB rating badge (MediaCard + Watch Later)
     ErrorBoundary.tsx   # Render crash catcher with retry
@@ -336,7 +336,7 @@ Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvma
 - Supabase data is protected by Row Level Security — each user can only read/write their own rows
 - TMDB API responses are cached in IndexedDB for 24 hours (max 100 entries, virtually unlimited space)
 - All `VITE_*` variables are inlined into the client bundle by design — there is no server-side secret. The Supabase key is `anon`-role and bounded by Row Level Security, and the TMDB token has no quota isolation, so it can be extracted and used to burn the account's rate limit
-- Playback position isn't always persisted by the embed player, so no resume percentage is advertised on detail pages — the Restart control is the reliable way to start over
+- Playback position is never stored (embeds rarely report it reliably), so Continue Watching tracks only that a title was started; playback always begins at 0:00 and Restart simply clears the flag
 - The `N new` badge uses TMDB's date-only `air_date`, while the calendar uses TVMaze's exact air instant; near midnight they can occasionally disagree
 - The app uses a privacy-conscious setup: noindex tags, no analytics, no tracking
 - Video playback quality and availability depend on the embed source

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import {
   getLastSeen,
   markUnwatched,
-  clearProgress,
+  clearWatching,
   clearShowHistory,
   clearAllMoviesWatched,
   getSeriesWatchedFlag,
@@ -48,7 +48,6 @@ type LastSeenEntry =
       title: string;
       ts: number;
       episodes: number;
-      year: string;
     }
   | {
       kind: "movie";
@@ -57,13 +56,7 @@ type LastSeenEntry =
       title: string;
       ts: number;
       episodes: number;
-      year: string;
     };
-
-function metaYear(meta: Record<string, unknown> | null | undefined): string {
-  const year = meta?.year;
-  return year == null ? "" : String(year);
-}
 
 function formatEpisodeLabel(item: LastSeenItem): string {
   if (item.season && item.episode) return `S${item.season}E${item.episode}`;
@@ -165,7 +158,6 @@ export default function LastSeen() {
         title: group.title,
         ts: group.latestTs,
         episodes: group.episodes.length,
-        year: metaYear(group.episodes[0]?.meta),
       }),
     );
     const movieEntries: LastSeenEntry[] = sortedMovies.map(
@@ -176,14 +168,12 @@ export default function LastSeen() {
         title: item.title || `Movie ${item.id}`,
         ts: item.ts || 0,
         episodes: 0,
-        year: metaYear(item.meta),
       }),
     );
 
     let combined = [...seriesEntries, ...movieEntries].sort((a, b) => {
       if (sortBy === "title") return dir * a.title.localeCompare(b.title);
       if (sortBy === "episodes") return dir * (a.episodes - b.episodes);
-      if (sortBy === "year") return dir * a.year.localeCompare(b.year);
       return dir * ((a.ts || 0) - (b.ts || 0));
     });
 
@@ -229,11 +219,11 @@ export default function LastSeen() {
     let removed = false;
     if (item.type === "movie") {
       markUnwatched("movie", item.id);
-      clearProgress("movie", item.id);
+      clearWatching("movie", item.id);
       removed = true;
     } else if (item.season && item.episode) {
       markUnwatched("tv", item.id, item.season, item.episode);
-      clearProgress("tv", item.id, item.season, item.episode);
+      clearWatching("tv", item.id, item.season, item.episode);
       if (getSeriesWatchedFlag(item.id).source === "auto") unmarkSeriesWatched(item.id);
       removed = true;
     } else if (item.type === "tv") {
@@ -263,7 +253,7 @@ export default function LastSeen() {
     } else {
       for (const item of movies) {
         markUnwatched("movie", item.id);
-        clearProgress("movie", item.id);
+        clearWatching("movie", item.id);
       }
     }
     setItems(getLastSeen());
@@ -294,7 +284,7 @@ export default function LastSeen() {
         );
         if (item) {
           markUnwatched("movie", item.id);
-          clearProgress("movie", item.id);
+          clearWatching("movie", item.id);
           removed += 1;
         }
       }
@@ -352,8 +342,8 @@ export default function LastSeen() {
           <div className="empty-state">
             <h3>No history yet</h3>
             <p>
-              Everything you watch - and where you left off - will appear
-              here as you start playing something.
+              Movies and episodes you finish or mark as watched will appear
+              here.
             </p>
             <div className="empty-state-actions">
               <Link to="/movies" className="empty-state-action">
@@ -382,7 +372,6 @@ export default function LastSeen() {
                   { value: "recent", label: "Date added" },
                   { value: "title", label: "Title" },
                   { value: "episodes", label: "Most episodes" },
-                  { value: "year", label: "Year" },
                 ]}
                 placeholder="Date added"
                 onSelect={(v: string) => {
@@ -467,10 +456,8 @@ export default function LastSeen() {
                           <div className="media-card-info">
                             <h3>{show.title}</h3>
                             <span className="media-card-year">
-                              {show.episodes.some((e) => e.source === "progress")
-                                ? "Resume"
-                                : show.episodes.length === 1 &&
-                                  !show.episodes[0].season
+                              {show.episodes.length === 1 &&
+                              !show.episodes[0].season
                                 ? "Watched"
                                 : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
                             </span>
@@ -541,14 +528,6 @@ export default function LastSeen() {
                           </div>
                           <div className="media-card-info">
                             <h3>{item.title || `Movie ${item.id}`}</h3>
-                            {item.source === "progress" && (
-                              <span className="media-card-year resume-badge">Resume</span>
-                            )}
-                            {entry.year && item.source !== "progress" && (
-                              <span className="media-card-year">
-                                {entry.year}
-                              </span>
-                            )}
                           </div>
                         </Link>
                         {!selectMode && (
@@ -646,9 +625,7 @@ export default function LastSeen() {
                           <span className={styles.lsLabel}>
                             {formatEpisodeLabel(item)}
                           </span>
-                          <span className={styles.lsMeta}>
-                            {item.source === "progress" ? "Resume" : "Watched"}
-                          </span>
+                          <span className={styles.lsMeta}>Watched</span>
                         </Link>
                         <button
                           className={styles.lsRemove}

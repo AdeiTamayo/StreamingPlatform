@@ -39,7 +39,7 @@ describe('LastSeen empty state', () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByText('No history yet')).toBeInTheDocument());
-    expect(screen.getByText(/where you left off/i)).toBeInTheDocument();
+    expect(screen.getByText(/finish or mark as watched/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Browse Movies' })).toHaveAttribute('href', '/movies');
     expect(screen.getByRole('link', { name: 'Explore TV Shows' })).toHaveAttribute('href', '/tv');
   });

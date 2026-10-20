@@ -8,7 +8,7 @@ import {
   getTimezone, setTimezone, getEffectiveTimezone,
   getSearchHistory, addSearchHistory, removeSearchHistory,
   getEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, isInEpisodeWatchLater,
-  saveProgress, getProgress, clearProgress,
+  markWatching, getWatching, clearWatching,
   getLastSeen, getContinueWatching,
   getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified, pruneOldNotifications, NOTIFICATIONS_KEY,
   clearAllData, exportData, importData,
@@ -162,14 +162,14 @@ describe('clearShowHistory', () => {
     expect(isWatched('movie', '2')).toBe(true);
   });
 
-  it('also clears progress entries for the show', () => {
-    saveProgress('tv', '1', 100, 1, 1);
-    saveProgress('tv', '1', 200, 1, 2);
-    saveProgress('tv', '2', 300, 1, 1);
+  it('also clears watching entries for the show', () => {
+    markWatching('tv', '1', 1, 1);
+    markWatching('tv', '1', 1, 2);
+    markWatching('tv', '2', 1, 1);
     clearShowHistory('1');
-    expect(getProgress('tv', '1', 1, 1)).toBeNull();
-    expect(getProgress('tv', '1', 1, 2)).toBeNull();
-    expect(getProgress('tv', '2', 1, 1)).not.toBeNull();
+    expect(getWatching('tv', '1', 1, 1)).toBeNull();
+    expect(getWatching('tv', '1', 1, 2)).toBeNull();
+    expect(getWatching('tv', '2', 1, 1)).not.toBeNull();
   });
 
   it('removes the series flag with the history', () => {
@@ -224,28 +224,49 @@ describe('episode watch later', () => {
   });
 });
 
-describe('progress', () => {
-  it('saves and retrieves progress', () => {
-    saveProgress('movie', '1', 300, null, null);
-    const p = getProgress('movie', '1');
-    expect(p).not.toBeNull();
-    expect(p!.currentTime).toBe(300);
+describe('watching', () => {
+  it('marks and retrieves a title being watched', () => {
+    markWatching('movie', '1');
+    const w = getWatching('movie', '1');
+    expect(w).not.toBeNull();
+    expect(w!.type).toBe('movie');
+    expect(w!.savedAt).toBeGreaterThan(0);
   });
 
-  it('returns null for non-existent progress', () => {
-    expect(getProgress('movie', '999')).toBeNull();
+  it('returns null for non-existent entries', () => {
+    expect(getWatching('movie', '999')).toBeNull();
   });
 
-  it('clears progress', () => {
-    saveProgress('movie', '1', 300);
-    clearProgress('movie', '1');
-    expect(getProgress('movie', '1')).toBeNull();
+  it('clears the watching flag', () => {
+    markWatching('movie', '1');
+    clearWatching('movie', '1');
+    expect(getWatching('movie', '1')).toBeNull();
   });
 
   it('persists metadata', () => {
-    saveProgress('tv', '1', 120, 1, 1, { title: 'Show', poster: 'p.jpg' });
-    const p = getProgress('tv', '1', 1, 1);
-    expect(p!.meta).toEqual({ title: 'Show', poster: 'p.jpg' });
+    markWatching('tv', '1', 1, 1, { title: 'Show', poster: 'p.jpg' });
+    const w = getWatching('tv', '1', 1, 1);
+    expect(w!.meta).toEqual({ title: 'Show', poster: 'p.jpg' });
+  });
+
+  it('drops the watched mark when playback starts (rewatch)', () => {
+    markWatched('movie', '1', 'Movie');
+    markWatching('movie', '1', null, null, { title: 'Movie' });
+    expect(isWatched('movie', '1')).toBe(false);
+    expect(getContinueWatching()).toHaveLength(1);
+  });
+
+  it('drops the series flag when playback starts (rewatch)', () => {
+    markSeriesWatched('1', 'Show', 'p.jpg');
+    markWatching('tv', '1', 1, 1, { title: 'Show' });
+    expect(isSeriesWatched('1')).toBe(false);
+  });
+
+  it('drops the watching flag when marked watched', () => {
+    markWatching('movie', '1');
+    markWatched('movie', '1', 'Movie');
+    expect(getWatching('movie', '1')).toBeNull();
+    expect(getContinueWatching()).toHaveLength(0);
   });
 });
 
@@ -260,51 +281,34 @@ describe('getLastSeen', () => {
     expect(seen[1].title).toBe('Show A');
   });
 
-  it('includes progress items with currentTime > 30 and no watched entry', () => {
-    saveProgress('tv', '1', 300, 1, 1, { title: 'Show C' });
-    const seen = getLastSeen();
-    expect(seen.some((s) => s.title === 'Show C')).toBe(true);
-  });
-
-  it('excludes progress items when matching watched entry exists', () => {
-    markWatched('tv', '1', 'Show', 1, 1);
-    saveProgress('tv', '1', 300, 1, 1, { title: 'Show' });
-    const seen = getLastSeen();
-    const progressEntries = seen.filter((s) => s.source === 'progress');
-    expect(progressEntries).toHaveLength(0);
-  });
-
-  it('excludes progress items with currentTime <= 30', () => {
-    saveProgress('tv', '1', 20, 1, 1, { title: 'Show' });
-    const seen = getLastSeen();
-    const progressEntries = seen.filter((s) => s.source === 'progress');
-    expect(progressEntries).toHaveLength(0);
+  it('does not list titles that are only being watched', () => {
+    markWatching('tv', '1', 1, 1, { title: 'Show C' });
+    expect(getLastSeen()).toEqual([]);
   });
 });
 
 describe('getContinueWatching', () => {
-  it('returns progress items with currentTime > 30', () => {
-    saveProgress('tv', '1', 300, 1, 1);
-    saveProgress('tv', '1', 20, 1, 2);
+  it('lists every title marked as being watched', () => {
+    markWatching('tv', '1', 1, 1);
+    markWatching('tv', '1', 1, 2);
     const cw = getContinueWatching();
-    expect(cw).toHaveLength(1);
-    expect(cw[0].episode).toBe(1);
+    expect(cw).toHaveLength(2);
   });
 
   it('excludes items that are fully watched', () => {
-    saveProgress('tv', '1', 300, 1, 1);
+    markWatching('tv', '1', 1, 1);
     markWatched('tv', '1', 'Show', 1, 1);
     const cw = getContinueWatching();
     expect(cw).toHaveLength(0);
   });
 
   it('sorts by savedAt descending', async () => {
-    saveProgress('tv', '1', 300, 1, 1);
+    markWatching('tv', '1', 1, 1, { title: 'First' });
     await new Promise((r) => setTimeout(r, 5));
-    saveProgress('tv', '2', 200, 1, 1);
+    markWatching('tv', '2', 1, 1, { title: 'Second' });
     const cw = getContinueWatching();
     expect(cw).toHaveLength(2);
-    expect(cw[0].season).toBe(1);
+    expect(cw[0].meta?.title).toBe('Second');
   });
 });
 
@@ -646,10 +650,10 @@ describe('clearAllData', () => {
     expect(isSeriesWatched('1')).toBe(false);
   });
 
-  it('clears progress entries', () => {
-    saveProgress('movie', '1', 300);
+  it('clears watching entries', () => {
+    markWatching('movie', '1');
     clearAllData();
-    expect(getProgress('movie', '1')).toBeNull();
+    expect(getWatching('movie', '1')).toBeNull();
   });
 
   it('clears watch later', () => {
@@ -684,7 +688,7 @@ describe('clearAllData', () => {
   });
 
   it('clears the progress_index key (ghost fix)', () => {
-    saveProgress('tv', '1', 300, 1, 1);
+    markWatching('tv', '1', 1, 1);
     clearAllData();
     const progressIndexRaw = localStorage.getItem('progress_index');
     expect(progressIndexRaw).toBeNull();
@@ -704,9 +708,9 @@ describe('clearAllData', () => {
 });
 
 describe('export / import', () => {
-  it('exports watched, progress, and other app keys', () => {
+  it('exports watched, watching, and other app keys', () => {
     markWatched('movie', '1', 'Movie');
-    saveProgress('tv', '1', 300, 1, 1);
+    markWatching('tv', '1', 1, 1);
     addSearchHistory('test');
     const data = exportData();
     expect(data[`watched:movie-1`]).toBeTruthy();

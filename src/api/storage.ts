@@ -217,6 +217,11 @@ export function markWatched(type: MediaType, id: string | number, title: string,
       meta: (meta ?? null) as never,
     });
   }
+
+  // Marked watched means no longer being watched.
+  if (localStorage.getItem(progressKey(type, id, season, episode))) {
+    clearWatching(type, id, season, episode);
+  }
 }
 
 export function markUnwatched(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
@@ -295,6 +300,9 @@ export function markSeriesWatched(showId: string | number, showName: string, pos
       meta: meta as never,
     });
   }
+
+  // The whole show is watched, so nothing in it is being watched.
+  clearWatchingForShow(showId);
 }
 
 export function unmarkSeriesWatched(showId: string | number): void {
@@ -409,16 +417,27 @@ export function getLastWatchedEpisode(showId: string | number): { type: string; 
   return last;
 }
 
-export function saveProgress(type: MediaType, id: string | number, currentTime: number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>, duration?: number): void {
-  const data: ProgressData = { type, id, currentTime, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(duration ? { duration } : {}), ...(meta ? { meta } : {}) };
+// Records that a movie/episode is being watched. No playback position is
+// stored: the embed does not report one reliably, so Continue Watching is
+// driven purely by this flag. Starting a title also clears its watched mark,
+// so a rewatch moves it out of Last Seen and back into Continue Watching.
+export function markWatching(type: MediaType, id: string | number, season?: number | null, episode?: number | null, meta?: Record<string, unknown>): void {
+  const data: ProgressData = { type, id, savedAt: Date.now(), season: season ?? undefined, episode: episode ?? undefined, ...(meta ? { meta } : {}) };
   const key = progressKey(type, id, season, episode);
   sessionModifiedKeys.progress.add(key);
   try {
     localStorage.setItem(key, JSON.stringify(data));
     addToProgressIndex(key);
-    logDebug(`saveProgress key=${key} currentTime=${currentTime}`);
   } catch (err) {
-    logDebug(`saveProgress FAILED key=${key} err=${String(err)}`);
+    logDebug(`markWatching FAILED key=${key} err=${String(err)}`);
+  }
+
+  // Watched and watching are mutually exclusive.
+  if (localStorage.getItem(watchedKey(type, id, season, episode))) {
+    markUnwatched(type, id, season, episode);
+  }
+  if (type === 'tv' && isSeriesWatched(id)) {
+    unmarkSeriesWatched(id);
   }
 
   const title = typeof meta?.title === 'string' ? meta.title : '';
@@ -440,7 +459,7 @@ export function saveProgress(type: MediaType, id: string | number, currentTime: 
   }
 }
 
-export function getProgress(type: string, id: string | number, season?: number | null, episode?: number | null): ProgressData | null {
+export function getWatching(type: string, id: string | number, season?: number | null, episode?: number | null): ProgressData | null {
   try {
     const raw = localStorage.getItem(progressKey(type, id, season, episode));
     if (!raw) return null;
@@ -450,7 +469,7 @@ export function getProgress(type: string, id: string | number, season?: number |
   }
 }
 
-export function clearProgress(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
+export function clearWatching(type: MediaType, id: string | number, season?: number | null, episode?: number | null): void {
   const key = progressKey(type, id, season, episode);
   localStorage.removeItem(key);
   removeFromProgressIndex(key);
@@ -458,6 +477,25 @@ export function clearProgress(type: MediaType, id: string | number, season?: num
 
   if (currentUserId && isSyncableId(id)) {
     progressRepository.remove(currentUserId, type, Number(id), season, episode);
+  }
+}
+
+// Drops every Continue Watching row for a show (local + remote). Used when a
+// series/season is marked watched, which means nothing in it is being watched.
+function clearWatchingForShow(showId: string | number): void {
+  const showIdStr = String(showId);
+  const keep: string[] = [];
+  for (const k of getProgressIndex()) {
+    if (parseProgressKey(k)?.showId === showIdStr) {
+      localStorage.removeItem(k);
+      progressRemoteSyncedAt.delete(k);
+    } else {
+      keep.push(k);
+    }
+  }
+  saveIndex(PROGRESS_INDEX_KEY, keep);
+  if (currentUserId && isSyncableId(showId)) {
+    void progressRepository.clearShow(currentUserId, Number(showId)).catch(() => {});
   }
 }
 
@@ -526,40 +564,14 @@ export function getLastSeen(): LastSeenItem[] {
           season: (data.season ?? parsed.season ?? null) as number | null,
           episode: (data.episode ?? parsed.episode ?? null) as number | null,
           ts: (data.watchedAt || 0) as number,
-          source: 'watched' as const,
           meta: (data.meta || null) as Record<string, unknown> | null,
         });
       }
     } catch {}
   }
 
-  const progressIndex = getProgressIndex();
-  for (const k of progressIndex) {
-    try {
-      const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
-      if ((data.currentTime as number) > 30) {
-        const wKey = k.replace('progress:', 'watched:');
-        if (!localStorage.getItem(wKey)) {
-          const parsed = parseProgressKey(k);
-          if (parsed) {
-            items.push({
-              storageKey: k as string,
-              type: parsed.type as MediaType,
-              id: (data.id ?? parsed.id ?? parsed.showId ?? '') as string | number,
-              title: ((data.meta as Record<string, unknown> | undefined)?.title as string) || null,
-              season: (data.season ?? parsed.season ?? null) as number | null,
-              episode: (data.episode ?? parsed.episode ?? null) as number | null,
-              ts: (data.savedAt || 0) as number,
-              source: 'progress' as const,
-              currentTime: data.currentTime as number,
-              meta: (data.meta || null) as Record<string, unknown> | null,
-            });
-          }
-        }
-      }
-    } catch {}
-  }
-
+  // Last Seen is a watch history: only finished or explicitly marked items.
+  // In-progress entries live in Continue Watching and must not leak in here.
   return items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
 }
 
@@ -571,19 +583,19 @@ export function getContinueWatching(): ContinueWatchingItem[] {
     if (!p) continue;
     try {
       const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
-      const cloudOnly = data.cloudOnly === true;
-      if (!data || ((data.currentTime as number) <= 30 && !cloudOnly)) continue;
-      const wKey = k.replace('progress:', 'watched:');
-      if (localStorage.getItem(wKey)) continue;
+      if (!data) continue;
+      // Safety net for rows written by older versions that never cleared
+      // progress when something was marked watched.
+      if (localStorage.getItem(k.replace('progress:', 'watched:'))) continue;
+      if (p.type === 'tv' && isSeriesWatched(p.showId ?? p.id)) continue;
       progressItems.push({
         type: p.type as MediaType,
         id: (p.showId ?? p.id) as string | number,
         season: p.season as number | null,
         episode: p.episode as number | null,
-        currentTime: data.currentTime as number,
-        savedAt: data.savedAt as number,
+        savedAt: (data.savedAt as number) || 0,
         meta: (data.meta || null) as Record<string, unknown> | null,
-        cloudOnly: cloudOnly ? true : undefined,
+        cloudOnly: data.cloudOnly === true ? true : undefined,
       });
     } catch {}
   }
@@ -708,6 +720,13 @@ export function markSeasonWatched(showId: string | number, seasonNumber: number,
 
   if (batch.length > 0) {
     watchedRepository.markBatch(batch);
+  }
+
+  // Every episode in the season is now watched, so none of them is in progress.
+  for (let i = 1; i <= episodeCount; i++) {
+    if (localStorage.getItem(progressKey('tv', showId, seasonNumber, i))) {
+      clearWatching('tv', showId, seasonNumber, i);
+    }
   }
 }
 

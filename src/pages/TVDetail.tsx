@@ -4,7 +4,7 @@ import { getTVDetail, getSeasonDetails, getTVExternalIds, getEpisodeExternalIds,
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from '../api/vidsrc';
 import { getImdbRating, type ImdbRating } from '../api/omdb';
 import { isEpisodeReleased } from '../api/tvmaze';
-import { isWatched, markWatched, markUnwatched, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag, saveProgress, getProgress, clearProgress } from '../api/storage';
+import { isWatched, markWatched, markUnwatched, markWatching, clearWatching, getLastWatchedEpisode, isInWatchLater, addWatchLater, removeWatchLater, getWatchedCount, isInEpisodeWatchLater, addEpisodeWatchLater, removeEpisodeWatchLater, markSeasonWatched, markAllSeasonsWatched, unmarkAllSeasonsWatched, getVideoSource, setVideoSource as persistVideoSource, getEpisodeWatchLater, isAlreadyNotified, addNotification, getWatchedEpisodeSet, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, syncSeriesWatchedFlag } from '../api/storage';
 import Player from '../components/Player';
 import EpisodeDropdown from '../components/EpisodeDropdown';
 import SeasonDropdown from '../components/SeasonDropdown';
@@ -17,13 +17,10 @@ import DetailActions from '../components/DetailActions';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
-import { logDebug } from '../utils/logger';
 import { formatVotes } from '../utils/format';
 import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
 import styles from './TVDetail.module.css';
-
-const AUTO_WATCH_REMAINING_SECONDS = 5 * 60;
 
 // A plain unmodified left-click (no Ctrl/Cmd/Shift/Alt and not the middle
 // button) - the only case where we want client-side state to react too.
@@ -82,16 +79,13 @@ export default function TVDetail() {
   const [epImdbRatings, setEpImdbRatings] = useState<Record<number, ImdbRating | null>>({});
   const [videoSource, setVideoSource] = useState(getVideoSource());
   const [playerOpen, setPlayerOpen] = useState(false);
-  const [startAt, setStartAt] = useState<number | null>(null);
-  // Bumped on every Restart click so the player remounts from 0:00 even
-  // when there was no saved position (key would otherwise be unchanged).
+  // Bumped on every Restart click so the player remounts from 0:00.
   const [restartTick, setRestartTick] = useState(0);
   const watchedRef = useRef(false);
-  const autoWatchedRef = useRef<string | null>(null);
+  // Episode key ("season-episode") whose playback already finished/was marked
+  // watched, so stray ticks can't re-add it to Continue Watching.
+  const finishedKeyRef = useRef<string | null>(null);
   const playerWrapRef = useRef<HTMLDivElement | null>(null);
-  // Last playback position reported by the embed - used to resume where the
-  // episode was left off after switching back from the trailer.
-  const lastTimeRef = useRef<number | null>(null);
   // Mirrors playerOpen so the Back effect can tell whether a bare URL is a
   // browser navigation (player was open) instead of the initial load.
   const playerOpenRef = useRef(false);
@@ -148,7 +142,7 @@ export default function TVDetail() {
     // watched and progress handlers.
     setShow(null);
     watchedRef.current = false;
-    autoWatchedRef.current = null;
+    finishedKeyRef.current = null;
     setTrailerKey(null);
     setShowTrailer(false);
     setEpisodes([]);
@@ -307,7 +301,7 @@ export default function TVDetail() {
     setWatched(isWatched('tv', id, season, episode));
     setInEpWL(isInEpisodeWatchLater(id, season, episode));
     watchedRef.current = isWatched('tv', id, season, episode);
-    autoWatchedRef.current = null;
+    finishedKeyRef.current = null;
   }, [id, season, episode]);
 
   // Per-episode Watch Later set for the current season - drives the
@@ -334,7 +328,7 @@ export default function TVDetail() {
   }, [watched]);
 
   useEffect(() => {
-    autoWatchedRef.current = null;
+    finishedKeyRef.current = null;
   }, [season, episode]);
 
   useEffect(() => {
@@ -611,36 +605,22 @@ export default function TVDetail() {
 
   function autoMarkWatched() {
     const episodeKey = `${season}-${episode}`;
-    if (!show || !id || watchedRef.current || autoWatchedRef.current === episodeKey) return;
-    autoWatchedRef.current = episodeKey;
+    if (!show || !id || finishedKeyRef.current === episodeKey) return;
+    finishedKeyRef.current = episodeKey;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
-    // Deliberately not resetting startAt: the stored progress is already
-    // cleared, and flipping startAt to null rewrites the Player key and the
-    // embed URL - which unmounts the iframe and replays the finished episode
-    // from 0:00. A real episode change reloads startAt from storage anyway.
   }
 
-  function handleProgress(currentTime: number, duration: number) {
-    lastTimeRef.current = currentTime;
-    if (watchedRef.current || !show || !id) return;
-    saveProgress('tv', id, currentTime, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: currentEpisode?.name }, duration || undefined);
-
-    // Runtime estimate: real duration when the embed reports one, else TMDB
-    // metadata for the current episode/series.
-    const tmdbRuntime = currentEpisode?.runtime || show?.episode_run_time?.[0] || null;
-    const runtimeSeconds = duration || (tmdbRuntime ? tmdbRuntime * 60 : null);
-
-    logDebug(`autoWatch check: currentTime=${currentTime} duration=${duration} tmdbRuntime=${tmdbRuntime} runtimeSeconds=${runtimeSeconds} episodesLoaded=${episodes.length}`);
-
-    if (!runtimeSeconds) return;
-
-    const autoWatchThreshold = Math.min(runtimeSeconds * 0.9, runtimeSeconds - AUTO_WATCH_REMAINING_SECONDS);
-
-    if (autoWatchThreshold > 0 && currentTime >= autoWatchThreshold) {
-      autoMarkWatched();
+  function handleWatching() {
+    const episodeKey = `${season}-${episode}`;
+    if (!show || !id || finishedKeyRef.current === episodeKey) return;
+    markWatching('tv', id, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: currentEpisode?.name });
+    // Starting a watched episode is a rewatch: markWatching dropped the
+    // watched mark, so keep the UI in step.
+    if (watchedRef.current) {
+      watchedRef.current = false;
+      setWatched(false);
     }
   }
 
@@ -652,12 +632,11 @@ export default function TVDetail() {
     if (!show || !id) return;
     if (watched) {
       markUnwatched('tv', id, season, episode);
-      clearProgress('tv', id, season, episode);
       setWatched(false);
       toast?.('Removed from watched');
     } else {
+      finishedKeyRef.current = `${season}-${episode}`;
       markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-      clearProgress('tv', id, season, episode);
       setWatched(true);
       toast?.('Marked as watched');
     }
@@ -720,13 +699,6 @@ export default function TVDetail() {
     }
   }
 
-  // Resume position is per episode: reload it whenever the episode
-  // changes (Prev/Next, dropdowns, dots, deep links, shortcuts).
-  useEffect(() => {
-    if (!id) { setStartAt(null); return; }
-    setStartAt(getProgress('tv', id, season, episode)?.currentTime || null);
-  }, [id, season, episode]);
-
   function goPrev() {
     markCurrentWatched();
     if (episode > 1) {
@@ -740,11 +712,10 @@ export default function TVDetail() {
 
   function markCurrentWatched() {
     if (watchedRef.current || !show || !id) return;
+    finishedKeyRef.current = `${season}-${episode}`;
     markWatched('tv', id, show.name, season, episode, { title: show.name, poster: show?.poster_path });
-    clearProgress('tv', id, season, episode);
     watchedRef.current = true;
     setWatched(true);
-    setStartAt(null);
   }
 
   function goNext() {
@@ -758,12 +729,6 @@ export default function TVDetail() {
   }
 
   function switchMode(next: 'trailer' | 'player') {
-    // Returning from the trailer: resume the episode where it was left off
-    // instead of restarting at 0:00.
-    if (next === 'player' && showTrailer && lastTimeRef.current != null) {
-      setStartAt(lastTimeRef.current);
-      setRestartTick((t) => t + 1);
-    }
     setShowTrailer(next === 'trailer');
   }
 
@@ -787,7 +752,7 @@ export default function TVDetail() {
   );
   if (!show) return <div className="page"><div className="loading">Show not found</div></div>;
 
-  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource, startAt ?? undefined);
+  const embedUrl = getTVEmbedUrl(safeId, season, episode, videoSource);
   const backdrop = imageUrl(show.backdrop_path, 'original');
   const year = (show.first_air_date || '').slice(0, 4);
   const ended = show.status === 'Ended';
@@ -858,7 +823,7 @@ export default function TVDetail() {
                   <span className="rating-source">{imdbRating.rating}</span>
                   {imdbRating.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
                 </a>
-              ) : (!imdbId || imdbResolved) && show.vote_average != null ? (
+              ) : (!imdbId || imdbResolved) && show.vote_average > 0 ? (
                 <span
                   className={`${styles.detailRating} badge rating rating-tmdb`}
                   title={`TMDB rating ${show.vote_average.toFixed(1)}/10${show.vote_count ? ` \u00b7 ${formatVotes(String(show.vote_count))} votes` : ''}`}
@@ -936,13 +901,12 @@ export default function TVDetail() {
           ) : (
             <div ref={playerWrapRef} className="player-fs-wrap">
               <Player
-                key={`${season}-${episode}-${startAt !== null ? 'resume' : 'fresh'}-${restartTick}`}
+                key={`${season}-${episode}-${restartTick}`}
                 src={embedUrl}
                 title={`${show.name} S${season}E${episode}`}
-                onProgress={handleProgress}
+                onWatching={handleWatching}
                 onEnded={handleEnded}
                 runtimeMinutes={currentEpisode?.runtime || show.episode_run_time?.[0] || null}
-                startAt={startAt ?? undefined}
               />
             </div>
           )}
@@ -983,7 +947,7 @@ export default function TVDetail() {
               <button
                 type="button"
                 className={styles.epActionBtn}
-                onClick={() => { setStartAt(null); clearProgress('tv', safeId, season, episode); setRestartTick((t) => t + 1); }}
+                onClick={() => { finishedKeyRef.current = null; clearWatching('tv', safeId, season, episode); setRestartTick((t) => t + 1); }}
                 title="Restart episode from the beginning"
                 aria-label="Restart episode from the beginning"
               >

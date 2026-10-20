@@ -5,7 +5,7 @@ import { MemoryRouter, Routes, Route, Link, useLocation } from 'react-router-dom
 import TVDetail from '../pages/TVDetail';
 import MovieDetail from '../pages/MovieDetail';
 import { markWatched } from '../api/storage';
-import { saveProgress, getProgress } from '../api/storage';
+import { markWatching, getWatching } from '../api/storage';
 
 vi.mock('../hooks/useAuth', () => ({
   useAuth: () => ({
@@ -247,11 +247,10 @@ describe('detail pages render', () => {
     await waitFor(() => expect(screen.getByText('✓ Watched')).toBeInTheDocument(), { timeout: 5000 });
   });
 
-  // Saved progress deliberately shows no badge: the player does not always
-  // persist a position, so a resume percentage can promise something that
-  // does not happen. The Restart button is the reliable affordance.
-  it('MovieDetail shows no resume badge for saved progress', async () => {
-    saveProgress('movie', '550', 3000, null, null, { title: 'Fight Club' }, 139 * 60);
+  // Continue Watching stores no playback position, so nothing can promise a
+  // resume point. The Restart button is the reliable affordance.
+  it('MovieDetail shows no resume badge for a title being watched', async () => {
+    markWatching('movie', '550', null, null, { title: 'Fight Club' });
     render(
       <MemoryRouter initialEntries={['/movie/550']}>
         <Routes>
@@ -263,8 +262,8 @@ describe('detail pages render', () => {
     expect(screen.queryByText(/Resume/)).not.toBeInTheDocument();
   });
 
-  it('TVDetail episode restart button clears the saved position', async () => {
-    saveProgress('tv', 1399, 120, 1, 1, { title: 'Game of Thrones' }, 3600);
+  it('TVDetail episode restart button clears the watching flag', async () => {
+    markWatching('tv', 1399, 1, 1, { title: 'Game of Thrones' });
     render(
       <MemoryRouter initialEntries={['/tv/1399']}>
         <Routes>
@@ -277,9 +276,9 @@ describe('detail pages render', () => {
     const restart = await screen.findByTitle('Restart episode from the beginning', {}, { timeout: 5000 });
     expect(restart).toBeInTheDocument();
     fireEvent.click(restart);
-    await waitFor(() => expect(getProgress('tv', 1399, 1, 1)).toBeNull());
+    await waitFor(() => expect(getWatching('tv', 1399, 1, 1)).toBeNull());
     // The button stays visible - restart always restarts, even with no
-    // saved position.
+    // watching flag.
     expect(screen.getByTitle('Restart episode from the beginning')).toBeInTheDocument();
   });
 
@@ -406,11 +405,10 @@ describe('detail pages render', () => {
     expect(screen.queryByText('Game of Thrones')).not.toBeInTheDocument();
   });
 
-  // Auto-marking a resumed film watched used to clear startAt, which flips the
-  // Player key and the embed URL - unmounting the iframe and replaying the
-  // finished film from 0:00 right as it ends.
-  it('MovieDetail keeps the player mounted when a resumed film is auto-marked watched', async () => {
-    saveProgress('movie', '550', 100, null, null, { title: 'Fight Club' }, 139 * 60);
+  // Completion must not change any player prop (key/src): that would unmount
+  // the iframe and replay the finished film from 0:00 as the credits roll.
+  it('MovieDetail keeps the player mounted when playback completes', async () => {
+    markWatching('movie', '550', null, null, { title: 'Fight Club' });
     render(
       <MemoryRouter initialEntries={['/movie/550']}>
         <Routes>
@@ -427,10 +425,10 @@ describe('detail pages render', () => {
     const iframe = document.querySelector('iframe');
     expect(iframe).not.toBeNull();
     const srcBefore = iframe!.getAttribute('src');
-    expect(srcBefore).toContain('t=100');
+    expect(srcBefore).not.toContain('t=');
 
-    // 8000s of 8340s runtime: past the 90% auto-watch threshold and the
-    // completion ratio, so both autoMarkWatched paths run.
+    // 8000s of 8400s runtime: past the 90% completion ratio, so the
+    // autoMarkWatched path runs.
     act(() => {
       window.dispatchEvent(
         new MessageEvent('message', {
@@ -443,7 +441,7 @@ describe('detail pages render', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Fight Club');
     expect(document.querySelector('iframe')).toBe(iframe);
     expect(iframe!.getAttribute('src')).toBe(srcBefore);
-    expect(getProgress('movie', 550)).toBeNull();
+    expect(getWatching('movie', 550)).toBeNull();
     expect(screen.getByTitle('Unmark as watched')).toHaveTextContent('Watched');
   });
 });

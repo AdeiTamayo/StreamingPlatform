@@ -5,7 +5,7 @@ import { getOmdbRatingByTitle, peekOmdbRatingByTmdb, type ImdbRating } from '../
 import MediaCard from '../components/MediaCard';
 import MediaCarousel from '../components/MediaCarousel';
 import CollectionSkeleton from '../components/CollectionSkeleton';
-import { getContinueWatching, clearProgress } from '../api/storage';
+import { getContinueWatching, clearWatching } from '../api/storage';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
@@ -120,10 +120,6 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
   const poster = item.meta?.poster as string | undefined;
   const backdrop = (item.meta?.backdrop as string | undefined) || poster;
   const episodeName = item.meta?.episodeName as string | undefined;
-  const metaRuntime = (item.meta?.runtime as number) || null;
-  const defaultRuntime = item.type === 'movie' ? 7200 : 2700;
-  const runtimeSeconds = metaRuntime ? metaRuntime * 60 : defaultRuntime;
-  const pct = !item.cloudOnly && item.currentTime > 0 ? Math.min(99, Math.round((item.currentTime / runtimeSeconds) * 100)) : null;
   const playTo = `/${item.type === 'tv' ? 'tv' : 'movie'}/${item.id}${item.season ? `?season=${item.season}&episode=${item.episode}` : ''}`;
   const typeLabel = item.type === 'tv'
     ? `Series${item.season ? ` \u00b7 S${item.season}E${item.episode}` : ''}`
@@ -143,18 +139,6 @@ function CwCard({ item, onRemove, onRestart }: { item: ContinueWatchingItem; onR
             <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
           </span>
         </div>
-        {pct !== null && (
-          <div
-            className={styles.cwCardBar}
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={pct}
-            aria-label={`${label} progress`}
-          >
-            <div className={styles.cwCardBarFill} style={{ width: `${pct}%` }} />
-          </div>
-        )}
         <div className={styles.cwCardBody}>
           <div className={styles.cwCardTop}>
             <span className={styles.cwCardType}>{typeLabel}</span>
@@ -316,15 +300,15 @@ export default function Home() {
   }, [trendingType]);
 
   function handleRemoveCW(item: ContinueWatchingItem) {
-    clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
+    clearWatching(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
     toast?.('Removed from Continue Watching');
   }
 
-  // Restart clears the saved position without removing anything else; the
-  // card links to the same play URL, which now opens fresh from 0:00.
+  // Drops the "being watched" flag so the card leaves the row; playback
+  // always starts from the beginning anyway.
   function handleRestartCW(item: ContinueWatchingItem) {
-    clearProgress(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
+    clearWatching(item.type, item.id, item.season ?? undefined, item.episode ?? undefined);
     setContinueWatching(getContinueWatching());
     toast?.('Restarting from the beginning');
   }
@@ -495,7 +479,7 @@ export default function Home() {
           <CollectionSkeleton variant="grid" count={12} />
         ) : error ? (
           <div className="empty-state" role="alert">
-            <h3>Couldn’t load trending</h3>
+            <h3>Couldnâ€™t load trending</h3>
             <p>Check your connection, then refresh the page.</p>
           </div>
         ) : playableTrending.length === 0 ? (

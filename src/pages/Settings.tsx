@@ -457,7 +457,7 @@ export default function Settings() {
                   />
 
                   <Row
-                    label="Progress"
+                    label="Continue Watching"
                     value={formatBytes(usage.breakdown.progress)}
                   />
 
@@ -504,8 +504,8 @@ export default function Settings() {
 
             <Card title="Danger Zone">
               <p className={styles.dangerText}>
-                Remove every local watch history, progress, cache and watch
-                later list.
+                Remove every local watch history, Continue Watching entry,
+                cache and watch later list.
               </p>
 
               <button

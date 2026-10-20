@@ -1,14 +1,8 @@
 import CONFIG from '../config';
 
 type SourceEntry = {
-  movie: (id: string | number, startAt?: number) => string;
-  tv: (id: string | number, s: number, e: number, startAt?: number) => string;
-  /**
-   * Whether the provider honours a start-time query parameter. Providers that
-   * return false ignore `startAt` entirely rather than shipping an unknown
-   * param that some players interpret as a raw-media URL and reject.
-   */
-  supportsStartAt?: boolean;
+  movie: (id: string | number) => string;
+  tv: (id: string | number, s: number, e: number) => string;
 };
 
 // Every host below was probed live (movie + TV episode) and only kept when it
@@ -22,17 +16,15 @@ type SourceEntry = {
 // byte placeholder page).
 const SOURCES: Record<string, SourceEntry> = {
   vidsrc: {
-    movie: (id, startAt) => `${CONFIG.VIDSRC_BASE}/embed/movie/${id}?autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    tv: (id, s, e, startAt) => `${CONFIG.VIDSRC_BASE}/embed/tv/${id}/${s}/${e}?autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    supportsStartAt: true,
+    movie: (id) => `${CONFIG.VIDSRC_BASE}/embed/movie/${id}?autoplay=1`,
+    tv: (id, s, e) => `${CONFIG.VIDSRC_BASE}/embed/tv/${id}/${s}/${e}?autoplay=1`,
   },
   // Same VidSrc player, served from a sibling domain. Kept separate because
   // vidsrc.fyi degrades to an empty player frame when it cannot resolve the id,
   // and this host has stayed up when that one has not.
   vsembed: {
-    movie: (id, startAt) => `https://vsembed.ru/embed/movie/${id}?autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    tv: (id, s, e, startAt) => `https://vsembed.ru/embed/tv/${id}/${s}/${e}?autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    supportsStartAt: true,
+    movie: (id) => `https://vsembed.ru/embed/movie/${id}?autoplay=1`,
+    tv: (id, s, e) => `https://vsembed.ru/embed/tv/${id}/${s}/${e}?autoplay=1`,
   },
   // The key stays `2embed` so a source already persisted in localStorage by an
   // earlier version keeps resolving, but the dead 2embed.cc host is replaced by
@@ -52,9 +44,8 @@ const SOURCES: Record<string, SourceEntry> = {
     tv: (id, s, e) => `https://nontongo.win/embed/tv/${id}/${s}/${e}?autoplay=1`,
   },
   embos: {
-    movie: (id, startAt) => `https://embos.top/movie/?mid=${id}&autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    tv: (id, s, e, startAt) => `https://embos.top/tv/?mid=${id}&s=${s}&e=${e}&autoplay=1${startAt ? `&t=${startAt}` : ''}`,
-    supportsStartAt: true,
+    movie: (id) => `https://embos.top/movie/?mid=${id}&autoplay=1`,
+    tv: (id, s, e) => `https://embos.top/tv/?mid=${id}&s=${s}&e=${e}&autoplay=1`,
   },
 };
 
@@ -69,14 +60,12 @@ function resolveSource(source: string): SourceEntry {
   return Object.hasOwn(SOURCES, source) ? SOURCES[source] : SOURCES[DEFAULT_SOURCE];
 }
 
-export function getMovieEmbedUrl(tmdbId: string | number, source: string = DEFAULT_SOURCE, startAt?: number): string {
-  const entry = resolveSource(source);
-  return entry.movie(tmdbId, entry.supportsStartAt ? startAt : undefined);
+export function getMovieEmbedUrl(tmdbId: string | number, source: string = DEFAULT_SOURCE): string {
+  return resolveSource(source).movie(tmdbId);
 }
 
-export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: number, source: string = DEFAULT_SOURCE, startAt?: number): string {
-  const entry = resolveSource(source);
-  return entry.tv(tmdbId, season, episode, entry.supportsStartAt ? startAt : undefined);
+export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: number, source: string = DEFAULT_SOURCE): string {
+  return resolveSource(source).tv(tmdbId, season, episode);
 }
 
 export function getSourceLabel(source: string): string {

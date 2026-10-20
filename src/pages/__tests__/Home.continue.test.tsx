@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Home from '../Home';
-import { saveProgress, getProgress } from '../../api/storage';
+import { markWatching, getWatching } from '../../api/storage';
 
 vi.mock('../../api/tmdb', () => ({
   getTrending: vi.fn().mockResolvedValue({ results: [] }),
@@ -55,30 +55,30 @@ describe('Home continue watching actions', () => {
   });
 
   it('remove clears only that item and drops the card', async () => {
-    saveProgress('movie', 1, 600, null, null, { title: 'Alpha' }, 7200);
-    saveProgress('movie', 2, 300, null, null, { title: 'Beta' }, 7200);
+    markWatching('movie', 1, null, null, { title: 'Alpha' });
+    markWatching('movie', 2, null, null, { title: 'Beta' });
     renderHome();
     await waitFor(() => expect(screen.getByText('Alpha')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Remove Alpha from Continue Watching' }));
     await waitFor(() => expect(screen.queryByText('Alpha')).not.toBeInTheDocument());
     // The other entry is untouched.
     expect(screen.getByText('Beta')).toBeInTheDocument();
-    expect(getProgress('movie', 2)).not.toBeNull();
+    expect(getWatching('movie', 2)).not.toBeNull();
   });
 
-  it('restart clears the saved position and navigates to the player', async () => {
-    saveProgress('tv', 1399, 900, 2, 5, { title: 'Gamma' }, 2700);
+  it('restart clears the watching flag and navigates to the player', async () => {
+    markWatching('tv', 1399, 2, 5, { title: 'Gamma' });
     renderHome();
     await waitFor(() => expect(screen.getByText('Gamma')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('link', { name: 'Restart Gamma from the beginning' }));
     // Navigates to the same play route with the same episode params.
     await waitFor(() => expect(screen.getByText('tv player')).toBeInTheDocument());
-    // Progress is cleared, so the card leaves Continue Watching.
-    expect(getProgress('tv', 1399, 2, 5)).toBeNull();
+    // The watching flag is cleared, so the card leaves Continue Watching.
+    expect(getWatching('tv', 1399, 2, 5)).toBeNull();
   });
 
   it('restart on a movie links to the movie route', async () => {
-    saveProgress('movie', 7, 60, null, null, { title: 'Delta' }, 7200);
+    markWatching('movie', 7, null, null, { title: 'Delta' });
     renderHome();
     await waitFor(() => expect(screen.getByText('Delta')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('link', { name: 'Restart Delta from the beginning' }));

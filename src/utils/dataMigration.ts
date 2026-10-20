@@ -263,7 +263,7 @@ function mergeIntoIndex(indexKey: string, prefix: string, newKeys: string[]): vo
 // overwrite entries created locally while signed out. Each section writes
 // only what is missing locally, then merges the indices.
 
-const PROGRESS_DOWNLOAD_TIMEOUT_MS = 1200;
+const SYNC_FETCH_TIMEOUT_MS = 4000;
 
 function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise((resolve) => {
@@ -275,13 +275,19 @@ function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<
   });
 }
 
+// Every strict fetch gets a deadline: one hung request must not block the
+// reconcile (and therefore cross-device deletions) forever.
+function fetchWithDeadline<T>(promise: Promise<T>): Promise<T | null> {
+  return withDeadline<T | null>(promise.catch(() => null), SYNC_FETCH_TIMEOUT_MS, null);
+}
+
 async function downloadSupabaseData(userId: string): Promise<void> {
   // Strict fetches: null means failure/timeout so we can skip reconcile.
   const [watchedRows, wlRows, searchRows, progressRows] = await Promise.all([
-    watchedRepository.getAllStrict(userId).catch(() => null),
-    watchLaterRepository.getAllStrict(userId).catch(() => null),
+    fetchWithDeadline(watchedRepository.getAllStrict(userId)),
+    fetchWithDeadline(watchLaterRepository.getAllStrict(userId)),
     searchHistoryRepository.getAll(userId).catch(() => []),
-    withDeadline(progressRepository.getAllStrict(userId).catch(() => null), PROGRESS_DOWNLOAD_TIMEOUT_MS, null),
+    fetchWithDeadline(progressRepository.getAllStrict(userId)),
   ]);
 
   // Track remote keys for reconcile.
@@ -360,7 +366,6 @@ async function downloadSupabaseData(userId: string): Promise<void> {
         localStorage.setItem(key, JSON.stringify({
           type: row.media_type,
           id: row.tmdb_id,
-          currentTime: 0,
           savedAt: new Date(row.updated_at).getTime(),
           season: row.season ?? undefined,
           episode: row.episode ?? undefined,

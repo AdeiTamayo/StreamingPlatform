@@ -8,7 +8,7 @@ import {
   isInWatchLater,
   addWatchLater,
   removeWatchLater,
-  clearProgress,
+  clearWatching,
 } from "../api/storage";
 import { useTVStatus } from "../hooks/useTVStatus";
 import { useAuth } from "../hooks/useAuth";
@@ -82,7 +82,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
         poster: item.poster_path,
         source: "explicit",
       });
-      clearProgress(type, id);
+      clearWatching(type, id);
       setIsWatchedState(true);
     }
   }
