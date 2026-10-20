@@ -68,6 +68,23 @@ export function getTVEmbedUrl(tmdbId: string | number, season: number, episode: 
   return resolveSource(source).tv(tmdbId, season, episode);
 }
 
+// Origins the player is allowed to post messages from. Derived from the
+// source table so adding a provider keeps the listener allowlist in sync.
+const PLAYER_ORIGINS = new Set<string>();
+for (const entry of Object.values(SOURCES)) {
+  for (const url of [entry.movie('0'), entry.tv('0', 0, 0)]) {
+    try {
+      PLAYER_ORIGINS.add(new URL(url).origin);
+    } catch {
+      // A malformed provider URL simply contributes no origin.
+    }
+  }
+}
+
+export function getPlayerOrigins(): readonly string[] {
+  return [...PLAYER_ORIGINS];
+}
+
 export function getSourceLabel(source: string): string {
   const labels: Record<string, string> = {
     vidsrc: 'VidSrc',

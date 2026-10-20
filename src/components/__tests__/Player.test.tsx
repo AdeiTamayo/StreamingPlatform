@@ -61,6 +61,41 @@ describe('Player runtime prop changes', () => {
     expect(onEnded).not.toHaveBeenCalled();
   });
 
+  it('ignores playback messages from an unknown origin', () => {
+    const { onWatching, onEnded } = baseCallbacks();
+    const { container } = render(
+      <Player
+        src="https://vidsrc.fyi/embed/movie/550"
+        title="Test"
+        onWatching={onWatching}
+        onEnded={onEnded}
+        runtimeMinutes={null}
+      />,
+    );
+
+    const iframe = container.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'));
+    expect(iframe).toHaveAttribute('referrerpolicy', 'no-referrer');
+
+    const event = (origin: string) =>
+      new MessageEvent('message', {
+        data: { type: 'PLAYER_EVENT', data: { event: 'play', currentTime: 5 } },
+        origin,
+        source: iframe?.contentWindow,
+      });
+
+    act(() => {
+      window.dispatchEvent(event('https://evil.example'));
+    });
+    expect(onWatching).not.toHaveBeenCalled();
+
+    act(() => {
+      window.dispatchEvent(event('https://vidsrc.fyi'));
+    });
+    expect(onWatching).toHaveBeenCalledTimes(1);
+  });
+
   it('starts a fresh playback when the video src changes', () => {
     const { onWatching, onEnded } = baseCallbacks();
     const props = {

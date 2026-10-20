@@ -15,6 +15,8 @@ import {
   WATCHED_INDEX_KEY,
   PROGRESS_INDEX_KEY,
   SEARCH_HISTORY_MAX,
+  MIGRATION_FLAG_PREFIX,
+  LEGACY_MIGRATION_FLAG_KEY,
 } from '../api/storage';
 import { getPendingOperations } from './offlineQueue';
 import {
@@ -24,9 +26,8 @@ import {
 } from '../api/storage';
 
 // Per-user flag: a global flag skips the upload for a second account on the
-// same browser, silently losing that account's pre-login rows.
-const MIGRATION_FLAG_PREFIX = 'supabase_data_migrated:';
-const LEGACY_MIGRATION_FLAG_KEY = 'supabase_data_migrated';
+// same browser, silently losing that account's pre-login rows. The prefix is
+// shared with the storage layer, which uses existing flags as an owner hint.
 
 function migrationFlagKey(userId: string): string {
   return `${MIGRATION_FLAG_PREFIX}${userId}`;

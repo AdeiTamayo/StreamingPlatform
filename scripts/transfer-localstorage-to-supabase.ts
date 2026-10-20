@@ -3,7 +3,11 @@
  *
  * Usage:
  * 1. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env
- * 2. Run: npx tsx scripts/transfer-localstorage-to-supabase.ts <email> <password>
+ * 2. Set TRANSFER_EMAIL and TRANSFER_PASSWORD in the environment (an
+ *    ephemeral shell variable or a secret manager, not a committed file).
+ *    Do NOT pass the password as a command-line argument: it is visible in
+ *    process listings and shell history.
+ * 3. Run: npx tsx scripts/transfer-localstorage-to-supabase.ts
  *
  * The script will:
  * - Sign in with the provided credentials
@@ -38,12 +42,11 @@ function loadEnv() {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const email = args[0];
-  const password = args[1];
+  const email = process.env.TRANSFER_EMAIL;
+  const password = process.env.TRANSFER_PASSWORD;
 
   if (!email || !password) {
-    console.error('Usage: npx tsx scripts/transfer-localstorage-to-supabase.ts <email> <password>');
+    console.error('Set TRANSFER_EMAIL and TRANSFER_PASSWORD in the environment.');
     process.exit(1);
   }
 
@@ -65,8 +68,12 @@ async function main() {
     process.exit(1);
   }
 
-  const userId = authData.user.id;
-  console.log(`Signed in as ${email} (${userId})`);
+  const userId = authData.user?.id;
+  if (!userId) {
+    console.error('Authentication returned no user.');
+    process.exit(1);
+  }
+  console.log('Signed in.');
 
   // Read localStorage data - this script runs in Node.js, so we use a simulated approach
   // In practice, run this in the browser console or use puppeteer

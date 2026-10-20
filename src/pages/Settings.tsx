@@ -29,6 +29,10 @@ function formatBytes(bytes: number): string {
   return (bytes / (1024 * 1024)).toFixed(2) + " MB";
 }
 
+// A backup is a small JSON file; anything larger is a mistake or an attempt to
+// freeze the tab while JSON.parse runs.
+const MAX_BACKUP_FILE_BYTES = 5 * 1024 * 1024;
+
 function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className={styles.card}>
@@ -214,6 +218,12 @@ export default function Settings() {
 
     if (!file) return;
 
+    if (file.size > MAX_BACKUP_FILE_BYTES) {
+      toast?.("Backup file is too large");
+      e.target.value = "";
+      return;
+    }
+
     const reader = new FileReader();
 
     reader.onload = async () => {
@@ -269,6 +279,12 @@ export default function Settings() {
     const file = e.target.files?.[0];
 
     if (!file) return;
+
+    if (file.size > MAX_BACKUP_FILE_BYTES) {
+      toast?.("Backup file is too large");
+      e.target.value = "";
+      return;
+    }
 
     const reader = new FileReader();
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   isWatched, markWatched, markUnwatched,
   getWatchLater, addWatchLater, removeWatchLater, isInWatchLater,
@@ -13,7 +13,9 @@ import {
   getNotifications, addNotification, removeNotification, markAllNotificationsRead, clearAllNotifications, isAlreadyNotified, pruneOldNotifications, NOTIFICATIONS_KEY,
   clearAllData, exportData, importData,
   isSeriesWatched, markSeriesWatched, unmarkSeriesWatched, getSeriesWatchedFlag, getSeriesWatchedShows, syncSeriesWatchedFlag,
+  setCurrentUserId, DATA_OWNER_KEY,
 } from './storage';
+import { disposeOfflineQueueSync, OFFLINE_QUEUE_KEY } from '../utils/offlineQueue';
 
 beforeEach(() => {
   localStorage.clear();
@@ -786,6 +788,55 @@ describe('removeSearchHistory', () => {
     addSearchHistory('hello');
     removeSearchHistory('   ');
     expect(getSearchHistory()).toEqual(['hello']);
+  });
+});
+
+describe('local data ownership', () => {
+  afterEach(() => {
+    setCurrentUserId(null);
+    disposeOfflineQueueSync();
+  });
+
+  it('clears account data on sign-out but keeps the offline queue', () => {
+    localStorage.setItem(DATA_OWNER_KEY, 'user-a');
+    markWatched('movie', '1', 'Movie');
+    localStorage.setItem(
+      OFFLINE_QUEUE_KEY,
+      JSON.stringify([{ id: 'op', table: 'watched', method: 'insert', data: {}, timestamp: 1, attempts: 0 }]),
+    );
+
+    setCurrentUserId(null);
+
+    expect(isWatched('movie', '1')).toBe(false);
+    expect(localStorage.getItem(OFFLINE_QUEUE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(DATA_OWNER_KEY)).toBeNull();
+  });
+
+  it('clears data written by a different account before signing in', () => {
+    localStorage.setItem(DATA_OWNER_KEY, 'user-a');
+    markWatched('movie', '1', 'A movie');
+
+    setCurrentUserId('user-b');
+
+    expect(isWatched('movie', '1')).toBe(false);
+    expect(localStorage.getItem(DATA_OWNER_KEY)).toBe('user-b');
+  });
+
+  it('preserves anonymous pre-login data for migration', () => {
+    markWatched('movie', '1', 'Anonymous');
+
+    setCurrentUserId('user-b');
+
+    expect(isWatched('movie', '1')).toBe(true);
+  });
+
+  it('treats the legacy global migration flag as an unknown owner', () => {
+    localStorage.setItem('supabase_data_migrated', 'true');
+    markWatched('movie', '1', 'Legacy');
+
+    setCurrentUserId('user-b');
+
+    expect(isWatched('movie', '1')).toBe(false);
   });
 });
 

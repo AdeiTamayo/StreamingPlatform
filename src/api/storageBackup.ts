@@ -15,6 +15,50 @@ export interface SupabaseBackupData {
   searchHistory: SearchHistoryInsert[];
 }
 
+// Mirrors the per-user row caps enforced by migration 004. Rejecting an
+// oversized file up front avoids thousands of doomed requests.
+const BACKUP_ROW_LIMITS: Record<'watched' | 'progress' | 'watchLater' | 'searchHistory', number> = {
+  watched: 10000,
+  progress: 5000,
+  watchLater: 5000,
+  searchHistory: 100,
+};
+
+function backupArray(data: unknown, field: keyof SupabaseBackupData): unknown[] | null {
+  if (!data || typeof data !== 'object') return null;
+  const value = (data as Record<string, unknown>)[field];
+  if (value == null) return [];
+  return Array.isArray(value) ? value : null;
+}
+
+function isPlainObject(value: unknown): boolean {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function isSupabaseBackupWithinLimits(data: unknown): boolean {
+  for (const [field, limit] of Object.entries(BACKUP_ROW_LIMITS) as Array<
+    [keyof typeof BACKUP_ROW_LIMITS, number]
+  >) {
+    const rows = backupArray(data, field);
+    if (!rows || rows.length > limit) return false;
+    if (!rows.every(isPlainObject)) return false;
+
+    if (field === 'watched') {
+      const invalidMeta = rows.some((row) => {
+        const meta = (row as Record<string, unknown>).meta;
+        if (meta == null) return false;
+        try {
+          return JSON.stringify(meta).length > 16384;
+        } catch {
+          return true;
+        }
+      });
+      if (invalidMeta) return false;
+    }
+  }
+  return true;
+}
+
 export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
   const userId = getCurrentUserId();
   if (!userId) return null;
@@ -65,18 +109,19 @@ export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
 
 // True when the object has no user data at all - used to reject empty or
 // malformed files before any import work happens.
-export function isSupabaseBackupEmpty(data: SupabaseBackupData): boolean {
+export function isSupabaseBackupEmpty(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return true;
   return (
-    (data.watched?.length ?? 0) === 0 &&
-    (data.progress?.length ?? 0) === 0 &&
-    (data.watchLater?.length ?? 0) === 0 &&
-    (data.searchHistory?.length ?? 0) === 0
+    (backupArray(data, 'watched')?.length ?? 0) === 0 &&
+    (backupArray(data, 'progress')?.length ?? 0) === 0 &&
+    (backupArray(data, 'watchLater')?.length ?? 0) === 0 &&
+    (backupArray(data, 'searchHistory')?.length ?? 0) === 0
   );
 }
 
 export async function importSupabaseData(data: SupabaseBackupData): Promise<boolean> {
   const userId = getCurrentUserId();
-  if (!userId) return false;
+  if (!userId || !isSupabaseBackupWithinLimits(data)) return false;
 
   const operations: Promise<unknown>[] = [];
 

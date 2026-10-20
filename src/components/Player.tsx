@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, memo } from 'react';
+import { getPlayerOrigins } from '../api/vidsrc';
 import { logDebug } from '../utils/logger';
 import styles from './Player.module.css';
 
@@ -16,6 +17,8 @@ const COMPLETION_RATIO = 0.9;
 // Absolute ceiling for the wall-clock estimate when no duration info exists:
 // a dead embed must still eventually end instead of counting forever.
 const FALLBACK_MAX_SECONDS = 3 * 60 * 60;
+
+const KNOWN_PLAYER_ORIGINS = new Set(getPlayerOrigins());
 
 interface PlayerProps {
   src: string;
@@ -117,6 +120,9 @@ const Player = memo(function Player({ src, title, onWatching, onEnded, runtimeMi
     // chatty or hostile frame can't drive playback state.
     const KNOWN_EVENTS = new Set(['time', 'play', 'pause', 'complete', 'ended', 'seek', 'seeked', 'buffering']);
 
+    const allowedOrigins = new Set(KNOWN_PLAYER_ORIGINS);
+    if (expectedOrigin) allowedOrigins.add(expectedOrigin);
+
     function handleMessage(e: MessageEvent) {
       const isSameWindow = e.source === iframeRef.current?.contentWindow;
       if (!isSameWindow) return;
@@ -124,11 +130,12 @@ const Player = memo(function Player({ src, title, onWatching, onEnded, runtimeMi
       // Late ticks after completion must not re-open the watching entry.
       if (state.current.ended) return;
 
-      // Origin is logged, not enforced — the embed may redirect internally
-      // (vidsrc.fyi -> whatever actually hosts the player) and the window
-      // object survives navigation while the origin changes.
-      if (expectedOrigin && e.origin !== expectedOrigin) {
-        logDebug(`origin mismatch src=${expectedOrigin} actual=${e.origin}`);
+      // The frame may navigate internally (vidsrc.fyi -> the actual player
+      // host), but it must stay on a known player origin. A hostile frame
+      // that takes over the iframe cannot drive watch state.
+      if (!allowedOrigins.has(e.origin)) {
+        logDebug(`origin rejected actual=${e.origin}`);
+        return;
       }
 
       // Some embeds send e.data as a JSON string, not an object.
@@ -205,6 +212,8 @@ const Player = memo(function Player({ src, title, onWatching, onEnded, runtimeMi
         title={title}
         allow="autoplay; fullscreen; encrypted-media"
         allowFullScreen
+        referrerPolicy="no-referrer"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
         className="player-iframe"
       />
     </div>

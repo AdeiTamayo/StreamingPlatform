@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getErrorMessage, isValidEmail } from './errors';
+import { getErrorMessage, isValidEmail, validatePassword, MIN_PASSWORD_LENGTH } from './errors';
 import styles from './AuthModal.module.css';
 
 interface RegisterFormProps {
@@ -39,8 +39,9 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       setErrorField('email');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
       setErrorField('password');
       return;
     }
@@ -101,10 +102,11 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
           <input
             type={showPassword ? 'text' : 'password'}
             className={styles.input}
-            placeholder="At least 6 characters"
+            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
+            minLength={MIN_PASSWORD_LENGTH}
             required
             disabled={submitting}
             aria-invalid={errorField === 'password'}

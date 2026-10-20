@@ -199,17 +199,22 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
    - `001_initial_schema.sql` — creates the `watched`, `watch_later`, and `search_history` tables with their indexes, unique constraints, and Row Level Security policies, and drops any legacy `settings` / `notifications` tables
    - `002_search_history_unique_index.sql` — dedupes search history and adds its unique index
    - `003_progress_table.sql` — creates the `progress` table for cross-device Continue Watching metadata (media identity only, never playback time)
+   - `004_security_hardening.sql` — adds `WITH CHECK` to the UPDATE policies, write-size constraints (`NOT VALID` so legacy rows are unaffected), per-user row caps enforced by triggers, and revokes table access from the `anon` role
 
-   All three are idempotent, so re-running them is safe.
+   All of them are idempotent, so re-running them is safe.
 3. Copy your project URL and anon key into `.env`
+
+   Migrations already applied to a hosted project are **not** re-run when you edit the file — add a new numbered migration instead. `supabase db push` applies pending files if you use the Supabase CLI.
 
 ### Migrating existing local data
 
 If you already used the app before adding Supabase, run:
 
 ```bash
-npm run transfer:supabase
+TRANSFER_EMAIL="you@example.com" TRANSFER_PASSWORD="..." npm run transfer:supabase
 ```
+
+The credentials come from the environment, not the command line — arguments would be visible in shell history and process listings.
 
 This prints a snippet to paste into the browser console while on the app, which uploads your existing localStorage data to your account (or just sign in — the app attempts this migration automatically on login).
 
@@ -227,7 +232,7 @@ Output goes to the `dist/` directory.
 npm run test
 ```
 
-323 tests across 31 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze and Supabase calls are mocked, so the suite never touches the network.
+339 tests across 33 files, run with [Vitest](https://vitest.dev) in a jsdom environment. TMDB/OMDb/TVMaze and Supabase calls are mocked, so the suite never touches the network.
 
 ```bash
 npm run typecheck  # tsc -b (also covers vite.config.ts and scripts/)
@@ -245,6 +250,14 @@ This project is ready for Vercel deployment. The `vercel.json` configures SPA ro
 4. Deploy
 
 Vercel will auto-deploy on every push to `main`.
+
+`vercel.json` also sets the security headers for every response: a Content-Security-Policy (self-only scripts/objects, explicit API `connect-src` list, `frame-ancestors 'none'`), HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options` and `Cross-Origin-Opener-Policy`.
+
+Production-hygiene notes:
+
+- Scope `VITE_*` variables **per environment** (Production / Preview / Development) in the Vercel dashboard. Give previews their own Supabase URL + anon key if you have them, so test work shares a project with test data only.
+- Preview deployments are public URLs by default — enable **Deployment Protection** (password or SSO) on Vercel if a branch build should not be reachable by anyone with the link.
+- Vercel ignores `.env*`, `dist`, `node_modules`, `screenshots` etc. via `.vercelignore`.
 
 Note: everything prefixed `VITE_` ships to the browser. Never put a server-side
 secret in this project — there is no server to keep it safe.
@@ -329,6 +342,33 @@ scripts/
 
 Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvmaze.test.ts`, `api/omdb.test.ts`, `api/vidsrc.test.ts`, `api/newEpisodeScan.test.ts`); page and component tests live in `__tests__/` folders.
 
+## Security
+
+**Enforced in this repo:**
+
+- **Per-account local data** — localStorage is tagged with `streamflow_data_owner`; signing out or switching accounts clears the previous account's mirrored rows (offline queue and migration flags survive) so a shared browser cannot leak one account's library to another.
+- **RLS hardening** (`004_security_hardening.sql`) — UPDATE policies carry a matching `WITH CHECK` (rows cannot be reassigned to another user), write-size constraints bound titles/posters/`meta`, triggers cap rows per user (10k watched, 5k watch-later/progress, 100 searches), and table access is revoked from `anon`.
+- **Auth** — 12-character minimum with upper/lowercase, number and symbol (client-side feedback; the server remains the authority); sign-up and password-reset respond the same whether or not an address exists, so the UI is not an email-enumeration oracle.
+- **Player** — the embed iframe is sandboxed and sends no referrer; `postMessage` events are ignored unless they come from a known player origin.
+- **Headers** — CSP and the rest are set in `vercel.json` (see "Deploying to Vercel").
+- **Self-hosted fonts** — Inter and Plus Jakarta Sans are vendored in `public/fonts/`; no request ever goes to Google Fonts, and the CSP is `font-src 'self'`.
+- **Logs** — `app_errors` / `player_debug` redact JWT-shaped strings, email addresses and `token=`/`password=`-style values.
+- **Backups** — import rejects files over 5 MB, more than 20k entries, or more rows than the server-side caps will accept.
+
+**Dashboard checklist (code cannot do these):**
+
+1. Supabase → Auth → Password settings: minimum length 12, require letters + numbers (+ symbols if available), and enable leaked-password protection if your plan has it.
+2. Supabase → Auth → URL Configuration: set the Site URL and an **allow list** limited to your own domains (e.g. `https://your-domain.com/*`). The app builds reset/confirm links from `window.location.origin`, so restricting this list prevents token links pointing elsewhere.
+3. For a personal deployment: consider disabling public sign-ups (Supabase → Auth → Providers → Email) so only accounts you create can log in.
+4. Account deletion: Supabase → Auth → Users → delete the user; every row in `watched` / `watch_later` / `search_history` / `progress` is removed by `on delete cascade`.
+5. API keys are intentionally public (`VITE_*` is inlined into the bundle). TMDB's key carries your quota — if abuse shows up as rate-limit 429s, rotate the key. If you ever want a true proxy you need a server, which this app does not have.
+
+Verify after deploy:
+
+```bash
+curl -sI https://your-domain.com | grep -iE 'content-security-policy|strict-transport'
+```
+
 ## Notes
 
 - All data is stored locally in your browser — accounts and a Supabase server are optional
@@ -340,7 +380,7 @@ Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvma
 - The `N new` badge uses TMDB's date-only `air_date`, while the calendar uses TVMaze's exact air instant; near midnight they can occasionally disagree
 - The app uses a privacy-conscious setup: noindex tags, no analytics, no tracking
 - Video playback quality and availability depend on the embed source
-- Errors are logged to localStorage under `app_errors` for debugging
+- Errors are logged to localStorage under `app_errors` for debugging, with JWT-shaped strings, email addresses and `password=`/`token=`-style values redacted before storage
 
 ## License
 

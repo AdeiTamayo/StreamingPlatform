@@ -428,11 +428,13 @@ describe('detail pages render', () => {
     expect(srcBefore).not.toContain('t=');
 
     // 8000s of 8400s runtime: past the 90% completion ratio, so the
-    // autoMarkWatched path runs.
+    // autoMarkWatched path runs. The Player enforces an origin allowlist, so
+    // the synthetic message must claim the iframe's real origin.
     act(() => {
       window.dispatchEvent(
         new MessageEvent('message', {
           source: iframe!.contentWindow,
+          origin: new URL(srcBefore!).origin,
           data: { type: 'PLAYER_EVENT', data: { event: 'time', currentTime: 8000, duration: 8400 } },
         }),
       );

@@ -21,7 +21,11 @@ export const EP_WL_PREFIX = 'epwl:';
 export const NOTIFICATIONS_MAX = 50;
 export const SEARCH_HISTORY_MAX = 15;
 export const EP_WL_MAX = 200;
+export const WATCH_LATER_MAX = 5000;
 export const NEW_EPISODE_SCAN_KEY = 'new_episode_scan_last_run';
+export const DATA_OWNER_KEY = 'streamflow_data_owner';
+export const MIGRATION_FLAG_PREFIX = 'supabase_data_migrated:';
+export const LEGACY_MIGRATION_FLAG_KEY = 'supabase_data_migrated';
 
 // Keys/prefixes owned by this app's data layer. clearAllData (explicit user
 // wipe) removes all of these; the login migration only clears the mirrored
@@ -46,9 +50,6 @@ export const LOCAL_DATA_KEYS: string[] = [
 
 let currentUserId: string | null = null;
 
-const PROGRESS_REMOTE_SYNC_MS = 60_000;
-const progressRemoteSyncedAt = new Map<string, number>();
-
 // Keys written locally during this tab session. The sign-in reconcile treats
 // the cloud as authoritative for deletions (so removing something on another
 // device propagates here), but must never drop a row the user just created
@@ -60,7 +61,87 @@ export const sessionModifiedKeys = {
   episodeWatchLater: new Set<string>(),
 };
 
+// Local state that belongs to a signed-in account. It is mirrored from
+// Supabase, so clearing it never loses cloud data - it is re-downloaded on the
+// next sign-in. The offline queue and per-user migration flags are
+// deliberately excluded: they must survive a sign-out so another account can
+// never replay or inherit the previous user's pending writes.
+const USER_SCOPED_LOCAL_KEYS: string[] = [
+  'watched:',
+  'progress:',
+  WL_KEY,
+  EP_WL_PREFIX,
+  EP_WL_INDEX_KEY,
+  SEARCH_HISTORY_KEY,
+  NOTIFICATIONS_KEY,
+  NOTIFICATIONS_DISMISSED_KEY,
+  PROGRESS_INDEX_KEY,
+  WATCHED_INDEX_KEY,
+  NEW_EPISODE_SCAN_KEY,
+  'app_errors',
+  'player_debug',
+];
+
+/**
+ * Removes every local key that belongs to the current account, except the
+ * offline queue and migration flags. Used when the local owner changes so a
+ * second account on a shared browser cannot see or re-upload the first
+ * account's library.
+ */
+export function clearLocalUserData(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && USER_SCOPED_LOCAL_KEYS.some((key) => k === key || k.startsWith(key))) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+  sessionModifiedKeys.progress.clear();
+  sessionModifiedKeys.watched.clear();
+  sessionModifiedKeys.watchLater.clear();
+  sessionModifiedKeys.episodeWatchLater.clear();
+}
+
+// The owner marker is absent for anonymous (pre-login) data and for data
+// written by versions that predate it. Migration flags act as a fallback
+// owner signal for that upgrade path: if a flag exists for a different user,
+// the local data must not be uploaded to the account that is signing in now.
+function localDataBelongsToAnotherUser(userId: string): boolean {
+  const owner = localStorage.getItem(DATA_OWNER_KEY);
+  if (owner) return owner !== userId;
+
+  // Pre-owner versions used a single global migration flag. Its owner is
+  // unknowable, so treat the data as foreign and re-download it from the
+  // account's cloud copy when it signs in.
+  if (localStorage.getItem(LEGACY_MIGRATION_FLAG_KEY)) return true;
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(MIGRATION_FLAG_PREFIX) && k.slice(MIGRATION_FLAG_PREFIX.length) !== userId) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const PROGRESS_REMOTE_SYNC_MS = 60_000;
+const progressRemoteSyncedAt = new Map<string, number>();
+
 export function setCurrentUserId(userId: string | null): void {
+  if (userId) {
+    if (localDataBelongsToAnotherUser(userId)) {
+      clearLocalUserData();
+    }
+    localStorage.setItem(DATA_OWNER_KEY, userId);
+  } else if (localStorage.getItem(DATA_OWNER_KEY)) {
+    // A real sign-out (or an expired session on boot) must not leave the
+    // previous account's library readable to the next visitor. Anonymous data
+    // created while signed out has no owner marker and is preserved.
+    clearLocalUserData();
+    localStorage.removeItem(DATA_OWNER_KEY);
+  }
+
   currentUserId = userId;
   progressRemoteSyncedAt.clear();
   // Scope queue replay to this user so another account's pending writes are
@@ -868,7 +949,9 @@ export function getSearchHistory(): string[] {
 }
 
 export function addSearchHistory(query: string): void {
-  const trimmed = query.trim();
+  // Matches the 200-char DB constraint from migration 004 so an over-long
+  // paste cannot queue a write that will be rejected server-side forever.
+  const trimmed = query.trim().slice(0, 200);
   if (!trimmed) return;
   const list = getSearchHistory().filter((q: string) => q.toLowerCase() !== trimmed.toLowerCase());
   list.unshift(trimmed);
@@ -893,6 +976,10 @@ export function removeSearchHistory(query: string): void {
 }
 
 const EXPORT_KEYS = ['watched:', 'progress:', 'watchlater', 'epwl:', 'search_history', 'watched_index', 'progress_index', 'notifications'];
+
+// A backup is small by construction. Capping the entry count keeps a hostile
+// or corrupt file from freezing the tab during Object.entries/JSON work.
+const MAX_IMPORT_ENTRIES = 20000;
 
 function isExportKey(k: string): boolean {
   return EXPORT_KEYS.some((prefix) => k === prefix || k.startsWith(prefix));
@@ -938,6 +1025,7 @@ function mergeWatchLaterList(raw: string): number {
   const merged = [...getWatchLater()];
   let added = 0;
   for (const item of incoming as WatchLaterItem[]) {
+    if (merged.length >= WATCH_LATER_MAX) break;
     if (!item || item.type == null || item.id == null) continue;
     if (merged.some((m) => m.type === item.type && String(m.id) === String(item.id))) continue;
     merged.push({ ...item, addedAt: typeof item.addedAt === 'number' ? item.addedAt : Date.now() });
@@ -966,6 +1054,7 @@ function mergeSearchHistoryList(raw: string): number {
   const merged = [...getSearchHistory()];
   let added = 0;
   for (const q of incoming as unknown[]) {
+    if (added >= SEARCH_HISTORY_MAX || merged.length >= SEARCH_HISTORY_MAX) break;
     if (typeof q !== 'string' || !q.trim()) continue;
     if (merged.some((m) => m.toLowerCase() === q.toLowerCase())) continue;
     merged.push(q);
@@ -982,6 +1071,10 @@ function mergeSearchHistoryList(raw: string): number {
 }
 
 export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): number {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return 0;
+  if (Object.keys(data).length > MAX_IMPORT_ENTRIES) {
+    throw new Error('Backup contains too many entries');
+  }
   let imported = 0;
   if (mode === 'replace') {
     const keys: string[] = [];
