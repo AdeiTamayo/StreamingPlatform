@@ -75,7 +75,6 @@ describe('Player runtime prop changes', () => {
 
     const iframe = container.querySelector('iframe');
     expect(iframe).not.toBeNull();
-    expect(iframe).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'));
     expect(iframe).toHaveAttribute('referrerpolicy', 'no-referrer');
 
     const event = (origin: string) =>
