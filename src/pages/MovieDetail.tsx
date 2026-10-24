@@ -143,7 +143,7 @@ export default function MovieDetail() {
       if (isTypingTarget(e.target)) return;
       const k = e.key.toLowerCase();
       if (k !== 'w' && k !== 'f' && k !== 'l') return;
-      if (!movie || !id) return;
+      if (!movie || !id || !isAuthenticated) return;
       if (k === 'f') {
         if (showTrailer) return;
         e.preventDefault();
@@ -169,7 +169,7 @@ export default function MovieDetail() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [movie, id, watched, inWL, showTrailer, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [movie, id, watched, inWL, showTrailer, toast, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!id) return <div className="page"><div className="loading">Movie not found</div></div>;
 
@@ -337,6 +337,7 @@ export default function MovieDetail() {
                 onToggleList={toggleWatchLater}
                 onToggleWatched={toggleWatched}
                 shareTitle={movie.title}
+                isAuthenticated={isAuthenticated}
               />
             </div>
             <p className="detail-overview">{movie.overview}</p>

@@ -8,6 +8,7 @@ interface DetailActionsProps {
   shareTitle: string;
   onToggleTrailer?: () => void;
   trailerActive?: boolean;
+  isAuthenticated?: boolean;
 }
 
 export default function DetailActions({
@@ -18,6 +19,7 @@ export default function DetailActions({
   shareTitle,
   onToggleTrailer,
   trailerActive = false,
+  isAuthenticated = true,
 }: DetailActionsProps) {
   const toast = useToast();
 
@@ -33,6 +35,22 @@ export default function DetailActions({
     } catch {
       // The user dismissed the share sheet or the clipboard was blocked.
     }
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="detail-actions">
+        <button
+          type="button"
+          className="detail-action-icon"
+          onClick={handleShare}
+          title="Share"
+          aria-label="Share"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.6" y1="10.6" x2="15.4" y2="6.4" /><line x1="8.6" y1="13.4" x2="15.4" y2="17.6" /></svg>
+        </button>
+      </div>
+    );
   }
 
   return (

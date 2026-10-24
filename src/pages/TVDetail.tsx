@@ -17,6 +17,7 @@ import DetailActions from '../components/DetailActions';
 import ViewModeToggle from '../components/ViewModeToggle';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
+import { useAuth } from '../hooks/useAuth';
 import { formatVotes } from '../utils/format';
 import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
@@ -50,6 +51,7 @@ export default function TVDetail() {
   // can never reach API paths, storage keys, or the embed iframe src.
   const id = rawId && /^\d+$/.test(rawId) ? rawId : undefined;
   const toast = useToast();
+  const { isAuthenticated } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const urlSeason = searchParams.get('season');
   const urlEpisode = searchParams.get('episode');
@@ -538,7 +540,7 @@ export default function TVDetail() {
         if (hasNext) { e.preventDefault(); goNext(); }
       } else if (k === 'p') {
         if (hasPrev) { e.preventDefault(); goPrev(); }
-      } else if (k === 'w') {
+      } else if (k === 'w' && isAuthenticated) {
         toggleWatched();
       } else if (k === 'f') {
         e.preventDefault();
@@ -547,7 +549,7 @@ export default function TVDetail() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [playerOpen, showTrailer, hasNext, hasPrev, season, episode, watched]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [playerOpen, showTrailer, hasNext, hasPrev, season, episode, watched, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // L = toggle Watch Later. On the episode view (player open) it targets the
   // current episode; on the series view it targets the series itself.
@@ -557,7 +559,7 @@ export default function TVDetail() {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       if (isTypingTarget(e.target)) return;
       if (e.key.toLowerCase() !== 'l') return;
-      if (!show || !id) return;
+      if (!show || !id || !isAuthenticated) return;
       e.preventDefault();
       if (playerOpen) {
         if (inEpWL) {
@@ -583,7 +585,7 @@ export default function TVDetail() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [show, id, inWL, inEpWL, playerOpen, season, episode, toast]);
+  }, [show, id, inWL, inEpWL, playerOpen, season, episode, toast, isAuthenticated]);
 
   function togglePlayerFullscreen() {
     const el = playerWrapRef.current;
@@ -849,6 +851,7 @@ export default function TVDetail() {
                 onToggleWatched={toggleSeriesWatched}
                 shareTitle={show.name}
                 onToggleTrailer={trailerKey && !playerOpen ? () => { setPlayerOpen(true); setShowTrailer(true); } : undefined}
+                isAuthenticated={isAuthenticated}
               />
             </div>
             <p className="detail-overview">{show.overview}</p>
@@ -934,16 +937,20 @@ export default function TVDetail() {
                 episodes={episodes}
                 onSelect={(ep: number) => { setEpisode(ep); }}
               />
-              <button
-                type="button"
-                className={`${styles.epActionBtn} ${watched ? styles.activeWatched : ''}`}
-                onClick={toggleWatched}
-                title={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
-                aria-label={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
-                aria-pressed={watched}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
-              </button>
+              {isAuthenticated && (
+                <>
+                  <button
+                    type="button"
+                    className={`${styles.epActionBtn} ${watched ? styles.activeWatched : ''}`}
+                    onClick={toggleWatched}
+                    title={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
+                    aria-label={watched ? 'Unmark episode as watched' : 'Mark episode as watched'}
+                    aria-pressed={watched}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5" /></svg>
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 className={styles.epActionBtn}
@@ -982,7 +989,7 @@ export default function TVDetail() {
                 onSelect={(s: number) => { setSeason(s); setEpisode(lastWatchedInSeason(safeId, s)); }}
               />
             )}
-            {seasons.length > 0 && (
+            {seasons.length > 0 && isAuthenticated && (
               <button className={styles.markSeasonBtn} onClick={() => {
                 if (allWatched) {
                   unmarkAllSeasonsWatched(safeId, seasons);
@@ -1004,7 +1011,7 @@ export default function TVDetail() {
                 <div className={styles.spHeader}>
                   <span className={styles.spLabel}>Season {season}</span>
                   <span className={styles.spCount}>{watchedCount}/{episodeCount} watched</span>
-                  {watchedCount < episodeCount && (
+                  {watchedCount < episodeCount && isAuthenticated && (
                     <button className={styles.markSeasonBtn} onClick={() => {
                       markSeasonWatched(safeId, season, episodeCount, show.name, show?.poster_path ?? '');
                       setWatchedCount(getWatchedCount(safeId, season, episodeCount));
@@ -1052,26 +1059,30 @@ export default function TVDetail() {
                       </div>
                       </Link>
                       <span className={styles.epCardActions}>
-                        <button
-                          type="button"
-                          className={`${styles.epActionBtn} ${isW ? styles.activeWatched : ''}`}
-                          onClick={() => toggleEpisodeWatched(ep.episode_number)}
-                          title={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
-                          aria-label={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
-                          aria-pressed={isW}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.epActionBtn} ${isWL ? styles.activeWatchLater : ''}`}
-                          onClick={() => toggleEpisodeWatchLater(ep.episode_number)}
-                          title={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
-                          aria-label={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
-                          aria-pressed={isWL}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
-                        </button>
+                        {isAuthenticated && (
+                          <>
+                            <button
+                              type="button"
+                              className={`${styles.epActionBtn} ${isW ? styles.activeWatched : ''}`}
+                              onClick={() => toggleEpisodeWatched(ep.episode_number)}
+                              title={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
+                              aria-label={isW ? `Unmark episode ${ep.episode_number} as watched` : `Mark episode ${ep.episode_number} as watched`}
+                              aria-pressed={isW}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className={`${styles.epActionBtn} ${isWL ? styles.activeWatchLater : ''}`}
+                              onClick={() => toggleEpisodeWatchLater(ep.episode_number)}
+                              title={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
+                              aria-label={isWL ? `Remove episode ${ep.episode_number} from Watch Later` : `Save episode ${ep.episode_number} to Watch Later`}
+                              aria-pressed={isWL}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+                            </button>
+                          </>
+                        )}
                       </span>
                     </div>
                     );

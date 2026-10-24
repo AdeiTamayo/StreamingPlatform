@@ -151,7 +151,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
           )}
         </div>
       </Link>
-      {loaded && !isPerson && (
+      {loaded && !isPerson && isAuthenticated && (
         <div className="media-card-actions">
           <button
             className={`media-card-wl ${inWL ? "active" : ""}`}
