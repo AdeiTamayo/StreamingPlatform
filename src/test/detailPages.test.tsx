@@ -12,7 +12,7 @@ vi.mock('../hooks/useAuth', () => ({
     user: null,
     session: null,
     loading: false,
-    isAuthenticated: false,
+    isAuthenticated: true,
     isAuthModalOpen: false,
     syncVersion: 0,
     openAuthModal: vi.fn(),

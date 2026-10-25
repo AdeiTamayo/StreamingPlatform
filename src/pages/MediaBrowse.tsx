@@ -3,12 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import { getPopularMovies, getPopularTV, getMovieGenres, getTVGenres, getCountries, getLanguages, discover, searchMovies, searchTV } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
-import FilterBar from '../components/FilterBar';
-import FilterDropdown from '../components/FilterDropdown';
 import DatePickerField from '../components/DatePickerField';
 import useSearchFilter from '../hooks/useSearchFilter';
 import type { MediaType, TMDBGenre, TMDBCountry, TMDBLanguage, TMDBMovie, TMDBSeries, TMDBPaginatedResponse, FilterOption } from '../types';
-import styles from './MediaBrowse.module.css';
+import SearchBar, { SearchSelectField } from '../components/SearchBar';
 
 const years = Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i);
 
@@ -30,9 +28,6 @@ const tvSortOptions: FilterOption[] = [
 
 const yearOptions: FilterOption[] = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
 
-// TMDB's /search endpoints ignore browse filters (genre, language, year,
-// votes), so when a text query is combined with those filters we refine the
-// returned page client-side to keep both working together.
 function refineSearchPage(
   data: TMDBPaginatedResponse<TMDBMovie | TMDBSeries>,
   filters: { genre?: string; language?: string; year?: string; voteCount?: string },
@@ -48,10 +43,6 @@ function refineSearchPage(
     if (voteCount && (item.vote_count || 0) < Number(voteCount)) return false;
     return true;
   });
-  // TMDB still reports the *unfiltered* page count. Scale it by the share of
-  // this page that survived refinement so the pager doesn't advertise empty
-  // tail pages; when the whole page was filtered out keep the original count
-  // so the user can still step back through earlier pages.
   const totalPages = Math.max(data.total_pages || 1, 1);
   const total_pages = source.length && results.length
     ? Math.max(1, Math.ceil((totalPages * results.length) / source.length))
@@ -90,7 +81,6 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
     getLanguages().then((data) => setLanguages(data as TMDBLanguage[])).catch(() => {});
   }, [isMovie]);
 
-  // Debounce the min-votes input so typing doesn't fire a request per key.
   useEffect(() => {
     const t = setTimeout(() => setVoteCount(voteInput.replace(/\D/g, '').slice(0, 6)), 400);
     return () => clearTimeout(t);
@@ -101,7 +91,8 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
   const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
   const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genres.map((g) => ({ value: String(g.id), label: g.name }))];
   const languageOptions: FilterOption[] = [{ value: '', label: 'Original language' }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
-  const activeFilters = [
+
+  const activeFiltersList = [
     query.trim() ? { key: 'query', label: `Search: ${query.trim()}` } : null,
     genre ? { key: 'genre', label: `Genre: ${genreOptions.find((o) => o.value === genre)?.label || genre}` } : null,
     country ? { key: 'country', label: `Country: ${countryOptions.find((o) => o.value === country)?.label || country}` } : null,
@@ -134,15 +125,12 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
     query, genre, country, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount,
   });
 
-  // Keep the genre and query filters in sync with the URL so deep links
-  // (e.g. the "Browse by genre" cards) and back/forward navigation restore the
-  // browse state instead of resetting it.
   useEffect(() => {
     const g = searchParams.get('genre') || '';
     if (g !== genre) { setGenre(g); setPage(1); }
     const q = searchParams.get('query') || '';
     if (q !== query) { setQuery(q); setPage(1); }
-  }, [searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleGenreChange = useCallback((value: string) => {
     setGenre(value);
@@ -200,9 +188,6 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, setPage]);
 
-  // Client-side refinement of a text search can leave the current page empty.
-  // Walk back one page at a time (the hook refetches on every setPage) and
-  // surface a hint, so a search never strands the user on a blank page.
   useEffect(() => {
     if (loading || error || !query.trim()) return;
     if (results.length === 0 && page > 1) {
@@ -217,97 +202,72 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
 
   return (
     <div className="page">
-      <section className="section" aria-labelledby="browse-heading">
-        <div className="section-header browse-header">
-          <h2 id="browse-heading" className="section-title">{isMovie ? 'Movies' : 'TV Shows'}</h2>
+      <SearchBar
+        query={query}
+        onQueryChange={handleQueryChange}
+        searchPlaceholder={`Search ${isMovie ? 'movies' : 'TV shows'}...`}
+        countryValue={country}
+        onCountryChange={(value) => { setCountry(value); setPage(1); }}
+        countryOptions={countryOptions}
+        genreValue={genre}
+        onGenreChange={handleGenreChange}
+        genreOptions={genreOptions}
+        showMore={showMore}
+        onToggleShowMore={() => setShowMore((s) => !s)}
+        activeFilters={activeFiltersList}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
+        isSearchContext={false}
+        title={isMovie ? 'Movies' : 'TV Shows'}
+        subtitle="Discover something new"
+      >
+        <div className="field">
+          <span className="field-label">Release from</span>
+          <DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
         </div>
-        <div className={styles.browseControls}>
-          <FilterBar
-            countryValue={country}
-            genreValue={genre}
-            showMore={showMore}
-            onToggleShowMore={() => setShowMore((s) => !s)}
-            onCountryChange={(value) => { setCountry(value); setPage(1); }}
-            onGenreChange={handleGenreChange}
-            countryOptions={countryOptions}
-            genreOptions={genreOptions}
-            hasActiveFilters={!!query || !!country || !!genre || !!year || !!sortBy || !!releaseDateFrom || !!releaseDateUntil || !!language || !!voteCount}
-            onClearFilters={clearFilters}
-          />
-          <div className={styles.browseSearch} role="search" aria-label={`Search ${isMovie ? 'movies' : 'TV shows'}`}>
-            <input
-              className="search-input"
-              type="text"
-              placeholder={`Search ${isMovie ? 'movies' : 'TV shows'}...`}
-              aria-label={`Search ${isMovie ? 'movies' : 'TV shows'}`}
-              value={query}
-              onChange={(e) => handleQueryChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
-            />
-          </div>
+        <div className="field">
+          <span className="field-label">Release until</span>
+          <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
         </div>
-        {showMore && (
-          <div className={`more-filters-panel ${styles.browseMoreFilters}`} aria-label="Additional filters">
-            <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} /></div>
-            <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} /></div>
-            <div className="filter-control"><span className="filter-control-label">Year</span><FilterDropdown value={year} options={yearOptions} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} /></div>
-            <div className="filter-control sort-filter-control"><span className="filter-control-label">Sort results</span><FilterDropdown value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} /></div>
-            <div className="filter-control"><span className="filter-control-label">Language</span><FilterDropdown value={language} options={languageOptions} placeholder="Original language" onSelect={(value) => { setLanguage(value); setPage(1); }} /></div>
-            <label className="filter-control"><span className="filter-control-label">Minimum votes</span><input className="filter-number-input" type="number" min="0" inputMode="numeric" placeholder="Any amount" aria-label="Minimum votes" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></label>
-            {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
-          </div>
-        )}
-        {activeFilters.length > 0 && (
-          <div className="active-filters" aria-label="Active filters">
-            <span className="active-filters-label">Active filters</span>
-            {activeFilters.map((filter) => (
-              <button
-                type="button"
-                className="filter-chip"
-                key={filter.key}
-                onClick={() => removeFilter(filter.key)}
-                aria-label={`Remove filter: ${filter.label}`}
-              >
-                {filter.label}
-                <span aria-hidden="true">&times;</span>
-              </button>
-            ))}
-          </div>
-        )}
-        {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
-        {error ? (
-          <div className="empty-state" role="alert"><h3>Couldn’t load results</h3><p>Check your connection, then refresh or adjust your filters.</p></div>
-        ) : loading ? (
-          <div className="media-grid" role="status" aria-live="polite" aria-label={`Loading ${isMovie ? 'movies' : 'TV shows'}`}>
-            {Array.from({ length: 12 }, (_, i) => (
-              <div className="media-card skeleton-card" key={i} aria-hidden="true">
-                <div className="media-card-poster"><div className="media-card-skeleton" /></div>
-                <div className="media-card-info">
-                  <div className="skeleton-text skeleton-title" />
-                  <div className="skeleton-text skeleton-year" />
-                </div>
+        <SearchSelectField label="Year" value={year} options={yearOptions} onChange={(value) => { setYear(value); setPage(1); }} />
+        <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
+        <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
+        <label className="field">
+          <span className="field-label">Minimum votes</span>
+          <span className="field-control"><input className="votes-input" placeholder="Any amount" type="number" min="0" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></span>
+        </label>
+        {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
+      </SearchBar>
+
+      {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
+      {error ? (
+        <div className="empty-state" role="alert"><h3>Couldn't load results</h3><p>Check your connection, then refresh or adjust your filters.</p></div>
+      ) : loading ? (
+        <div className="media-grid" role="status" aria-live="polite" aria-label={`Loading ${isMovie ? 'movies' : 'TV shows'}`}>
+          {Array.from({ length: 12 }, (_, i) => (
+            <div className="media-card skeleton-card" key={i} aria-hidden="true">
+              <div className="media-card-poster"><div className="media-card-skeleton" /></div>
+              <div className="media-card-info">
+                <div className="skeleton-text skeleton-title" />
+                <div className="skeleton-text skeleton-year" />
               </div>
+            </div>
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <div className="empty-state" role="status"><h3>No {isMovie ? 'movies' : 'TV shows'} found</h3><p>Try removing a filter or searching for a different title.</p>{activeFiltersList.length > 0 && <button className="empty-state-action" onClick={clearFilters}>Clear filters</button>}</div>
+      ) : (
+        <>
+          <div className="media-grid">
+            {results.map((item) => (
+              <MediaCard key={item.id} item={item} mediaType={type} />
             ))}
           </div>
-        ) : results.length === 0 ? (
-          <div className="empty-state" role="status"><h3>No {isMovie ? 'movies' : 'TV shows'} found</h3><p>Try removing a filter or searching for a different title.</p>{activeFilters.length > 0 && <button className="empty-state-action" onClick={clearFilters}>Clear filters</button>}</div>
-        ) : (
-          <>
-            <div className="media-grid">
-              {results.map((item) => (
-                <MediaCard key={item.id} item={item} mediaType={type} />
-              ))}
-            </div>
-            {totalPages > 1 && (
-              <Pagination page={page} totalPages={totalPages} onChange={setPage} />
-            )}
-          </>
-        )}
-      </section>
+          {totalPages > 1 && (
+            <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+          )}
+        </>
+      )}
     </div>
   );
 }

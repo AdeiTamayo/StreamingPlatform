@@ -1,17 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { searchMulti, searchMovies, searchTV, getPersonCredits, getMovieGenres, getTVGenres, getCountries, getLanguages } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
 import PersonList from '../components/PersonList';
-import FilterBar from '../components/FilterBar';
-import FilterDropdown from '../components/FilterDropdown';
 import DatePickerField from '../components/DatePickerField';
 import TypeToggle from '../components/TypeToggle';
 import type { PersonListPerson } from '../components/PersonList';
 import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
 import type { TMDBMovie, TMDBSeries, TMDBPersonCredits, TMDBGenre, TMDBCountry, TMDBLanguage, FilterOption } from '../types';
+import SearchBar, { SearchSelectField } from '../components/SearchBar';
 import styles from './Search.module.css';
 
 const TYPE_TABS: { value: string; label: string }[] = [
@@ -41,7 +40,6 @@ const YEAR_OPTIONS: FilterOption[] = [
   ...Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map((y) => ({ value: String(y), label: String(y) })),
 ];
 
-// TMDB pages are 20 items; person credits use the same page size client-side.
 const PAGE_SIZE = 20;
 
 function isPersonResult(item: unknown): item is { id: number; name: string } {
@@ -153,14 +151,11 @@ export default function Search() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [personId, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [personId, retryKey]);
 
-  // Remembers what was last fetched so a query/tab change resets to page 1
-  // instead of firing one request with the stale page and a second right
-  // after (flash of wrong-page results).
   const lastFetchKey = useRef<string>('');
   useEffect(() => {
-    if (personId) return; // person credits are owned by the personId effect
+    if (personId) return;
     if (!query.trim()) {
       setResults([]);
       setTotalPages(1);
@@ -187,7 +182,7 @@ export default function Search() {
         setError(true);
       })
       .finally(() => setLoading(false));
-  }, [personId, query, page, tab, retryKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [personId, query, page, tab, retryKey]);
 
   useEffect(() => {
     if (personId) return;
@@ -195,7 +190,7 @@ export default function Search() {
       addSearchHistory(query.trim());
       setHistory(getSearchHistory());
     }
-  }, [query, personId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, personId]);
 
   useEffect(() => { setInput(query); }, [query]);
 
@@ -203,16 +198,14 @@ export default function Search() {
     if (!personId && !query.trim()) {
       inputRef.current?.focus();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Reset to the first page whenever a browse filter changes.
   useEffect(() => {
     setPage(1);
   }, [country, genreFilter, year, sortBy, releaseDateFrom, releaseDateUntil, language, voteCount]);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const q = input.trim();
+  function handleSubmit(value: string) {
+    const q = value.trim();
     setSearchParams(q ? { q } : {});
   }
 
@@ -231,8 +224,6 @@ export default function Search() {
     setHistory(getSearchHistory());
   }
 
-  // Suggestions shown while the search bar is focused: the most recent
-  // searches, filtered by what is typed. Capped so the dropdown stays small.
   const suggestions = (() => {
     const needle = input.trim().toLowerCase();
     const matches = needle
@@ -242,17 +233,15 @@ export default function Search() {
   })();
   const showSuggestions = searchFocused && suggestions.length > 0;
 
-  // Reset the keyboard highlight whenever the list changes.
   useEffect(() => {
     setActiveSugg(-1);
   }, [input, searchFocused, history]);
 
-  // Recent searches worth retrying when the current query finds nothing.
   const recoverySearches = history
     .filter((q) => q.toLowerCase() !== query.trim().toLowerCase())
     .slice(0, 5);
 
-  function handleSuggestKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleSuggestKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Escape') {
       (e.target as HTMLInputElement).blur();
       return;
@@ -273,8 +262,6 @@ export default function Search() {
     }
   }
 
-  // Query results split by kind: people have no detail page, so they are
-  // surfaced separately and linked to the credits search route.
   const people: PersonListPerson[] = !personId && tab === 'all'
     ? (results as unknown[]).filter(isPersonResult).map((p) => ({ id: p.id, name: p.name }))
     : [];
@@ -286,7 +273,6 @@ export default function Search() {
       ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
       : results;
 
-  // --- Browse-style filter options -----------------------------------------
   const genreNames = Array.from(new Set([...genresMovie, ...genresTv].map((g) => g.name))).sort();
   const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genreNames.map((name) => ({ value: name, label: name }))];
   const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
@@ -324,10 +310,6 @@ export default function Search() {
 
   const isEmpty = refinedMedia.length === 0 && people.length === 0;
   const refinedEmpty = refinedMedia.length === 0;
-  // Person credits come back unpaginated - slice them client-side to match
-  // the page size the query search gets from TMDB. Client-side refinement of a
-  // server page scales the advertised page count so the pager doesn't promise
-  // empty tail pages.
   const displayTotalPages = personId
     ? Math.max(1, Math.ceil(refinedMedia.length / PAGE_SIZE))
     : filtersActive && results.length > 0
@@ -336,8 +318,6 @@ export default function Search() {
   const safePage = Math.min(page, displayTotalPages);
   const visible = personId ? refinedMedia.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE) : refinedMedia;
 
-  // Refinement can leave the current server page empty; step back one page and
-  // surface a hint so a search never strands the user on a blank page.
   useEffect(() => {
     if (personId || !filtersActive || loading || error) return;
     if (refinedEmpty && page > 1) {
@@ -388,285 +368,260 @@ export default function Search() {
   }
 
   const dateRangeInvalid = !!releaseDateFrom && !!releaseDateUntil && releaseDateFrom > releaseDateUntil;
-  const showFilterUi = !!query.trim() || !!personId;
+
+  const suggestionsDropdown = showSuggestions ? (
+    <div className={styles.searchSuggest}>
+      <div className={styles.searchSuggestLabel} id="search-suggest-label">Recent searches</div>
+      <div className={styles.searchSuggestBody}>
+        <ul
+          role="listbox"
+          aria-labelledby="search-suggest-label"
+          id="search-suggest-list"
+          className={styles.searchSuggestList}
+        >
+          {suggestions.map((q, qi) => (
+            <li
+              key={q}
+              role="option"
+              id={`search-sugg-${qi}`}
+              aria-selected={qi === activeSugg}
+              className={`${styles.searchSuggestItem} ${qi === activeSugg ? styles.suggActive : ''}`}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleHistoryClick(q)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <polyline points="12 7 12 12 15.5 14" />
+              </svg>
+              <span>{q}</span>
+            </li>
+          ))}
+        </ul>
+        <div className={styles.searchSuggestRemoveCol}>
+          {suggestions.map((q) => (
+            <button
+              key={`remove-${q}`}
+              type="button"
+              className={styles.searchSuggestRemove}
+              aria-label={`Remove "${q}" from search history`}
+              title="Remove from history"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleRemoveHistory(q)}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <div className="page">
-      <section className="section">
-        <h2 className="section-title">{personId ? (query ? `Movies & TV featuring "${query}"` : 'Movies & TV shows') : query ? `Search Results for "${query}"` : 'Search'}</h2>
-        <div className={styles.searchBoxWrap}>
-          <form className={styles.searchFormRow} role="search" onSubmit={handleSubmit}>
-            <input
-              ref={inputRef}
-              type="search"
-              className={styles.searchInput}
-              placeholder="Search movies, TV shows..."
-              aria-label="Search"
-              autoComplete="off"
-              role="combobox"
-              aria-autocomplete="list"
-              aria-expanded={showSuggestions}
-              aria-controls="search-suggest-list"
-              aria-activedescendant={activeSugg >= 0 ? `search-sugg-${activeSugg}` : undefined}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              onKeyDown={handleSuggestKeyDown}
-            />
-            <button type="submit" className={styles.searchSubmitBtn}>Search</button>
-          </form>
-          {showSuggestions && (
-            <div className={styles.searchSuggest}>
-              <div className={styles.searchSuggestLabel} id="search-suggest-label">Recent searches</div>
-              <div className={styles.searchSuggestBody}>
-                <ul
-                  role="listbox"
-                  aria-labelledby="search-suggest-label"
-                  id="search-suggest-list"
-                  className={styles.searchSuggestList}
+      <SearchBar
+        query={input}
+        onQueryChange={setInput}
+        onSearch={handleSubmit}
+        searchPlaceholder="Search movies, TV shows..."
+        countryValue={country}
+        onCountryChange={(value) => { setCountry(value); setPage(1); }}
+        countryOptions={countryOptions}
+        genreValue={genreFilter}
+        onGenreChange={(value) => { setGenreFilter(value); setPage(1); }}
+        genreOptions={genreOptions}
+        showMore={showMore}
+        onToggleShowMore={() => setShowMore((s) => !s)}
+        activeFilters={activeFilters}
+        onRemoveFilter={removeFilter}
+        onClearFilters={clearFilters}
+        isSearchContext={true}
+        title={personId ? (query ? `Movies & TV featuring "${query}"` : 'Movies & TV shows') : query ? `Search Results for "${query}"` : 'Search'}
+        subtitle="Discover something new"
+        inputRef={inputRef}
+        onInputFocus={() => setSearchFocused(true)}
+        onInputBlur={() => setSearchFocused(false)}
+        onInputKeyDown={handleSuggestKeyDown}
+        combobox
+        ariaExpanded={showSuggestions}
+        ariaControls="search-suggest-list"
+        ariaActiveDescendant={activeSugg >= 0 ? `search-sugg-${activeSugg}` : undefined}
+        searchOverlay={suggestionsDropdown}
+      >
+        <div className="field">
+          <span className="field-label">Release from</span>
+          <DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
+        </div>
+        <div className="field">
+          <span className="field-label">Release until</span>
+          <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
+        </div>
+        <SearchSelectField label="Year" value={year} options={YEAR_OPTIONS} onChange={(value) => { setYear(value); setPage(1); }} />
+        <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
+        <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
+        <label className="field">
+          <span className="field-label">Minimum votes</span>
+          <span className="field-control"><input className="votes-input" placeholder="Any amount" type="number" min="0" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></span>
+        </label>
+        {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
+      </SearchBar>
+
+      <div className={styles.searchFilterHeader}>
+        <TypeToggle
+          value={tab}
+          options={TYPE_TABS}
+          onChange={(value) => { setTab(value); setPage(1); }}
+          ariaLabel="Search categories"
+        />
+      </div>
+
+      {!query && !searchFocused && history.length > 0 && (
+        <div className={styles.searchHistory}>
+          <div className={styles.searchHistoryHeader}>
+            <div className={styles.searchHistoryTitle}>Recent searches</div>
+            <button type="button" className={styles.searchHistoryClear} onClick={handleClearHistory}>Clear all</button>
+          </div>
+          <div className={styles.searchHistoryList}>
+            {history.map((q) => (
+              <span key={q} className={styles.searchHistoryChip}>
+                <button type="button" className={styles.searchHistoryLabel} onClick={() => handleHistoryClick(q)}>{q}</button>
+                <button
+                  type="button"
+                  className={styles.searchHistoryRemove}
+                  aria-label={`Remove "${q}" from search history`}
+                  title="Remove from history"
+                  onClick={() => handleRemoveHistory(q)}
                 >
-                  {suggestions.map((q, qi) => (
-                    <li
-                      key={q}
-                      role="option"
-                      id={`search-sugg-${qi}`}
-                      aria-selected={qi === activeSugg}
-                      className={`${styles.searchSuggestItem} ${qi === activeSugg ? styles.suggActive : ''}`}
-                      // mousedown fires before blur: prevent the default so the
-                      // input keeps focus and the click is not swallowed.
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleHistoryClick(q)}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <circle cx="12" cy="12" r="9" />
-                        <polyline points="12 7 12 12 15.5 14" />
-                      </svg>
-                      <span>{q}</span>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
+      {error ? (
+        <div className="empty-state" role="alert">
+          <h3>Search failed</h3>
+          <p>Check your connection and try again.</p>
+          <div className="empty-state-actions">
+            <button type="button" className={styles.searchRetry} onClick={() => setRetryKey((n) => n + 1)}>
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : loading ? (
+        <div className={styles.searchStatus} role="status">Searching...</div>
+      ) : !personId && !query.trim() ? (
+        <div className={styles.searchStatus}>Type above to search movies and TV shows</div>
+      ) : isEmpty ? (
+        filtersActive && results.length > 0 ? (
+          <div className="empty-state" role="status">
+            <h3>No matches for these filters</h3>
+            <p>Try removing a filter or widening the search.</p>
+            <div className="empty-state-actions">
+              <button type="button" className="empty-state-action" onClick={clearFilters}>Clear filters</button>
+            </div>
+          </div>
+        ) : (
+          <div className="empty-state">
+            <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
+            <p>
+              Check the spelling, try fewer words, or start from one of these
+              instead.
+            </p>
+            <div className="empty-state-actions">
+              <Link to="/" className="empty-state-action">
+                Browse Trending
+              </Link>
+              <Link to="/movies" className="empty-state-action">
+                Movies
+              </Link>
+              <Link to="/tv" className="empty-state-action">
+                TV Shows
+              </Link>
+            </div>
+            {recoverySearches.length > 0 && (
+              <div className={styles.searchRecovery}>
+                <div className={styles.searchRecoveryTitle}>
+                  Or try one of your recent searches
+                </div>
+                <ul className={styles.searchRecoveryList}>
+                  {recoverySearches.map((q) => (
+                    <li key={q} className={styles.searchRecoveryRow}>
+                      <button
+                        type="button"
+                        className={styles.searchRecoveryLabel}
+                        onClick={() => handleHistoryClick(q)}
+                        title={`Search again for "${q}"`}
+                      >
+                        <svg
+                          className={styles.searchRecoveryIcon}
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <span>{q}</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.searchRecoveryRemove}
+                        aria-label={`Remove "${q}" from search history`}
+                        title="Remove from history"
+                        onClick={() => handleRemoveHistory(q)}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
                     </li>
                   ))}
                 </ul>
-                <div className={styles.searchSuggestRemoveCol}>
-                  {suggestions.map((q) => (
-                    <button
-                      key={`remove-${q}`}
-                      type="button"
-                      className={styles.searchSuggestRemove}
-                      aria-label={`Remove "${q}" from search history`}
-                      title="Remove from history"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => handleRemoveHistory(q)}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className={styles.searchFilterHeader}>
-          <TypeToggle
-            value={tab}
-            options={TYPE_TABS}
-            onChange={(value) => { setTab(value); setPage(1); }}
-            ariaLabel="Search categories"
-          />
-          {showFilterUi && (
-            <FilterBar
-              countryValue={country}
-              genreValue={genreFilter}
-              showMore={showMore}
-              onToggleShowMore={() => setShowMore((s) => !s)}
-              onCountryChange={(value) => { setCountry(value); setPage(1); }}
-              onGenreChange={(value) => { setGenreFilter(value); setPage(1); }}
-              countryOptions={countryOptions}
-              genreOptions={genreOptions}
-              hasActiveFilters={filtersActive}
-              onClearFilters={clearFilters}
-            />
-          )}
-        </div>
-        {showFilterUi && (
-          <>
-            {showMore && (
-              <div className={`more-filters-panel ${styles.searchMoreFilters}`} aria-label="Additional filters">
-                <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} /></div>
-                <div className="filter-control"><span className="filter-control-label">Release date</span><DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} /></div>
-                <div className="filter-control"><span className="filter-control-label">Year</span><FilterDropdown value={year} options={YEAR_OPTIONS} placeholder="Any year" onSelect={(value) => { setYear(value); setPage(1); }} /></div>
-                <div className="filter-control"><span className="filter-control-label">Sort results</span><FilterDropdown value={sortBy} options={sortOptionList} placeholder="Sort by" onSelect={(value) => { setSortBy(value); setPage(1); }} /></div>
-                <div className="filter-control"><span className="filter-control-label">Language</span><FilterDropdown value={language} options={languageOptions} placeholder="Original language" onSelect={(value) => { setLanguage(value); setPage(1); }} /></div>
-                <label className="filter-control"><span className="filter-control-label">Minimum votes</span><input className="filter-number-input" type="number" min="0" inputMode="numeric" placeholder="Any amount" aria-label="Minimum votes" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></label>
-                {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
               </div>
             )}
-            {activeFilters.length > 0 && (
-              <div className="active-filters" aria-label="Active filters">
-                <span className="active-filters-label">Active filters</span>
-                {activeFilters.map((filter) => (
-                  <button
-                    type="button"
-                    className="filter-chip"
-                    key={filter.key}
-                    onClick={() => removeFilter(filter.key)}
-                    aria-label={`Remove filter: ${filter.label}`}
-                  >
-                    {filter.label}
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
-        )}
-        {!query && !searchFocused && history.length > 0 && (
-          <div className={styles.searchHistory}>
-            <div className={styles.searchHistoryHeader}>
-              <div className={styles.searchHistoryTitle}>Recent searches</div>
-              <button type="button" className={styles.searchHistoryClear} onClick={handleClearHistory}>Clear all</button>
-            </div>
-            <div className={styles.searchHistoryList}>
-              {history.map((q) => (
-                <span key={q} className={styles.searchHistoryChip}>
-                  <button type="button" className={styles.searchHistoryLabel} onClick={() => handleHistoryClick(q)}>{q}</button>
-                  <button
-                    type="button"
-                    className={styles.searchHistoryRemove}
-                    aria-label={`Remove "${q}" from search history`}
-                    title="Remove from history"
-                    onClick={() => handleRemoveHistory(q)}
-                  >
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </span>
+          </div>
+        )
+      ) : (
+        <>
+          {visible.length > 0 && (
+            <div className="media-grid">
+              {visible.map((item) => (
+                <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
               ))}
             </div>
-          </div>
-        )}
-        {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
-        {error ? (
-          <div className="empty-state" role="alert">
-            <h3>Search failed</h3>
-            <p>Check your connection and try again.</p>
-            <div className="empty-state-actions">
-              <button type="button" className={styles.searchRetry} onClick={() => setRetryKey((n) => n + 1)}>
-                Retry
-              </button>
+          )}
+          {people.length > 0 && (
+            <div className={styles.searchPeople}>
+              <h3 className={styles.searchPeopleTitle}>People</h3>
+              <PersonList people={people} />
             </div>
-          </div>
-        ) : loading ? (
-          <div className={styles.searchStatus} role="status">Searching...</div>
-        ) : !personId && !query.trim() ? (
-          <div className={styles.searchStatus}>Type above to search movies and TV shows</div>
-        ) : isEmpty ? (
-          filtersActive && results.length > 0 ? (
-            <div className="empty-state" role="status">
-              <h3>No matches for these filters</h3>
-              <p>Try removing a filter or widening the search.</p>
-              <div className="empty-state-actions">
-                <button type="button" className="empty-state-action" onClick={clearFilters}>Clear filters</button>
-              </div>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
-              <p>
-                Check the spelling, try fewer words, or start from one of these
-                instead.
-              </p>
-              <div className="empty-state-actions">
-                <Link to="/" className="empty-state-action">
-                  Browse Trending
-                </Link>
-                <Link to="/movies" className="empty-state-action">
-                  Movies
-                </Link>
-                <Link to="/tv" className="empty-state-action">
-                  TV Shows
-                </Link>
-              </div>
-              {recoverySearches.length > 0 && (
-                <div className={styles.searchRecovery}>
-                  <div className={styles.searchRecoveryTitle}>
-                    Or try one of your recent searches
-                  </div>
-                  <ul className={styles.searchRecoveryList}>
-                    {recoverySearches.map((q) => (
-                      <li key={q} className={styles.searchRecoveryRow}>
-                        <button
-                          type="button"
-                          className={styles.searchRecoveryLabel}
-                          onClick={() => handleHistoryClick(q)}
-                          title={`Search again for "${q}"`}
-                        >
-                          <svg
-                            className={styles.searchRecoveryIcon}
-                            width="13"
-                            height="13"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                          >
-                            <circle cx="11" cy="11" r="8" />
-                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                          </svg>
-                          <span>{q}</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.searchRecoveryRemove}
-                          aria-label={`Remove "${q}" from search history`}
-                          title="Remove from history"
-                          onClick={() => handleRemoveHistory(q)}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )
-        ) : (
-          <>
-            {visible.length > 0 && (
-              <div className="media-grid">
-                {visible.map((item) => (
-                  <MediaCard key={`${(item as { media_type?: string }).media_type || tab}-${item.id}`} item={item} mediaType={tab !== 'all' ? tab as 'movie' | 'tv' : undefined} />
-                ))}
-              </div>
-            )}
-            {people.length > 0 && (
-              <div className={styles.searchPeople}>
-                <h3 className={styles.searchPeopleTitle}>People</h3>
-                <PersonList people={people} />
-              </div>
-            )}
-            {displayTotalPages > 1 && (
-              <Pagination
-                page={safePage}
-                totalPages={displayTotalPages}
-                onChange={setPage}
-                label={`Page ${safePage} of ${displayTotalPages}`}
-              />
-            )}
-          </>
-        )}
-      </section>
+          )}
+          {displayTotalPages > 1 && (
+            <Pagination
+              page={safePage}
+              totalPages={displayTotalPages}
+              onChange={setPage}
+              label={`Page ${safePage} of ${displayTotalPages}`}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }
