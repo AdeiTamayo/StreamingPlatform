@@ -222,6 +222,16 @@ select:focus-visible {
   margin-bottom: 28px;
 }
 
+.page > .panel-heading {
+  margin-top: 1.5rem;
+}
+
+.custom-select-trigger-icon {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: #6f9ce3;
@@ -231,7 +241,7 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
-.movies-panel h1 {
+.panel-heading h1 {
   margin: 0;
   font-size: clamp(30px, 4vw, 46px);
   letter-spacing: -.045em;
@@ -460,10 +470,6 @@ select:focus-visible {
 
 .date-control input::placeholder {
   color: #8498bc;
-}
-
-.votes-input {
-  color: var(--foreground);
 }
 
 .secondary-grid .filter-error {

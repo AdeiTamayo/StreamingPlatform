@@ -4,6 +4,7 @@ import { getPopularMovies, getPopularTV, getMovieGenres, getTVGenres, getCountri
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
 import DatePickerField from '../components/DatePickerField';
+import NumberStepper from '../components/NumberStepper';
 import useSearchFilter from '../hooks/useSearchFilter';
 import type { MediaType, TMDBGenre, TMDBCountry, TMDBLanguage, TMDBMovie, TMDBSeries, TMDBPaginatedResponse, FilterOption } from '../types';
 import SearchBar, { SearchSelectField } from '../components/SearchBar';
@@ -232,10 +233,17 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
         <SearchSelectField label="Year" value={year} options={yearOptions} onChange={(value) => { setYear(value); setPage(1); }} />
         <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
         <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
-        <label className="field">
-          <span className="field-label">Minimum votes</span>
-          <span className="field-control"><input className="votes-input" placeholder="Any amount" type="number" min="0" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></span>
-        </label>
+        <div className="field">
+          <label className="field-label" htmlFor="browse-min-votes">Minimum votes</label>
+          <NumberStepper
+            id="browse-min-votes"
+            label="minimum votes"
+            value={voteInput}
+            onChange={setVoteInput}
+            step={100}
+            placeholder="Any amount"
+          />
+        </div>
         {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
       </SearchBar>
 

@@ -29,6 +29,31 @@
   background: rgba(255, 255, 255, 0.07);
 }
 
+/* Single "order by" button: label + sort icon, like the query bar control. */
+.last-seen-controls .last-seen-sort-select .custom-select-trigger {
+  border-radius: 14px;
+  border-color: var(--border-strong);
+  padding: 0 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface-overlay);
+}
+
+.last-seen-controls .last-seen-sort-select .custom-select-trigger:hover {
+  border-color: rgba(125, 211, 252, 0.4);
+  background: var(--surface-overlay-hover);
+}
+
+.last-seen-controls .last-seen-sort-select .custom-select-trigger-icon {
+  margin-left: 0.9rem;
+  color: var(--text-muted);
+}
+
+.last-seen-controls .last-seen-sort-select .custom-select-menu {
+  min-width: 200px;
+}
+
 .last-seen-search {
   min-height: 42px;
   box-sizing: border-box;
@@ -49,73 +74,62 @@
   background: rgba(255, 255, 255, 0.07);
 }
 
-.last-seen-clear-btn {
+.last-seen-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: -0.35rem 0 1rem;
+}
+
+.last-seen-count {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.last-seen-meta-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.last-seen-meta-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 0.4rem;
-  min-height: 42px;
-  box-sizing: border-box;
-  padding: 0.5rem 0.85rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-dim);
+  font: inherit;
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease;
+  transition: color 0.18s ease;
 }
 
-.last-seen-clear-btn:hover {
-  background: rgba(125, 211, 252, 0.1);
+.last-seen-meta-btn:hover {
   color: var(--text);
 }
 
-.last-seen-clear-btn.active {
-  background: rgba(125, 211, 252, 0.12);
+.last-seen-meta-btn.active,
+.last-seen-meta-btn.accent {
   color: var(--accent);
-  border-color: rgba(125, 211, 252, 0.35);
 }
 
-.last-seen-sort-dir-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 42px;
-  min-height: 42px;
-  box-sizing: border-box;
-  padding: 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition:
-    background 0.18s ease,
-    color 0.18s ease,
-    border-color 0.18s ease;
+.last-seen-meta-btn.active:hover,
+.last-seen-meta-btn.accent:hover {
+  color: var(--accent-bright);
 }
 
-.last-seen-sort-dir-btn:hover {
-  background: rgba(125, 211, 252, 0.1);
-  color: var(--text);
-}
-
-.last-seen-sort-dir-btn:focus-visible,
-.last-seen-clear-btn:focus-visible {
+.last-seen-meta-btn:focus-visible {
   outline: 2px solid rgba(125, 211, 252, 0.7);
   outline-offset: 2px;
-}
-
-.last-seen-select-btn {
-  margin-left: auto;
-  min-width: 42px;
-  padding: 0.5rem;
 }
 
 .last-seen-series-poster {

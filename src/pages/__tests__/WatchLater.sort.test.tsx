@@ -86,48 +86,47 @@ describe('WatchLater list sorting', () => {
     vi.clearAllMocks();
   });
 
-  it('defaults to date added, newest first', () => {
+  it('defaults to recently added, newest first', () => {
     seedList();
     renderList();
     expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
-    expect(screen.getByRole('button', { name: 'Date added' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recently added' })).toBeInTheDocument();
   });
 
-  it('direction toggle flips date-added order oldest-first', () => {
+  it('can order by oldest added', () => {
     seedList();
     renderList();
     expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
-    fireEvent.click(screen.getByRole('button', { name: /sort direction/i }));
+    selectSortField('Recently added', 'Oldest added');
     expect(cardTitles()).toEqual(['Alpha', 'Zulu']);
   });
 
-  it('title sorts A-Z then reverses to Z-A', () => {
+  it('title sorts A-Z then Z-A', () => {
     seedList();
     renderList();
-    selectSortField('Date added', 'Title');
+    selectSortField('Recently added', 'Title A–Z');
     expect(cardTitles()).toEqual(['Alpha', 'Zulu']);
-    fireEvent.click(screen.getByRole('button', { name: /sort direction/i }));
+    selectSortField('Title A–Z', 'Title Z–A');
     expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
   });
 
   it('year sorts newest then oldest', () => {
     seedList();
     renderList();
-    selectSortField('Date added', 'Year');
+    selectSortField('Recently added', 'Year (newest)');
     expect(cardTitles()).toEqual(['Alpha', 'Zulu']);
-    fireEvent.click(screen.getByRole('button', { name: /sort direction/i }));
+    selectSortField('Year (newest)', 'Year (oldest)');
     expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
   });
 
-  it('clear filters restores date-added newest-first', () => {
+  it('clear filters restores recently added order', () => {
     seedList();
     renderList();
-    selectSortField('Date added', 'Title');
-    fireEvent.click(screen.getByRole('button', { name: /sort direction/i }));
-    expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
+    selectSortField('Recently added', 'Oldest added');
+    expect(cardTitles()).toEqual(['Alpha', 'Zulu']);
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(cardTitles()).toEqual(['Zulu', 'Alpha']);
-    expect(screen.getByRole('button', { name: 'Date added' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Recently added' })).toBeInTheDocument();
   });
 });
 

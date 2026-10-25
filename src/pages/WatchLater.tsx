@@ -23,7 +23,6 @@ import RatingBadge from "../components/RatingBadge";
 import FilterDropdown from "../components/FilterDropdown";
 import TypeToggle from "../components/TypeToggle";
 import SelectIcon from "../components/SelectIcon";
-import SortDirectionIcon from "../components/SortDirectionIcon";
 import Pagination from "../components/Pagination";
 import CloseIcon from "../components/CloseIcon";
 import BulkSelectBar from "../components/BulkSelectBar";
@@ -941,6 +940,8 @@ export default function WatchLater() {
   // Library present but the active filter/search matches nothing.
   const hasNoMatches =
     sortedItems.length === 0 && visibleEpItems.length === 0;
+  const totalTitleCount = items.length + epItems.length;
+  const visibleTitleCount = sortedItems.length + visibleEpItems.length;
 
   const {
     selectMode,
@@ -1251,9 +1252,14 @@ export default function WatchLater() {
 
   return (
     <div className="page">
-      <section className="section">
-        <h2 className="section-title">Watch Later</h2>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Personal library</p>
+          <h1>Watch Later</h1>
+        </div>
+      </div>
 
+      <section className="section">
         {loading ? (
           <CollectionSkeleton variant="grid" count={6} />
         ) : items.length === 0 && epItems.length === 0 ? (
@@ -1306,99 +1312,120 @@ export default function WatchLater() {
                     }}
                   />
                   <FilterDropdown
-                    value={sortBy}
-                    options={[
-                      { value: "added", label: "Date added" },
-                      { value: "title", label: "Title" },
-                      { value: "year", label: "Year" },
-                    ]}
-                    placeholder="Sort by"
-                    onSelect={(v: string) => {
-                      setSortBy(v);
-                      // Each field starts in its natural direction; the
-                      // toggle reverses from there.
-                      setSortDir(v === "title" ? "asc" : "desc");
-                      setPage(1);
-                      setEpPage(1);
-                    }}
-                  />
-                  <button
-                    className={styles.wlClearBtn}
-                    onClick={() =>
-                      setSortDir((d) => (d === "desc" ? "asc" : "desc"))
-                    }
-                    title={`Sort ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
-                    aria-label={`Sort direction: ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
-                  >
-                    <SortDirectionIcon direction={sortDir} />
-                  </button>
-                  {unreleasedKeys.size > 0 && (
-                    <button
-                      className={`${styles.wlClearBtn} ${hideUnreleasedPosters ? styles.active : ""}`}
-                      onClick={() => setHideUnreleasedPosters((v) => !v)}
-                      title={
-                        hideUnreleasedPosters
-                          ? "Show unreleased titles"
-                          : "Hide unreleased titles"
-                      }
-                    >
+                    className={styles.wlSortSelect}
+                    icon={
                       <svg
-                        width="15"
-                        height="15"
+                        width="18"
+                        height="18"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
                         strokeWidth="2"
                         strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ verticalAlign: "-2px" }}
+                        aria-hidden="true"
                       >
-                        {hideUnreleasedPosters ? (
-                          <>
-                            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                            <line x1="2" y1="2" x2="22" y2="22" />
-                          </>
-                        ) : (
-                          <>
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </>
-                        )}
+                        <line x1="4" y1="6" x2="20" y2="6" />
+                        <line x1="4" y1="12" x2="14" y2="12" />
+                        <line x1="4" y1="18" x2="8" y2="18" />
                       </svg>
-                      {hideUnreleasedPosters
-                        ? "Show unreleased"
-                        : "Hide unreleased"}
-                    </button>
-                  )}
-                  {(filterType !== "all" ||
-                    sortBy !== "added" ||
-                    sortDir !== "desc" ||
-                    searchQuery.trim()) && (
+                    }
+                    value={`${sortBy}-${sortDir}`}
+                    options={[
+                      { value: "added-desc", label: "Recently added" },
+                      { value: "added-asc", label: "Oldest added" },
+                      { value: "title-asc", label: "Title A–Z" },
+                      { value: "title-desc", label: "Title Z–A" },
+                      { value: "year-desc", label: "Year (newest)" },
+                      { value: "year-asc", label: "Year (oldest)" },
+                    ]}
+                    placeholder="Recently added"
+                    onSelect={(v: string) => {
+                      const [field, dir] = v.split("-");
+                      setSortBy(field);
+                      setSortDir(dir === "asc" ? "asc" : "desc");
+                      setPage(1);
+                      setEpPage(1);
+                    }}
+                  />
+                </div>
+                <div className={styles.wlMeta}>
+                  <span className={styles.wlCount}>
+                    {visibleTitleCount} of {totalTitleCount} titles
+                  </span>
+                  <div className={styles.wlMetaActions}>
+                    {unreleasedKeys.size > 0 && (
+                      <button
+                        className={`${styles.wlMetaBtn} ${hideUnreleasedPosters ? styles.active : ""}`}
+                        onClick={() => setHideUnreleasedPosters((v) => !v)}
+                        title={
+                          hideUnreleasedPosters
+                            ? "Show unreleased titles"
+                            : "Hide unreleased titles"
+                        }
+                      >
+                        <svg
+                          width="15"
+                          height="15"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          {hideUnreleasedPosters ? (
+                            <>
+                              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                              <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                              <line x1="2" y1="2" x2="22" y2="22" />
+                            </>
+                          ) : (
+                            <>
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </>
+                          )}
+                        </svg>
+                        {hideUnreleasedPosters
+                          ? "Show unreleased"
+                          : "Hide unreleased"}
+                      </button>
+                    )}
+                    {(filterType !== "all" ||
+                      sortBy !== "added" ||
+                      sortDir !== "desc" ||
+                      searchQuery.trim()) && (
+                      <button
+                        className={`${styles.wlMetaBtn} ${styles.accent}`}
+                        onClick={() => {
+                          setFilterType("all");
+                          setSortBy("added");
+                          setSortDir("desc");
+                          setSearchQuery("");
+                          setPage(1);
+                          setEpPage(1);
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    )}
                     <button
-                      className={styles.wlClearBtn}
-                      onClick={() => {
-                        setFilterType("all");
-                        setSortBy("added");
-                        setSortDir("desc");
-                        setSearchQuery("");
-                        setPage(1);
-                        setEpPage(1);
-                      }}
+                      className={`${styles.wlMetaBtn} ${selectMode ? styles.active : ""}`}
+                      onClick={toggleSelectMode}
+                      aria-pressed={selectMode}
+                      aria-label={selectMode ? "Done" : "Select"}
+                      title={
+                        selectMode
+                          ? "Exit selection"
+                          : "Select multiple titles"
+                      }
                     >
-                      Clear filters
+                      <SelectIcon />
+                      {selectMode ? "Done" : "Select"}
                     </button>
-                  )}
-                  <button
-                    className={`${styles.wlClearBtn} ${styles.wlSelectBtn} ${selectMode ? styles.active : ""}`}
-                    onClick={toggleSelectMode}
-                    aria-pressed={selectMode}
-                    aria-label={selectMode ? "Done" : "Select"}
-                    title={selectMode ? "Exit selection" : "Select multiple titles"}
-                  >
-                    <SelectIcon />
-                  </button>
+                  </div>
                 </div>
                 {selectMode && (
                   <BulkSelectBar

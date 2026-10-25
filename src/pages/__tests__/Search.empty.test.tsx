@@ -71,7 +71,7 @@ describe('Search no-results recovery', () => {
     await waitFor(() => expect(screen.getByText(/No results for/)).toBeInTheDocument());
     // The block is labelled, so the rows are not mistaken for more filters.
     expect(
-      screen.getByText(/try one of your recent searches/i),
+      screen.getByText('Recent searches'),
     ).toBeInTheDocument();
     const items = screen.getByRole('list');
     const rows = within(items).getAllByRole('listitem');

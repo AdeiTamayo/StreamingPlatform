@@ -5,6 +5,7 @@ import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
 import PersonList from '../components/PersonList';
 import DatePickerField from '../components/DatePickerField';
+import NumberStepper from '../components/NumberStepper';
 import TypeToggle from '../components/TypeToggle';
 import type { PersonListPerson } from '../components/PersonList';
 import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
@@ -461,21 +462,30 @@ export default function Search() {
         <SearchSelectField label="Year" value={year} options={YEAR_OPTIONS} onChange={(value) => { setYear(value); setPage(1); }} />
         <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
         <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
-        <label className="field">
-          <span className="field-label">Minimum votes</span>
-          <span className="field-control"><input className="votes-input" placeholder="Any amount" type="number" min="0" value={voteInput} onChange={(e) => setVoteInput(e.target.value)} /></span>
-        </label>
+        <div className="field">
+          <label className="field-label" htmlFor="search-min-votes">Minimum votes</label>
+          <NumberStepper
+            id="search-min-votes"
+            label="minimum votes"
+            value={voteInput}
+            onChange={setVoteInput}
+            step={100}
+            placeholder="Any amount"
+          />
+        </div>
         {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
       </SearchBar>
 
-      <div className={styles.searchFilterHeader}>
-        <TypeToggle
-          value={tab}
-          options={TYPE_TABS}
-          onChange={(value) => { setTab(value); setPage(1); }}
-          ariaLabel="Search categories"
-        />
-      </div>
+      {!(isEmpty && !loading && !error) && (
+        <div className={styles.searchFilterHeader}>
+          <TypeToggle
+            value={tab}
+            options={TYPE_TABS}
+            onChange={(value) => { setTab(value); setPage(1); }}
+            ariaLabel="Search categories"
+          />
+        </div>
+      )}
 
       {!query && !searchFocused && history.length > 0 && (
         <div className={styles.searchHistory}>
@@ -530,27 +540,67 @@ export default function Search() {
             </div>
           </div>
         ) : (
-          <div className="empty-state">
-            <h3>{personId ? 'No credits found' : <>No results for &ldquo;{query}&rdquo;</>}</h3>
-            <p>
-              Check the spelling, try fewer words, or start from one of these
-              instead.
+          <div className={styles.noResults}>
+            <span className={styles.noResultsIcon} aria-hidden="true">
+              <svg
+                width="30"
+                height="30"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <line x1="16.5" y1="16.5" x2="21" y2="21" />
+              </svg>
+            </span>
+            <div className={styles.noResultsEyebrow}>Search complete</div>
+            <h3 className={styles.noResultsTitle}>
+              {personId ? (
+                'No credits found'
+              ) : (
+                <>
+                  No results for{' '}
+                  <span className={styles.noResultsQuery}>
+                    &ldquo;{query}&rdquo;
+                  </span>
+                </>
+              )}
+            </h3>
+            <p className={styles.noResultsText}>
+              {personId
+                ? 'Try a different person or explore one of these starting points.'
+                : 'Try a different title, check the spelling, or explore one of these starting points.'}
             </p>
-            <div className="empty-state-actions">
-              <Link to="/" className="empty-state-action">
+            <div className={styles.noResultsActions}>
+              <Link
+                to="/"
+                className={`${styles.noResultsAction} ${styles.noResultsActionPrimary}`}
+              >
                 Browse Trending
               </Link>
-              <Link to="/movies" className="empty-state-action">
+              <Link to="/movies" className={styles.noResultsAction}>
                 Movies
               </Link>
-              <Link to="/tv" className="empty-state-action">
+              <Link to="/tv" className={styles.noResultsAction}>
                 TV Shows
               </Link>
             </div>
             {recoverySearches.length > 0 && (
               <div className={styles.searchRecovery}>
-                <div className={styles.searchRecoveryTitle}>
-                  Or try one of your recent searches
+                <div className={styles.searchRecoveryHead}>
+                  <div className={styles.searchRecoveryTitle}>
+                    Recent searches
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.searchRecoveryClear}
+                    onClick={handleClearHistory}
+                  >
+                    Clear history
+                  </button>
                 </div>
                 <ul className={styles.searchRecoveryList}>
                   {recoverySearches.map((q) => (
@@ -563,8 +613,8 @@ export default function Search() {
                       >
                         <svg
                           className={styles.searchRecoveryIcon}
-                          width="13"
-                          height="13"
+                          width="18"
+                          height="18"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -585,7 +635,7 @@ export default function Search() {
                         title="Remove from history"
                         onClick={() => handleRemoveHistory(q)}
                       >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <line x1="18" y1="6" x2="6" y2="18" />
                           <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>

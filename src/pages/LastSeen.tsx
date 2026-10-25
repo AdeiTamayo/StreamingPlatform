@@ -16,7 +16,6 @@ import Pagination from "../components/Pagination";
 import CloseIcon from "../components/CloseIcon";
 import TypeToggle from "../components/TypeToggle";
 import SelectIcon from "../components/SelectIcon";
-import SortDirectionIcon from "../components/SortDirectionIcon";
 import BulkSelectBar from "../components/BulkSelectBar";
 import useBulkSelect from "../components/useBulkSelect";
 import bulkStyles from "../components/BulkSelectBar.module.css";
@@ -93,7 +92,7 @@ export default function LastSeen() {
     setLoading(false);
   }, []);
 
-  const { series, movies, combined } = useMemo(() => {
+  const { series, movies, combined, total } = useMemo(() => {
     const seriesMap = new Map<string, SeriesGroup>();
     const movieItems: LastSeenItem[] = [];
 
@@ -183,7 +182,12 @@ export default function LastSeen() {
       combined = combined.filter((e) => e.kind === "series");
     }
 
-    return { series: groupedSeries, movies: sortedMovies, combined };
+    return {
+      series: groupedSeries,
+      movies: sortedMovies,
+      combined,
+      total: seriesMap.size + movieItems.length,
+    };
   }, [items, sortBy, sortDir, searchQuery, filterType]);
 
   // Reset to the first page whenever the visible ordering/contents change,
@@ -373,52 +377,71 @@ export default function LastSeen() {
               />
               <TypeToggle value={filterType} options={TYPE_TABS} onChange={setFilterType} />
               <FilterDropdown
-                value={sortBy}
+                className={styles.lastSeenSortSelect}
+                icon={
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="4" y1="6" x2="20" y2="6" />
+                    <line x1="4" y1="12" x2="14" y2="12" />
+                    <line x1="4" y1="18" x2="8" y2="18" />
+                  </svg>
+                }
+                value={`${sortBy}-${sortDir}`}
                 options={[
-                  { value: "recent", label: "Date added" },
-                  { value: "title", label: "Title" },
-                  { value: "episodes", label: "Most episodes" },
+                  { value: "recent-desc", label: "Recently added" },
+                  { value: "recent-asc", label: "Oldest added" },
+                  { value: "title-asc", label: "Title A–Z" },
+                  { value: "title-desc", label: "Title Z–A" },
+                  { value: "episodes-desc", label: "Most episodes" },
+                  { value: "episodes-asc", label: "Fewest episodes" },
                 ]}
-                placeholder="Date added"
+                placeholder="Recently added"
                 onSelect={(v: string) => {
-                  setSortBy(v);
-                  setSortDir(v === "title" ? "asc" : "desc");
+                  const [field, dir] = v.split("-");
+                  setSortBy(field);
+                  setSortDir(dir === "asc" ? "asc" : "desc");
                 }}
               />
-              <button
-                className={styles.lastSeenSortDirBtn}
-                onClick={() =>
-                  setSortDir((d) => (d === "desc" ? "asc" : "desc"))
-                }
-                title={`Sort ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
-                aria-label={`Sort direction: ${sortDir === "desc" ? "descending" : "ascending"} — activate to reverse`}
-              >
-                <SortDirectionIcon direction={sortDir} />
-              </button>
-              {hasActiveFilter && (
+            </div>
+            <div className={styles.lastSeenMeta}>
+              <span className={styles.lastSeenCount}>
+                {combined.length} of {total} titles
+              </span>
+              <div className={styles.lastSeenMetaActions}>
+                {hasActiveFilter && (
+                  <button
+                    className={`${styles.lastSeenMetaBtn} ${styles.accent}`}
+                    onClick={() => {
+                      setFilterType("all");
+                      setSortBy("recent");
+                      setSortDir("desc");
+                      setSearchQuery("");
+                      setSelectedSeriesId(null);
+                      setPage(0);
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                )}
                 <button
-                  className={styles.lastSeenClearBtn}
-                  onClick={() => {
-                    setFilterType("all");
-                    setSortBy("recent");
-                    setSortDir("desc");
-                    setSearchQuery("");
-                    setSelectedSeriesId(null);
-                    setPage(0);
-                  }}
+                  className={`${styles.lastSeenMetaBtn} ${selectMode ? styles.active : ""}`}
+                  onClick={toggleSelectMode}
+                  aria-pressed={selectMode}
+                  aria-label={selectMode ? "Done" : "Select"}
+                  title={selectMode ? "Exit selection" : "Select multiple titles"}
                 >
-                  Clear filters
+                  <SelectIcon />
+                  {selectMode ? "Done" : "Select"}
                 </button>
-              )}
-              <button
-                className={`${styles.lastSeenClearBtn} ${styles.lastSeenSelectBtn} ${selectMode ? styles.active : ""}`}
-                onClick={toggleSelectMode}
-                aria-pressed={selectMode}
-                aria-label={selectMode ? "Done" : "Select"}
-                title={selectMode ? "Exit selection" : "Select multiple titles"}
-              >
-                <SelectIcon />
-              </button>
+              </div>
             </div>
 
             {selectMode && (

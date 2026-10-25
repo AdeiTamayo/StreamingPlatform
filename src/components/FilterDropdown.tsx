@@ -1,4 +1,4 @@
-import { useMemo, useState, useId, useCallback } from 'react';
+import { useMemo, useState, useId, useCallback, type ReactNode } from 'react';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
 import useDropdownKeys from '../hooks/useDropdownKeys';
@@ -10,9 +10,11 @@ interface FilterDropdownProps {
   placeholder: string;
   onSelect: (value: string) => void;
   className?: string;
+  /** Optional trailing icon shown instead of the chevron. */
+  icon?: ReactNode;
 }
 
-export default function FilterDropdown({ value, options, placeholder, onSelect, className = '' }: FilterDropdownProps) {
+export default function FilterDropdown({ value, options, placeholder, onSelect, className = '', icon }: FilterDropdownProps) {
     const [open, setOpen] = useState(false);
     const close = useCallback(() => setOpen(false), []);
     const ref = useClickOutside(close);
@@ -47,7 +49,11 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
                 aria-label={current?.label || placeholder}
             >
                 <span className="custom-select-trigger-label">{current?.label || placeholder}</span>
-                <span className={`cs-arrow ${open ? 'open' : ''}`} aria-hidden="true">&#9662;</span>
+                {icon ? (
+                    <span className="custom-select-trigger-icon" aria-hidden="true">{icon}</span>
+                ) : (
+                    <span className={`cs-arrow ${open ? 'open' : ''}`} aria-hidden="true">&#9662;</span>
+                )}
             </button>
             {open && (
                 <div id={menuId} className="custom-select-menu filter-select-menu" role="listbox" aria-label={placeholder}>

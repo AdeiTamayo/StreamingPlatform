@@ -238,24 +238,142 @@
   outline-offset: 2px;
 }
 
+/* No-results card: mirrors the query-bar surface with a larger, calmer
+   layout so an empty search still feels like a destination. */
+.no-results {
+  margin-top: 1.25rem;
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+  border: 1px solid var(--border-strong);
+  border-radius: 24px;
+  background: var(--panel);
+}
+
+.no-results-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: var(--field);
+  color: var(--accent);
+  margin-bottom: 1.5rem;
+}
+
+.no-results-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.no-results-title {
+  margin-top: 0.6rem;
+  font-family: var(--font-headline);
+  font-size: clamp(1.6rem, 3.2vw, 2.1rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.no-results-query {
+  color: var(--accent);
+}
+
+.no-results-text {
+  margin-top: 0.9rem;
+  max-width: 52ch;
+  color: var(--text-muted);
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.no-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 1.75rem;
+}
+
+.no-results-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.65rem 1.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+
+.no-results-action:hover {
+  background: var(--surface-overlay-hover);
+}
+
+.no-results-action-primary {
+  border-color: transparent;
+  background: var(--accent);
+  color: var(--background);
+  font-weight: 700;
+}
+
+.no-results-action-primary:hover {
+  background: var(--accent-bright);
+}
+
+.no-results-action:focus-visible,
+.search-recovery-clear:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 /* Recent-search recovery inside the no-results state. A vertical list of
    full-width rows, not chips: chips sat next to the browse links and read as
    a fourth filter, and a chip without its "x" button is lopsided. */
 .search-recovery {
   width: 100%;
-  margin-top: 1.15rem;
-  padding-top: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
   border-top: 1px solid var(--border);
   text-align: left;
 }
 
+.search-recovery-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+}
+
 .search-recovery-title {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-dim);
-  margin-bottom: 0.5rem;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.search-recovery-clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.search-recovery-clear:hover {
+  color: var(--accent-bright);
 }
 
 .search-recovery-list {
@@ -264,16 +382,18 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.6rem;
 }
 
 .search-recovery-row {
   display: flex;
   align-items: center;
-  gap: 0.15rem;
-  border-radius: 10px;
-  border: 1px solid transparent;
-  background: var(--surface-overlay);
+  gap: 0.3rem;
+  min-height: 3.4rem;
+  padding-right: 0.5rem;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--field);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -286,17 +406,17 @@
 .search-recovery-label {
   flex: 1;
   min-width: 0;
-  min-height: 42px;
+  min-height: 3.4rem;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
-  padding: 0.55rem 0.6rem;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
   border: 0;
-  border-radius: 10px;
+  border-radius: 14px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text);
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   text-align: left;
   cursor: pointer;
   transition: color 0.15s ease;
@@ -333,9 +453,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  margin-right: 0.35rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -518,6 +637,8 @@
   .search-input,
   .search-submit-btn,
   .search-retry,
+  .no-results-action,
+  .search-recovery-clear,
   .search-recovery-row,
   .search-recovery-label,
   .search-recovery-remove,
