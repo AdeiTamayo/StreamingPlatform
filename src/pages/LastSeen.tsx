@@ -334,8 +334,14 @@ export default function LastSeen() {
 
   return (
     <div className="page">
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Viewing history</p>
+          <h1>Last Seen</h1>
+        </div>
+      </div>
+
       <section className="section">
-        <h2 className="section-title">Last Seen</h2>
         {loading ? (
           <CollectionSkeleton variant="history" count={3} />
         ) : items.length === 0 ? (
