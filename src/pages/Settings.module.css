@@ -1,3 +1,25 @@
+.pageHeading {
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pageSubtitle {
+  margin: .55rem 0 0;
+  color: var(--text-muted);
+  font-size: .92rem;
+}
+
+.savedStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .2rem;
+  color: var(--green-text);
+  font-size: .82rem;
+  font-weight: 500;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
@@ -18,8 +40,8 @@
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 1.4rem;
+  border-radius: 18px;
+  padding: 1.6rem;
   backdrop-filter: blur(10px);
 }
 
@@ -33,13 +55,35 @@
   z-index: 5;
 }
 
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
 .cardTitle {
-  font-size: .82rem;
+  margin: 0;
+  font-size: .72rem;
   font-weight: 700;
-  letter-spacing: .08em;
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 1.25rem;
+}
+
+/* Right-aligned controls open their menu inward so it never overflows. */
+.card :global(.custom-select-menu) {
+  left: auto;
+  right: 0;
+}
+
+.card :global(.custom-select-trigger) {
+  min-height: 38px;
+  padding: .4rem .9rem;
+  background: var(--field);
+  font-size: .84rem;
+  font-weight: 600;
 }
 
 /* ------------------------- */
@@ -49,13 +93,13 @@
 .account {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  gap: 1.1rem;
+  margin-bottom: 1.1rem;
 }
 
 .avatar {
-  width: 58px;
-  height: 58px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: var(--surface-overlay);
   border: 1px solid var(--border);
@@ -64,25 +108,41 @@
   align-items: center;
   justify-content: center;
 
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 700;
 }
 
 .accountInfo {
   display: flex;
   flex-direction: column;
-  gap: .2rem;
+  gap: .25rem;
 }
 
 .accountInfo h4 {
   margin: 0;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .accountInfo span {
   color: var(--text-muted);
   font-size: .85rem;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, .14);
 }
 
 /* ------------------------- */
@@ -95,12 +155,12 @@
   align-items: center;
   gap: 1rem;
 
-  padding: .9rem 0;
+  padding: .95rem 0;
 
   border-top: 1px solid var(--border);
 }
 
-.row:first-of-type {
+.cardHeader + .row {
   border-top: none;
 }
 
@@ -112,41 +172,46 @@
 .label {
   color: var(--text-muted);
   font-size: .9rem;
+  line-height: 1.4;
 }
 
 .value {
+  font-size: .9rem;
   font-weight: 600;
+  text-align: right;
 }
 
 .rowActions {
   display: flex;
   align-items: center;
   gap: .75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* ------------------------- */
-/* Buttons container */
+/* Buttons */
 /* ------------------------- */
 
 .actions {
   display: flex;
   flex-wrap: wrap;
   gap: .75rem;
-  margin-top: 1.2rem;
+  margin-top: 1.1rem;
 }
 
-/* Standard action pill shared by every button on the page. */
 .pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: .45rem .9rem;
+  gap: .45rem;
+  min-height: 40px;
+  padding: .5rem 1.05rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface-overlay-hover);
   color: var(--text);
-  font-size: .8rem;
+  font-size: .84rem;
   font-weight: 600;
   transition: background .2s, border-color .2s, opacity .2s, color .2s;
 }
@@ -162,13 +227,17 @@
 }
 
 .pillDanger {
-  border-color: rgba(239, 68, 68, .35);
-  color: var(--danger-strong);
+  gap: .5rem;
+  min-height: 40px;
+  border-radius: 10px;
+  border-color: rgba(239, 68, 68, .4);
+  background: rgba(239, 68, 68, .08);
+  color: var(--danger);
 }
 
 .pillDanger:hover:not(:disabled) {
   background: rgba(239, 68, 68, .15);
-  border-color: rgba(239, 68, 68, .5);
+  border-color: rgba(239, 68, 68, .55);
 }
 
 /* Off-screen file pickers must stay programmatically clickable. */
@@ -180,8 +249,26 @@
 /* Storage */
 /* ------------------------- */
 
+.healthPill {
+  flex: 0 0 auto;
+  padding: .3rem .75rem;
+  border-radius: 999px;
+  border: 1px solid var(--green-border);
+  background: var(--green-fill);
+  color: var(--green-text);
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.healthPillWarn {
+  border-color: rgba(239, 68, 68, .35);
+  background: rgba(239, 68, 68, .08);
+  color: var(--danger);
+}
+
 .storageHeader {
-  margin-bottom: 1.5rem;
+  margin-bottom: .25rem;
 }
 
 .storageError {
@@ -194,17 +281,19 @@
 .storageTotal {
   font-size: 2rem;
   font-weight: 700;
+  letter-spacing: -.02em;
 }
 
 .storageSubtitle {
   color: var(--text-muted);
-  margin-top: .2rem;
-  margin-bottom: 1rem;
+  font-size: .9rem;
+  margin-top: .35rem;
 }
 
 .storageBar {
   width: 100%;
-  height: 8px;
+  height: 6px;
+  margin-top: 1.15rem;
   border-radius: 999px;
 
   background: var(--surface-overlay);
@@ -215,9 +304,7 @@
   height: 100%;
   border-radius: 999px;
 
-  background: linear-gradient(90deg,
-      var(--accent),
-      var(--accent-strong));
+  background: var(--blue);
 
   transition: width .35s ease;
 }
@@ -228,38 +315,37 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .9rem;
 }
 
 .statCard {
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, .03);
+  border-radius: 12px;
 
-  padding: 1.25rem;
+  padding: 1.15rem .75rem;
 
   background: var(--surface-overlay);
 
   text-align: center;
 
-  transition: .2s ease;
+  transition: background .2s ease;
 }
 
 .statCard:hover {
-  transform: translateY(-2px);
-
-  background: rgba(255, 255, 255, .035);
+  background: var(--surface-overlay-hover);
 }
 
 .statValue {
-  font-size: 2rem;
+  font-size: 1.9rem;
   font-weight: 700;
+  letter-spacing: -.02em;
 }
 
 .statLabel {
   margin-top: .35rem;
   color: var(--text-muted);
-  font-size: .85rem;
+  font-size: .82rem;
 }
 
 /* ------------------------- */
@@ -269,14 +355,54 @@
 .backupGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 2rem;
+  gap: 1.25rem;
 }
 
 .backupTitle {
-  margin: 0 0 .9rem;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0 0 .85rem;
 
-  font-size: .9rem;
+  font-size: .88rem;
   font-weight: 600;
+}
+
+.backupTitle svg {
+  color: var(--text-muted);
+}
+
+.backupActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: .55rem;
+}
+
+.fileBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  min-width: 96px;
+  min-height: 38px;
+  padding: .4rem .9rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-overlay-hover);
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 600;
+  transition: background .2s, border-color .2s, color .2s;
+}
+
+.fileBtn:hover {
+  background: rgba(125, 211, 252, .12);
+  border-color: rgba(125, 211, 252, .22);
+}
+
+.fileBtn svg {
+  color: var(--text-muted);
 }
 
 /* ------------------------- */
@@ -284,9 +410,10 @@
 /* ------------------------- */
 
 .dangerText {
-  color: var(--text-muted);
-  line-height: 1.6;
   margin: 0 0 1rem;
+  color: var(--text-muted);
+  font-size: .9rem;
+  line-height: 1.6;
 }
 
 /* ------------------------- */
@@ -335,31 +462,27 @@
 /* Responsive */
 /* ------------------------- */
 
-@media (max-width: 960px) {
+@media (max-width: 1040px) {
+  .grid {
+    grid-template-columns: 320px minmax(0, 1fr);
+  }
+}
 
+@media (max-width: 960px) {
   .grid {
     grid-template-columns: 1fr;
   }
-
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .backupGrid {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-
 }
 
-@media (max-width:640px) {
-
-  .card {
-    padding: 1rem;
-  }
-
+@media (max-width: 760px) {
   .statsGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1.2rem;
   }
 
   .row {
@@ -369,7 +492,7 @@
 
   .rowActions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-start;
   }
 
   .actions {
@@ -381,14 +504,25 @@
     width: 100%;
   }
 
+  .backupGrid {
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .backupGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .statCard,
-  .statCard:hover,
   .storageFill {
     animation: none;
     transition: none;
-    transform: none;
   }
 }

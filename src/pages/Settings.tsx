@@ -17,6 +17,7 @@ import { exportSupabaseData, importSupabaseData, isSupabaseBackupEmpty } from ".
 import { getQueueSize } from "../utils/offlineQueue";
 import { useToast } from "../components/useToast";
 import { useAuth } from "../hooks/useAuth";
+import CheckIcon from "../components/CheckIcon";
 import FilterDropdown from "../components/FilterDropdown";
 
 import type { StorageUsage, Stats } from "../types";
@@ -33,10 +34,88 @@ function formatBytes(bytes: number): string {
 // freeze the tab while JSON.parse runs.
 const MAX_BACKUP_FILE_BYTES = 5 * 1024 * 1024;
 
-function Card({ title, children }: { title: string; children: ReactNode }) {
+function Icon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+function DatabaseIcon() {
+  return (
+    <Icon>
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v6c0 1.66 3.58 3 8 3s8-1.34 8-3V5" />
+      <path d="M4 11v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" />
+    </Icon>
+  );
+}
+
+function CloudIcon() {
+  return (
+    <Icon>
+      <path d="M6.5 19a4.5 4.5 0 0 1-.36-8.99A6.5 6.5 0 0 1 18.7 11.1 4 4 0 0 1 18 19H6.5z" />
+    </Icon>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <Icon>
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M5 21h14" />
+    </Icon>
+  );
+}
+
+function UploadIcon() {
+  return (
+    <Icon>
+      <path d="M12 15V3" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M5 21h14" />
+    </Icon>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <Icon>
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="m19 6-1 14H6L5 6" />
+      <path d="M10 11v5M14 11v5" />
+    </Icon>
+  );
+}
+
+function Card({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className={styles.card}>
-      <h3 className={styles.cardTitle}>{title}</h3>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>{title}</h3>
+        {action}
+      </div>
       {children}
     </div>
   );
@@ -88,8 +167,10 @@ export default function Settings() {
   const systemTimeZone = getSystemTimezone();
 
   const [confirm, setConfirm] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const savedTimerRef = useRef<number | null>(null);
   const supabaseFileInputRef = useRef<HTMLInputElement>(null);
   const confirmDialogRef = useRef<HTMLDivElement>(null);
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
@@ -169,11 +250,25 @@ export default function Settings() {
     setConfirm(false);
   }
 
+  function markSaved() {
+    setShowSaved(true);
+    if (savedTimerRef.current != null) window.clearTimeout(savedTimerRef.current);
+    savedTimerRef.current = window.setTimeout(() => {
+      setShowSaved(false);
+      savedTimerRef.current = null;
+    }, 2500);
+  }
+
+  useEffect(() => () => {
+    if (savedTimerRef.current != null) window.clearTimeout(savedTimerRef.current);
+  }, []);
+
   async function clearCache() {
     await clearTMDBCache();
 
     await loadUsage();
 
+    markSaved();
     toast?.("TMDB cache cleared");
   }
 
@@ -188,6 +283,7 @@ export default function Settings() {
     setStats(getStats());
     setQueueSize(getQueueSize());
 
+    markSaved();
     toast?.("All data cleared");
   }
 
@@ -236,8 +332,10 @@ export default function Settings() {
         setStats(getStats());
         setQueueSize(getQueueSize());
 
-        if (count > 0) toast?.("Data imported successfully");
-        else toast?.("No data found in file");
+        if (count > 0) {
+          markSaved();
+          toast?.("Data imported successfully");
+        } else toast?.("No data found in file");
       } catch {
         toast?.("Invalid backup file");
       }
@@ -299,8 +397,10 @@ export default function Settings() {
 
         const ok = await importSupabaseData(data);
 
-        if (ok) toast?.("Supabase data imported successfully");
-        else toast?.("Import failed");
+        if (ok) {
+          markSaved();
+          toast?.("Supabase data imported successfully");
+        } else toast?.("Import failed");
       } catch {
         toast?.("Invalid backup file");
       }
@@ -312,140 +412,183 @@ export default function Settings() {
   }
   return (
     <div className="page">
-      <section className="section">
-        <h2 className="section-title">Settings</h2>
+      <div className={`panel-heading ${styles.pageHeading}`}>
+        <div>
+          <p className="eyebrow">Your account</p>
+          <h1>Settings</h1>
+          <p className={styles.pageSubtitle}>
+            Manage your account, preferences, and local data.
+          </p>
+        </div>
 
-        <div className={styles.grid}>
-          {/* LEFT COLUMN */}
+        {showSaved && (
+          <span className={styles.savedStatus} role="status" aria-live="polite">
+            <CheckIcon size={15} />
+            All changes saved
+          </span>
+        )}
+      </div>
 
-          <div className={styles.column}>
-            <Card title="Account">
-              <div className={styles.account}>
-                <div className={styles.avatar}>
-                  {user?.email?.[0]?.toUpperCase()}
-                </div>
-
-                <div className={styles.accountInfo}>
-                  <h4>{user?.email}</h4>
-                  <span>Cloud account</span>
-                </div>
+      <div className={styles.grid}>
+        <div className={styles.column}>
+          <Card title="Account">
+            <div className={styles.account}>
+              <div className={styles.avatar}>
+                {user?.email?.[0]?.toUpperCase()}
               </div>
 
-              <Row label="Status" value="Connected" />
-
-              <div className={styles.actions}>
-                <button
-                  className={styles.pill}
-                  onClick={signOut}
-                  title="Sign out"
-                >
-                  Sign Out
-                </button>
+              <div className={styles.accountInfo}>
+                <h4>{user?.email}</h4>
+                <span>Cloud account</span>
               </div>
-            </Card>
+            </div>
 
-            <Card title="Preferences">
-              <Row label="Default Video Source">
-                <FilterDropdown
-                  value={videoSource}
-                  options={SOURCE_KEYS.map((key) => ({
-                    value: key,
-                    label: getSourceLabel(key),
-                  }))}
-                  placeholder="Select source"
-                  onSelect={(value: string) => {
-                    setVideoSourceState(value);
-                    setVideoSource(value);
-                  }}
-                />
-              </Row>
-              <Row label="Calendar Timezone">
-                <FilterDropdown
-                  value={timeZone}
-                  options={[
-                    { value: "", label: `System (${systemTimeZone})` },
-                    ...TIMEZONE_OPTIONS,
-                  ]}
-                  placeholder="Select timezone"
-                  onSelect={(value: string) => {
-                    setTimeZoneState(value);
-                    setTimezone(value);
-                  }}
-                />
-              </Row>
-            </Card>
+            <Row
+              label="Status"
+              value={
+                <span className={styles.status}>
+                  <span className={styles.statusDot} aria-hidden="true" />
+                  Connected
+                </span>
+              }
+            />
 
-            <Card title="Backup">
-              <div className={styles.backupGrid}>
-                <div>
-                  <h4 className={styles.backupTitle}>Local</h4>
+            <div className={styles.actions}>
+              <button
+                className={styles.pill}
+                onClick={signOut}
+                title="Sign out"
+              >
+                Sign out
+              </button>
+            </div>
+          </Card>
 
-                  <div className={styles.actions}>
-                    <button className={styles.pill} onClick={handleExport}>
-                      Export
-                    </button>
+          <Card title="Preferences">
+            <Row label="Default video source">
+              <FilterDropdown
+                value={videoSource}
+                options={SOURCE_KEYS.map((key) => ({
+                  value: key,
+                  label: getSourceLabel(key),
+                }))}
+                placeholder="Select source"
+                onSelect={(value: string) => {
+                  setVideoSourceState(value);
+                  setVideoSource(value);
+                  markSaved();
+                }}
+              />
+            </Row>
+            <Row label="Calendar timezone">
+              <FilterDropdown
+                value={timeZone}
+                options={[
+                  { value: "", label: `System (${systemTimeZone})` },
+                  ...TIMEZONE_OPTIONS,
+                ]}
+                placeholder="Select timezone"
+                onSelect={(value: string) => {
+                  setTimeZoneState(value);
+                  setTimezone(value);
+                  markSaved();
+                }}
+              />
+            </Row>
+          </Card>
 
-                    <button
-                      className={styles.pill}
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Import
-                    </button>
-                  </div>
+          <Card title="Backup">
+            <div className={styles.backupGrid}>
+              <div>
+                <h4 className={styles.backupTitle}>
+                  <DatabaseIcon />
+                  Local
+                </h4>
 
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={handleImport}
-                    className={styles.fileInput}
-                  />
-                </div>
+                <div className={styles.backupActions}>
+                  <button className={styles.fileBtn} onClick={handleExport}>
+                    <DownloadIcon />
+                    Export
+                  </button>
 
-                <div>
-                  <h4 className={styles.backupTitle}>Cloud</h4>
-
-                  <div className={styles.actions}>
-                    <button
-                      className={styles.pill}
-                      onClick={handleSupabaseExport}
-                    >
-                      Export
-                    </button>
-
-                    <button
-                      className={styles.pill}
-                      onClick={() => supabaseFileInputRef.current?.click()}
-                    >
-                      Import
-                    </button>
-                  </div>
-
-                  <input
-                    ref={supabaseFileInputRef}
-                    type="file"
-                    accept=".json"
-                    onChange={handleSupabaseImport}
-                    className={styles.fileInput}
-                  />
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* RIGHT COLUMN */}
-
-          <div className={styles.column}>
-            <Card title="Storage">
-              {usageError ? (
-                <div className={styles.storageError}>
-                  <div className={styles.value}>Storage usage unavailable</div>
-                  <button className={styles.pill} onClick={loadUsage}>
-                    Retry
+                  <button
+                    className={styles.fileBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <UploadIcon />
+                    Import
                   </button>
                 </div>
-              ) : (
-                usage && (
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className={styles.fileInput}
+                />
+              </div>
+
+              <div>
+                <h4 className={styles.backupTitle}>
+                  <CloudIcon />
+                  Cloud
+                </h4>
+
+                <div className={styles.backupActions}>
+                  <button
+                    className={styles.fileBtn}
+                    onClick={handleSupabaseExport}
+                  >
+                    <DownloadIcon />
+                    Export
+                  </button>
+
+                  <button
+                    className={styles.fileBtn}
+                    onClick={() => supabaseFileInputRef.current?.click()}
+                  >
+                    <UploadIcon />
+                    Import
+                  </button>
+                </div>
+
+                <input
+                  ref={supabaseFileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleSupabaseImport}
+                  className={styles.fileInput}
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <div className={styles.column}>
+          <Card
+            title="Storage"
+            action={
+              usageError ? (
+                <span
+                  className={`${styles.healthPill} ${styles.healthPillWarn}`}
+                >
+                  Unavailable
+                </span>
+              ) : usage ? (
+                <span className={styles.healthPill}>Healthy</span>
+              ) : null
+            }
+          >
+            {usageError ? (
+              <div className={styles.storageError}>
+                <div className={styles.value}>Storage usage unavailable</div>
+                <button className={styles.pill} onClick={loadUsage}>
+                  Retry
+                </button>
+              </div>
+            ) : (
+              usage && (
                 <>
                   <div className={styles.storageHeader}>
                     <div className={styles.storageTotal}>
@@ -460,32 +603,31 @@ export default function Settings() {
                       <div
                         className={styles.storageFill}
                         style={{
-                          // localStorage quota is ~5MB - show usage against that.
-                          width: `${Math.min(100, (usage.total / 5000000) * 100)}%`,
+                          width: `${Math.min(100, (usage.total / (40 * 1024 * 1024)) * 100)}%`,
                         }}
                       />
                     </div>
                   </div>
 
                   <Row
-                    label="Watch History"
+                    label="Watch history"
                     value={formatBytes(usage.breakdown.watched)}
                   />
 
                   <Row
-                    label="Continue Watching"
+                    label="Continue watching"
                     value={formatBytes(usage.breakdown.progress)}
                   />
 
                   <Row
-                    label="Watch Later"
+                    label="Watch later"
                     value={formatBytes(
                       usage.breakdown.watchlater + usage.breakdown.epwl,
                     )}
                   />
 
                   <Row
-                    label="TMDB Cache"
+                    label="TMDB cache"
                     value={formatBytes(usage.breakdown.cache)}
                   >
                     <button className={styles.pill} onClick={clearCache}>
@@ -494,47 +636,45 @@ export default function Settings() {
                   </Row>
 
                   <Row
-                    label="Offline Queue"
+                    label="Offline queue"
                     value={queueSize > 0 ? `${queueSize} pending` : "Empty"}
                   />
                 </>
-                )
-              )}
-            </Card>
+              )
+            )}
+          </Card>
 
-            <Card title="Statistics">
-              {stats && (
-                <>
-                  <div className={styles.statsGrid}>
-                    <Stat title="Movies" value={stats.moviesWatched} />
+          <Card title="Statistics">
+            {stats && (
+              <div className={styles.statsGrid}>
+                <Stat title="Movies" value={stats.moviesWatched} />
 
-                    <Stat title="Episodes" value={stats.episodesWatched} />
+                <Stat title="Episodes" value={stats.episodesWatched} />
 
-                    <Stat title="Series" value={stats.seriesWatched} />
+                <Stat title="Series" value={stats.seriesWatched} />
 
-                    <Stat title="Watch Later" value={stats.watchLaterCount} />
-                  </div>
-                </>
-              )}
-            </Card>
+                <Stat title="Watch later" value={stats.watchLaterCount} />
+              </div>
+            )}
+          </Card>
 
-            <Card title="Danger Zone">
-              <p className={styles.dangerText}>
-                Remove every local watch history, Continue Watching entry,
-                cache and watch later list.
-              </p>
+          <Card title="Danger Zone">
+            <p className={styles.dangerText}>
+              Remove all local watch history, Continue Watching entries,
+              cache, and your Watch Later list.
+            </p>
 
-              <button
-                ref={clearTriggerRef}
-                className={`${styles.pill} ${styles.pillDanger}`}
-                onClick={openConfirm}
-              >
-                Clear Local Data
-              </button>
-            </Card>
-          </div>
+            <button
+              ref={clearTriggerRef}
+              className={`${styles.pill} ${styles.pillDanger}`}
+              onClick={openConfirm}
+            >
+              <TrashIcon />
+              Clear local data
+            </button>
+          </Card>
         </div>
-      </section>
+      </div>
 
       {confirm && (
         <div
