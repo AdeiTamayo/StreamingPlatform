@@ -29,6 +29,10 @@
   background: rgba(255, 255, 255, 0.07);
 }
 
+.last-seen-controls .last-seen-sort-select {
+  margin-left: auto;
+}
+
 /* Single "order by" button: label + sort icon, like the query bar control. */
 .last-seen-controls .last-seen-sort-select .custom-select-trigger {
   border-radius: 14px;

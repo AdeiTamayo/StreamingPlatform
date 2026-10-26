@@ -1,22 +1,22 @@
 .wlControls {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
   flex-wrap: wrap;
   align-items: center;
-  --type-toggle-height: 42px;
+  --type-toggle-height: 38px;
 }
 
-/* Every control in this row shares one 42px height */
+/* Every control in this row shares one 38px height */
 .wlControls .custom-select-trigger {
-  padding: 0.5rem 0.85rem;
+  padding: 0.4rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  min-height: 42px;
+  min-height: 38px;
   transition:
     border-color 0.18s ease,
     background 0.18s ease;
@@ -32,12 +32,16 @@
   background: rgba(255, 255, 255, 0.07);
 }
 
+.wlControls .wlSortSelect {
+  margin-left: auto;
+}
+
 /* Single "order by" button: label + sort icon, like the query bar control. */
 .wlControls .wlSortSelect .custom-select-trigger {
   border-radius: 14px;
   border-color: var(--border-strong);
-  padding: 0 0.95rem;
-  font-size: 0.9rem;
+  padding: 0 0.8rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text);
   background: var(--surface-overlay);
@@ -58,17 +62,17 @@
 }
 
 .wlSearch {
-  min-height: 42px;
+  min-height: 38px;
   box-sizing: border-box;
-  padding: 0.5rem 0.85rem;
+  padding: 0.4rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   outline: none;
   min-width: 0;
-  flex: 0 1 200px;
+  flex: 0 1 180px;
   transition:
     border-color 0.18s ease,
     background 0.18s ease;
