@@ -16,7 +16,7 @@ const movieSortOptions: FilterOption[] = [
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'primary_release_date.desc', label: 'Release date (newest)' },
   { value: 'primary_release_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_title.asc', label: 'Title A-Z' },
+  { value: 'original_title.asc', label: 'Title A–Z' },
 ];
 
 const tvSortOptions: FilterOption[] = [
@@ -24,7 +24,7 @@ const tvSortOptions: FilterOption[] = [
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'first_air_date.desc', label: 'Release date (newest)' },
   { value: 'first_air_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_name.asc', label: 'Name A-Z' },
+  { value: 'original_name.asc', label: 'Title A–Z' },
 ];
 
 const yearOptions: FilterOption[] = [{ value: '', label: 'Any year' }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
@@ -213,6 +213,9 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
         genreValue={genre}
         onGenreChange={handleGenreChange}
         genreOptions={genreOptions}
+        sortValue={sortBy}
+        onSortChange={(value) => { setSortBy(value); setPage(1); }}
+        sortOptions={sortOptionList}
         showMore={showMore}
         onToggleShowMore={() => setShowMore((s) => !s)}
         activeFilters={activeFiltersList}
@@ -231,7 +234,6 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
           <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
         </div>
         <SearchSelectField label="Year" value={year} options={yearOptions} onChange={(value) => { setYear(value); setPage(1); }} />
-        <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
         <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
         <div className="field">
           <label className="field-label" htmlFor="browse-min-votes">Minimum votes</label>

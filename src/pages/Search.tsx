@@ -25,7 +25,7 @@ const MOVIE_SORT_OPTIONS: FilterOption[] = [
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'primary_release_date.desc', label: 'Release date (newest)' },
   { value: 'primary_release_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_title.asc', label: 'Title A-Z' },
+  { value: 'original_title.asc', label: 'Title A–Z' },
 ];
 
 const TV_SORT_OPTIONS: FilterOption[] = [
@@ -33,7 +33,7 @@ const TV_SORT_OPTIONS: FilterOption[] = [
   { value: 'vote_average.desc', label: 'Rating' },
   { value: 'first_air_date.desc', label: 'Release date (newest)' },
   { value: 'first_air_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_name.asc', label: 'Name A-Z' },
+  { value: 'original_name.asc', label: 'Title A–Z' },
 ];
 
 const YEAR_OPTIONS: FilterOption[] = [
@@ -433,6 +433,9 @@ export default function Search() {
         genreValue={genreFilter}
         onGenreChange={(value) => { setGenreFilter(value); setPage(1); }}
         genreOptions={genreOptions}
+        sortValue={sortBy}
+        onSortChange={(value) => { setSortBy(value); setPage(1); }}
+        sortOptions={sortOptionList}
         showMore={showMore}
         onToggleShowMore={() => setShowMore((s) => !s)}
         activeFilters={activeFilters}
@@ -460,7 +463,6 @@ export default function Search() {
           <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
         </div>
         <SearchSelectField label="Year" value={year} options={YEAR_OPTIONS} onChange={(value) => { setYear(value); setPage(1); }} />
-        <SearchSelectField label="Sort results" value={sortBy} options={sortOptionList} onChange={(value) => { setSortBy(value); setPage(1); }} />
         <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
         <div className="field">
           <label className="field-label" htmlFor="search-min-votes">Minimum votes</label>

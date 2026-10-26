@@ -27,6 +27,12 @@ interface SearchBarProps {
   onGenreChange?: (value: string) => void;
   /** Genre options */
   genreOptions?: SelectOption[];
+  /** Sort results filter shown in the primary row */
+  sortValue?: string;
+  /** Called when the sort filter changes */
+  onSortChange?: (value: string) => void;
+  /** Sort options */
+  sortOptions?: SelectOption[];
   /** Whether more filters panel is open */
   showMore?: boolean;
   /** Called when more filters toggle is clicked */
@@ -109,10 +115,12 @@ const SLIDERS_ICON = (
   </svg>
 );
 
-const ROTATE_CCW_ICON = (
+const BIN_ICON = (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-    <path d="M21 12a9 9 0 1 0-9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+    <path d="M3 6h18" />
+    <path d="M8 6V4h8v2" />
+    <path d="m19 6-1 14H6L5 6" />
+    <path d="M10 11v5M14 11v5" />
   </svg>
 );
 
@@ -156,6 +164,9 @@ export default function SearchBar({
   genreValue = '',
   onGenreChange,
   genreOptions = [],
+  sortValue = '',
+  onSortChange,
+  sortOptions = [],
   showMore = false,
   onToggleShowMore,
   children,
@@ -230,12 +241,12 @@ export default function SearchBar({
               {searchOverlay}
             </div>
 
-            {countryOptions.length > 0 && (
+            {sortOptions.length > 0 && (
               <SearchSelectField
-                label="Country"
-                value={countryValue}
-                options={countryOptions}
-                onChange={onCountryChange}
+                label="Sort results"
+                value={sortValue}
+                options={sortOptions}
+                onChange={onSortChange}
               />
             )}
 
@@ -267,16 +278,25 @@ export default function SearchBar({
               <div className="secondary-heading">
                 <div>
                   <h2>{isSearchContext ? 'Refine your results' : 'Additional filters'}</h2>
-                  <p>{isSearchContext ? 'Fine-tune your search with more options.' : 'More filtering options.'}</p>
+                  {isSearchContext && <p>Fine-tune your search with more options.</p>}
                 </div>
                 {(onClearFilters || activeFilters.length > 0) && (
                   <button type="button" className="clear-filters" onClick={onClearFilters}>
-                    {ROTATE_CCW_ICON} Clear all
+                    {BIN_ICON} Clear all
                   </button>
                 )}
               </div>
 
               <div className="secondary-grid">
+                {countryOptions.length > 0 && (
+                  <SearchSelectField
+                    label="Country"
+                    value={countryValue}
+                    options={countryOptions}
+                    onChange={onCountryChange}
+                  />
+                )}
+
                 {children}
               </div>
 
