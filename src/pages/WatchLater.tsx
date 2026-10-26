@@ -973,8 +973,6 @@ export default function WatchLater() {
   }, [epListPages, epPage]);
 
   if (view === "calendar") {
-    const maxPosters = 1;
-
     // Show full skeleton only on first load with no data yet. Once we have
     // (or had) data, render the grid immediately and stream releases in.
     if (loadingCalendar && calendarItems.length === 0 && !calendarHasLoaded) {
@@ -1096,6 +1094,10 @@ export default function WatchLater() {
 
               {calendarGrid.cells.map((cell) => {
                 const releases = itemsByDate[cell.isoString] || [];
+
+                // Two releases fit side by side; otherwise one poster plus a
+                // "+N" badge that counts every title after the first.
+                const maxPosters = releases.length === 2 ? 2 : 1;
 
                 const heat = Math.min(3, releases.length);
 
