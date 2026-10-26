@@ -15,6 +15,7 @@ import DetailActions from '../components/DetailActions';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
+import { useSourceFallback } from '../hooks/useSourceFallback';
 import { formatVotes } from '../utils/format';
 import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBMovie, TMDBCastMember, TMDBCrewMember } from '../types';
@@ -170,6 +171,16 @@ export default function MovieDetail() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [movie, id, watched, inWL, showTrailer, toast, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useSourceFallback({
+    active: Boolean(movie) && !showTrailer,
+    mediaType: 'movie',
+    id,
+    source: videoSource,
+    onSwitch: setVideoSource,
+    onSwitched: (from, to) => toast?.(`${getSourceLabel(from)} has no stream for this movie - switched to ${getSourceLabel(to)}`),
+    onNoSource: () => toast?.('No provider has a stream for this movie - try another source'),
+  });
 
   if (!id) return <div className="page"><div className="loading">Movie not found</div></div>;
 

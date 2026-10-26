@@ -27,8 +27,41 @@ function validateApiKeys(mode: string): Plugin {
   }
 }
 
+// Mirrors the Vercel function at api/probe.ts during `vite dev`, so provider
+// availability can be tested locally instead of silently falling back to
+// "unknown" in development.
+function providerProbeDevServer(): Plugin {
+  return {
+    name: 'provider-probe-dev-server',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = new URL(req.url ?? '/', 'http://localhost');
+        if (url.pathname !== '/api/probe') {
+          next();
+          return;
+        }
+        void (async () => {
+          try {
+            const module = await server.ssrLoadModule('/src/api/providerProbeCore.ts');
+            const handle = module.handleProbeQuery as (query: Record<string, string>) => Promise<unknown>;
+            const result = await handle(Object.fromEntries(url.searchParams.entries()));
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(JSON.stringify(result));
+          } catch {
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.end(JSON.stringify({ available: null, best: null }));
+          }
+        })();
+      });
+    },
+  };
+}
+
 export default defineConfig((config) => ({
-  plugins: [react(), validateApiKeys(config.mode)],
+  plugins: [react(), validateApiKeys(config.mode), providerProbeDevServer()],
   css: {
     modules: {
       // Page components use styles.someClassName against kebab-case CSS.

@@ -18,6 +18,7 @@ import ViewModeToggle from '../components/ViewModeToggle';
 import { useToast } from '../components/useToast';
 import { useAbortController } from '../hooks/useAbortController';
 import { useAuth } from '../hooks/useAuth';
+import { useSourceFallback } from '../hooks/useSourceFallback';
 import { formatVotes } from '../utils/format';
 import { isTypingTarget } from '../utils/isTypingTarget';
 import type { TMDBSeries, TMDBMovie, TMDBSeason, TMDBEpisode, TMDBVideo, EpisodeWatchLaterItem } from '../types';
@@ -738,6 +739,18 @@ export default function TVDetail() {
   function retry() {
     setRetryKey((k) => k + 1);
   }
+
+  useSourceFallback({
+    active: Boolean(show) && playerOpen && !showTrailer,
+    mediaType: 'tv',
+    id,
+    season,
+    episode,
+    source: videoSource,
+    onSwitch: setVideoSource,
+    onSwitched: (from, to) => toast?.(`${getSourceLabel(from)} has no stream for this episode - switched to ${getSourceLabel(to)}`),
+    onNoSource: () => toast?.('No provider has a stream for this episode - try another source'),
+  });
 
   if (!id) return <div className="page"><div className="loading">Show not found</div></div>;
   const safeId = id;
