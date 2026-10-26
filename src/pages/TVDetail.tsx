@@ -617,13 +617,11 @@ export default function TVDetail() {
   function handleWatching() {
     const episodeKey = `${season}-${episode}`;
     if (!show || !id || finishedKeyRef.current === episodeKey) return;
+    // markWatching is mutually exclusive with the watched mark, so starting a
+    // rewatch would silently drop it and desync the player button from the
+    // episode list. Keep an already-watched episode marked as watched.
+    if (watchedRef.current) return;
     markWatching('tv', id, season, episode, { title: show.name, poster: show?.poster_path, backdrop: show?.backdrop_path, episodeName: currentEpisode?.name });
-    // Starting a watched episode is a rewatch: markWatching dropped the
-    // watched mark, so keep the UI in step.
-    if (watchedRef.current) {
-      watchedRef.current = false;
-      setWatched(false);
-    }
   }
 
   function handleEnded() {
