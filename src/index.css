@@ -206,8 +206,8 @@ select:focus-visible {
    ============================================================ */
 
 .query-bar-panel {
-  margin-top: 1.5rem;
-  margin-bottom: 1rem;
+  margin-top: 0.85rem;
+  margin-bottom: 0.75rem;
 }
 
 .movies-panel {
@@ -250,17 +250,17 @@ select:focus-visible {
 
 .query-bar {
   border: 1px solid var(--border);
-  border-radius: 22px;
-  background: var(--panel);
-  box-shadow: 0 24px 80px rgba(0,0,0,.22);
+  border-radius: 18px;
+  background: var(--surface-overlay);
+  box-shadow: 0 6px 20px rgba(0,0,0,.08);
 }
 
 .primary-row {
   display: grid;
   grid-template-columns: minmax(250px, 1.5fr) minmax(145px, .75fr) minmax(145px, .75fr) auto;
   align-items: end;
-  gap: 12px;
-  padding: 22px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .search-field-wrap {
@@ -271,13 +271,13 @@ select:focus-visible {
 .search-field {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 9px;
   width: 100%;
-  height: 52px;
-  padding: 0 16px;
+  height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: var(--field);
+  background: transparent;
   color: var(--accent);
 }
 
@@ -315,7 +315,7 @@ select:focus-visible {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .field-label {
@@ -365,12 +365,12 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 52px;
-  min-height: 52px;
-  padding: 0 15px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: var(--field);
+  background: transparent;
   color: var(--accent-bright);
   font-size: 14px;
   font-weight: 500;
@@ -379,7 +379,7 @@ select:focus-visible {
 .query-select .custom-select-trigger:hover,
 .query-select .custom-select-trigger:focus {
   border-color: var(--blue);
-  background: var(--field);
+  background: var(--surface-overlay-hover);
 }
 
 .query-select .custom-select-menu {
@@ -391,8 +391,8 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 52px;
-  padding: 0 17px;
+  height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
   background: transparent;
@@ -409,17 +409,17 @@ select:focus-visible {
 }
 
 .secondary-panel {
-  padding: 22px;
+  padding: 14px 12px;
   border-top: 1px solid var(--border);
-  border-radius: 0 0 21px 21px;
-  background: var(--surface-overlay);
+  border-radius: 0 0 17px 17px;
+  background: transparent;
 }
 
 .secondary-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .movies-panel h2 {
