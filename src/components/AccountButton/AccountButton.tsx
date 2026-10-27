@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import useClickOutside from '../../hooks/useClickOutside';
 import { useAuth } from '../../hooks/useAuth';
 import styles from './AccountButton.module.css';
@@ -9,6 +10,7 @@ interface AccountButtonProps {
 }
 
 export default function AccountButton({ sidebar = false }: AccountButtonProps) {
+  const { t } = useTranslation();
   const { isAuthenticated, openAuthModal, signOut, user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -49,14 +51,16 @@ export default function AccountButton({ sidebar = false }: AccountButtonProps) {
         className={sidebar ? styles.sidebarSignIn : styles.signInBtn}
         onClick={openAuthModal}
       >
-        Sign In
+        {t('account.signIn')}
       </button>
     );
   }
 
   const email = user?.email || '';
   const initial = email ? email[0].toUpperCase() : '?';
-  const triggerLabel = email ? `Account menu for ${email}` : 'Account menu';
+  const triggerLabel = email
+    ? t('account.accountMenuFor', { email })
+    : t('account.accountMenu');
 
   return (
     <div ref={rootRef} className={sidebar ? styles.sidebarAccount : styles.account}>
@@ -70,14 +74,14 @@ export default function AccountButton({ sidebar = false }: AccountButtonProps) {
         aria-label={triggerLabel}
       >
         <span className={styles.avatar} aria-hidden="true">{initial}</span>
-        {sidebar && <span className={styles.avatarLabel}>{email || 'Account'}</span>}
+        {sidebar && <span className={styles.avatarLabel}>{email || t('account.account')}</span>}
       </button>
       {menuOpen && (
         <div
           ref={menuRef}
           className={sidebar ? styles.sidebarMenu : styles.menu}
           role="menu"
-          aria-label="Account"
+          aria-label={t('account.account')}
         >
           <Link
             to="/settings"
@@ -85,7 +89,7 @@ export default function AccountButton({ sidebar = false }: AccountButtonProps) {
             className={styles.menuItem}
             onClick={() => setMenuOpen(false)}
           >
-            Settings
+            {t('account.settings')}
           </Link>
           <button
             type="button"
@@ -96,7 +100,7 @@ export default function AccountButton({ sidebar = false }: AccountButtonProps) {
               void signOut();
             }}
           >
-            Sign out
+            {t('account.signOut')}
           </button>
         </div>
       )}

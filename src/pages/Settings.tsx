@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { APP_LANGUAGES, getLanguage, setAppLanguage, type AppLanguage } from "../i18n";
+import { usePageTitle } from "../i18n/usePageTitle";
 import {
   exportData,
   importData,
@@ -154,6 +157,7 @@ function Stat({ title, value }: { title: string; value: number }) {
 }
 
 export default function Settings() {
+  const { t } = useTranslation();
   const toast = useToast();
 
   const { user, signOut } = useAuth();
@@ -164,7 +168,10 @@ export default function Settings() {
   const [queueSize, setQueueSize] = useState(getQueueSize());
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
   const [timeZone, setTimeZoneState] = useState(getTimezone());
+  const [language, setLanguageState] = useState(getLanguage());
   const systemTimeZone = getSystemTimezone();
+
+  usePageTitle(t('settings.title'));
 
   const [confirm, setConfirm] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -187,8 +194,6 @@ export default function Settings() {
   }
 
   useEffect(() => {
-    document.title = "Settings - StreamFlow";
-
     getStorageUsage()
       .then((data) => { setUsage(data); setUsageError(false); })
       .catch(() => setUsageError(true));
@@ -269,7 +274,7 @@ export default function Settings() {
     await loadUsage();
 
     markSaved();
-    toast?.("TMDB cache cleared");
+    toast?.(t('toast.tmdbCacheCleared'));
   }
 
   async function clearAll() {
@@ -284,7 +289,7 @@ export default function Settings() {
     setQueueSize(getQueueSize());
 
     markSaved();
-    toast?.("All data cleared");
+    toast?.(t('toast.allDataCleared'));
   }
 
   function handleExport() {
@@ -306,7 +311,7 @@ export default function Settings() {
 
     URL.revokeObjectURL(url);
 
-    toast?.("Data exported");
+    toast?.(t('toast.dataExported'));
   }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -315,7 +320,7 @@ export default function Settings() {
     if (!file) return;
 
     if (file.size > MAX_BACKUP_FILE_BYTES) {
-      toast?.("Backup file is too large");
+      toast?.(t('toast.backupTooLarge'), { kind: 'error' });
       e.target.value = "";
       return;
     }
@@ -334,10 +339,10 @@ export default function Settings() {
 
         if (count > 0) {
           markSaved();
-          toast?.("Data imported successfully");
-        } else toast?.("No data found in file");
+          toast?.(t('toast.dataImported'));
+        } else toast?.(t('toast.noDataInFile'));
       } catch {
-        toast?.("Invalid backup file");
+        toast?.(t('toast.invalidBackup'), { kind: 'error' });
       }
     };
 
@@ -350,7 +355,7 @@ export default function Settings() {
     const data = await exportSupabaseData();
 
     if (!data) {
-      toast?.("Log in to export Supabase data");
+      toast?.(t('toast.loginToExport'));
       return;
     }
 
@@ -370,7 +375,7 @@ export default function Settings() {
 
     URL.revokeObjectURL(url);
 
-    toast?.("Supabase data exported");
+    toast?.(t('toast.supabaseExported'));
   }
 
   async function handleSupabaseImport(e: React.ChangeEvent<HTMLInputElement>) {
@@ -379,7 +384,7 @@ export default function Settings() {
     if (!file) return;
 
     if (file.size > MAX_BACKUP_FILE_BYTES) {
-      toast?.("Backup file is too large");
+      toast?.(t('toast.backupTooLarge'), { kind: 'error' });
       e.target.value = "";
       return;
     }
@@ -391,7 +396,7 @@ export default function Settings() {
         const data = JSON.parse(reader.result as string);
 
         if (isSupabaseBackupEmpty(data)) {
-          toast?.("No data found in file");
+          toast?.(t('toast.noDataInFile'));
           return;
         }
 
@@ -399,10 +404,10 @@ export default function Settings() {
 
         if (ok) {
           markSaved();
-          toast?.("Supabase data imported successfully");
-        } else toast?.("Import failed");
+          toast?.(t('toast.supabaseImported'));
+        } else toast?.(t('toast.importFailed'), { kind: 'error' });
       } catch {
-        toast?.("Invalid backup file");
+        toast?.(t('toast.invalidBackup'), { kind: 'error' });
       }
     };
 
@@ -414,24 +419,24 @@ export default function Settings() {
     <div className="page">
       <div className={`panel-heading ${styles.pageHeading}`}>
         <div>
-          <p className="eyebrow">Your account</p>
-          <h1>Settings</h1>
+          <p className="eyebrow">{t('settings.eyebrow')}</p>
+          <h1>{t('settings.title')}</h1>
           <p className={styles.pageSubtitle}>
-            Manage your account, preferences, and local data.
+            {t('settings.subtitle')}
           </p>
         </div>
 
         {showSaved && (
           <span className={styles.savedStatus} role="status" aria-live="polite">
             <CheckIcon size={15} />
-            All changes saved
+            {t('settings.allSaved')}
           </span>
         )}
       </div>
 
       <div className={styles.grid}>
         <div className={styles.column}>
-          <Card title="Account">
+          <Card title={t('settings.account')}>
             <div className={styles.account}>
               <div className={styles.avatar}>
                 {user?.email?.[0]?.toUpperCase()}
@@ -439,16 +444,16 @@ export default function Settings() {
 
               <div className={styles.accountInfo}>
                 <h4>{user?.email}</h4>
-                <span>Cloud account</span>
+                <span>{t('settings.cloudAccount')}</span>
               </div>
             </div>
 
             <Row
-              label="Status"
+              label={t('settings.status')}
               value={
                 <span className={styles.status}>
                   <span className={styles.statusDot} aria-hidden="true" />
-                  Connected
+                  {t('settings.connected')}
                 </span>
               }
             />
@@ -457,22 +462,22 @@ export default function Settings() {
               <button
                 className={styles.pill}
                 onClick={signOut}
-                title="Sign out"
+                title={t('settings.signOut')}
               >
-                Sign out
+                {t('settings.signOut')}
               </button>
             </div>
           </Card>
 
-          <Card title="Preferences">
-            <Row label="Default video source">
+          <Card title={t('settings.preferences')}>
+            <Row label={t('settings.defaultSource')}>
               <FilterDropdown
                 value={videoSource}
                 options={SOURCE_KEYS.map((key) => ({
                   value: key,
                   label: getSourceLabel(key),
                 }))}
-                placeholder="Select source"
+                placeholder={t('settings.selectSource')}
                 onSelect={(value: string) => {
                   setVideoSourceState(value);
                   setVideoSource(value);
@@ -480,14 +485,14 @@ export default function Settings() {
                 }}
               />
             </Row>
-            <Row label="Calendar timezone">
+            <Row label={t('settings.calendarTimezone')}>
               <FilterDropdown
                 value={timeZone}
                 options={[
-                  { value: "", label: `System (${systemTimeZone})` },
+                  { value: "", label: t('settings.system', { zone: systemTimeZone }) },
                   ...TIMEZONE_OPTIONS,
                 ]}
-                placeholder="Select timezone"
+                placeholder={t('settings.selectTimezone')}
                 onSelect={(value: string) => {
                   setTimeZoneState(value);
                   setTimezone(value);
@@ -495,20 +500,36 @@ export default function Settings() {
                 }}
               />
             </Row>
+            <Row label={t('settings.language')}>
+              <FilterDropdown
+                value={language}
+                options={APP_LANGUAGES.map((option) => ({
+                  value: option.code,
+                  label: option.label,
+                }))}
+                placeholder={t('settings.language')}
+                onSelect={(value: string) => {
+                  const next = value as AppLanguage;
+                  setLanguageState(next);
+                  setAppLanguage(next);
+                  markSaved();
+                }}
+              />
+            </Row>
           </Card>
 
-          <Card title="Backup">
+          <Card title={t('settings.backup')}>
             <div className={styles.backupGrid}>
               <div>
                 <h4 className={styles.backupTitle}>
                   <DatabaseIcon />
-                  Local
+                  {t('settings.local')}
                 </h4>
 
                 <div className={styles.backupActions}>
                   <button className={styles.fileBtn} onClick={handleExport}>
                     <DownloadIcon />
-                    Export
+                    {t('settings.export')}
                   </button>
 
                   <button
@@ -516,7 +537,7 @@ export default function Settings() {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <UploadIcon />
-                    Import
+                    {t('settings.import')}
                   </button>
                 </div>
 
@@ -532,7 +553,7 @@ export default function Settings() {
               <div>
                 <h4 className={styles.backupTitle}>
                   <CloudIcon />
-                  Cloud
+                  {t('settings.cloud')}
                 </h4>
 
                 <div className={styles.backupActions}>
@@ -541,7 +562,7 @@ export default function Settings() {
                     onClick={handleSupabaseExport}
                   >
                     <DownloadIcon />
-                    Export
+                    {t('settings.export')}
                   </button>
 
                   <button
@@ -549,7 +570,7 @@ export default function Settings() {
                     onClick={() => supabaseFileInputRef.current?.click()}
                   >
                     <UploadIcon />
-                    Import
+                    {t('settings.import')}
                   </button>
                 </div>
 
@@ -567,24 +588,24 @@ export default function Settings() {
 
         <div className={styles.column}>
           <Card
-            title="Storage"
+            title={t('settings.storage')}
             action={
               usageError ? (
                 <span
                   className={`${styles.healthPill} ${styles.healthPillWarn}`}
                 >
-                  Unavailable
+                  {t('settings.unavailable')}
                 </span>
               ) : usage ? (
-                <span className={styles.healthPill}>Healthy</span>
+                <span className={styles.healthPill}>{t('settings.healthy')}</span>
               ) : null
             }
           >
             {usageError ? (
               <div className={styles.storageError}>
-                <div className={styles.value}>Storage usage unavailable</div>
+                <div className={styles.value}>{t('settings.storageUnavailable')}</div>
                 <button className={styles.pill} onClick={loadUsage}>
-                  Retry
+                  {t('settings.retry')}
                 </button>
               </div>
             ) : (
@@ -596,7 +617,7 @@ export default function Settings() {
                     </div>
 
                     <div className={styles.storageSubtitle}>
-                      Local storage used
+                      {t('settings.localStorageUsed')}
                     </div>
 
                     <div className={styles.storageBar}>
@@ -610,58 +631,59 @@ export default function Settings() {
                   </div>
 
                   <Row
-                    label="Watch history"
+                    label={t('settings.watchHistory')}
                     value={formatBytes(usage.breakdown.watched)}
                   />
 
                   <Row
-                    label="Continue watching"
+                    label={t('settings.continueWatching')}
                     value={formatBytes(usage.breakdown.progress)}
                   />
 
                   <Row
-                    label="Watch later"
+                    label={t('settings.watchLater')}
                     value={formatBytes(
                       usage.breakdown.watchlater + usage.breakdown.epwl,
                     )}
                   />
 
                   <Row
-                    label="TMDB cache"
+                    label={t('settings.tmdbCache')}
                     value={formatBytes(usage.breakdown.cache)}
                   >
                     <button className={styles.pill} onClick={clearCache}>
-                      Clear
+                      {t('settings.clear')}
                     </button>
                   </Row>
 
                   <Row
-                    label="Offline queue"
-                    value={queueSize > 0 ? `${queueSize} pending` : "Empty"}
+                    label={t('settings.offlineQueue')}
+                    value={queueSize > 0
+                      ? t('settings.pending', { count: queueSize })
+                      : t('settings.empty')}
                   />
                 </>
               )
             )}
           </Card>
 
-          <Card title="Statistics">
+          <Card title={t('settings.statistics')}>
             {stats && (
               <div className={styles.statsGrid}>
-                <Stat title="Movies" value={stats.moviesWatched} />
+                <Stat title={t('settings.movies')} value={stats.moviesWatched} />
 
-                <Stat title="Episodes" value={stats.episodesWatched} />
+                <Stat title={t('settings.episodes')} value={stats.episodesWatched} />
 
-                <Stat title="Series" value={stats.seriesWatched} />
+                <Stat title={t('settings.series')} value={stats.seriesWatched} />
 
-                <Stat title="Watch later" value={stats.watchLaterCount} />
+                <Stat title={t('settings.watchLaterCount')} value={stats.watchLaterCount} />
               </div>
             )}
           </Card>
 
-          <Card title="Danger Zone">
+          <Card title={t('settings.dangerZone')}>
             <p className={styles.dangerText}>
-              Remove all local watch history, Continue Watching entries,
-              cache, and your Watch Later list.
+              {t('settings.dangerText')}
             </p>
 
             <button
@@ -670,7 +692,7 @@ export default function Settings() {
               onClick={openConfirm}
             >
               <TrashIcon />
-              Clear local data
+              {t('settings.clearLocalData')}
             </button>
           </Card>
         </div>
@@ -691,16 +713,16 @@ export default function Settings() {
             aria-labelledby="confirm-clear-title"
             tabIndex={-1}
           >
-            <h4 id="confirm-clear-title">This action cannot be undone.</h4>
+            <h4 id="confirm-clear-title">{t('settings.confirmTitle')}</h4>
 
-            <p>All local information will be permanently removed.</p>
+            <p>{t('settings.confirmBody')}</p>
 
             <div className={styles.dialogActions}>
               <button
                 className={`${styles.pill} ${styles.pillDanger}`}
                 onClick={clearAll}
               >
-                Delete Everything
+                {t('settings.deleteEverything')}
               </button>
 
               <button
@@ -708,7 +730,7 @@ export default function Settings() {
                 className={styles.pill}
                 onClick={closeConfirm}
               >
-                Cancel
+                {t('settings.cancel')}
               </button>
             </div>
           </div>

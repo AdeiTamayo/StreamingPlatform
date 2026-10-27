@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
@@ -26,6 +27,7 @@ function createPages() {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const location = useLocation();
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [pageEpoch, setPageEpoch] = useState(0);
@@ -73,11 +75,11 @@ export default function App() {
         onRetry={() => setPageEpoch((epoch) => epoch + 1)}
       >
         <div className="app-shell">
-          <a href="#main-content" className="skip-link">Skip to content</a>
+          <a href="#main-content" className="skip-link">{t('app.skipToContent')}</a>
           <Navbar />
           <AuthModal />
           <main id="main-content" className="app-content" ref={mainRef} tabIndex={-1}>
-            <Suspense fallback={<div className="page"><div className="loading">Loading...</div></div>}>
+            <Suspense fallback={<div className="page"><div className="loading">{t('app.loading')}</div></div>}>
               <Routes>
                 <Route path="/" element={<pages.Home />} />
                 <Route path="/movies" element={<pages.Movies />} />
@@ -95,7 +97,7 @@ export default function App() {
           <button
             className={`back-to-top${showBackToTop ? ' visible' : ''}`}
             onClick={scrollToTop}
-            aria-label="Back to top"
+            aria-label={t('app.backToTop')}
             // Hidden state is opacity-only, so keep the invisible button out
             // of the tab order and the accessibility tree until it shows.
             tabIndex={showBackToTop ? 0 : -1}
