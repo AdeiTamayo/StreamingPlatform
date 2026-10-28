@@ -1,9 +1,10 @@
 export const LANGUAGE_KEY = 'language';
 
+// Flags live in /public/flags (served from the site root).
 export const APP_LANGUAGES = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Español' },
-  { code: 'eu', label: 'Euskara' },
+  { code: 'en', label: 'English', flag: '/flags/en.svg' },
+  { code: 'es', label: 'Español', flag: '/flags/es.svg' },
+  { code: 'eu', label: 'Euskara', flag: '/flags/eu.svg' },
 ] as const;
 
 export type AppLanguage = (typeof APP_LANGUAGES)[number]['code'];
