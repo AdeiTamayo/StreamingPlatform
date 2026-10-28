@@ -525,29 +525,8 @@ export default function Settings() {
                 value={language}
                 options={APP_LANGUAGES.map((option) => ({
                   value: option.code,
-                  label: (
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <img
-                        src={option.flag}
-                        alt=""
-                        aria-hidden="true"
-                        width={20}
-                        height={14}
-                        style={{
-                          objectFit: "cover",
-                          borderRadius: 2,
-                          flexShrink: 0,
-                        }}
-                      />
-                      {option.label}
-                    </span>
-                  ),
+                  label: option.label,
+                  icon: option.flag,
                 }))}
                 placeholder={t("settings.language")}
                 onSelect={(value: string) => {

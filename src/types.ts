@@ -314,4 +314,6 @@ export interface Stats {
 export interface FilterOption {
   value: string;
   label: string;
+  /** Optional image URL (e.g. a flag) shown before the label. */
+  icon?: string;
 }
