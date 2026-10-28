@@ -20,16 +20,12 @@ import BulkSelectBar from "../components/BulkSelectBar";
 import useBulkSelect from "../components/useBulkSelect";
 import bulkStyles from "../components/BulkSelectBar.module.css";
 import { useToast } from "../components/useToast";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "../i18n/usePageTitle";
 import type { LastSeenItem } from "../types";
 import styles from "./LastSeen.module.css";
 
 const ITEMS_PER_PAGE = 21;
-
-const TYPE_TABS = [
-  { value: "all", label: "All" },
-  { value: "movies", label: "Movies" },
-  { value: "tv", label: "TV Shows" },
-];
 
 interface SeriesGroup {
   id: number | string;
@@ -57,12 +53,6 @@ type LastSeenEntry =
       episodes: number;
     };
 
-function formatEpisodeLabel(item: LastSeenItem): string {
-  if (item.season && item.episode) return `S${item.season}E${item.episode}`;
-  if (item.season == null && item.episode == null) return "Series";
-  return "Episode";
-}
-
 function watchedEpisodeCount(group: SeriesGroup): number {
   return group.episodes.filter((e: LastSeenItem) => e.season && e.episode).length;
 }
@@ -76,6 +66,7 @@ function movieKey(storageKey: string): string {
 }
 
 export default function LastSeen() {
+  const { t } = useTranslation();
   const [items, setItems] = useState<LastSeenItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState("recent");
@@ -87,10 +78,15 @@ export default function LastSeen() {
   const toast = useToast();
 
   useEffect(() => {
-    document.title = "Last Seen - StreamFlow";
     setItems(getLastSeen());
     setLoading(false);
   }, []);
+  usePageTitle(t("lastSeen.title"));
+  const typeTabs = [
+    { value: "all", label: t("lastSeen.all") },
+    { value: "movies", label: t("lastSeen.movies") },
+    { value: "tv", label: t("lastSeen.tvShows") },
+  ];
 
   const { series, movies, combined, total } = useMemo(() => {
     const seriesMap = new Map<string, SeriesGroup>();
@@ -235,7 +231,7 @@ export default function LastSeen() {
       removed = true;
     }
     setItems(getLastSeen());
-    if (removed) toast?.("Removed from history");
+    if (removed) toast?.(t("lastSeen.toastRemoved"));
   }
 
   function handleRemoveShow(showId: string | number) {
@@ -244,7 +240,7 @@ export default function LastSeen() {
     if (selectedSeriesId && String(selectedSeriesId) === String(showId)) {
       setSelectedSeriesId(null);
     }
-    toast?.("Series removed from history");
+    toast?.(t("lastSeen.toastSeriesRemoved"));
   }
 
   // Removes every movie in the current view - all of them when unfiltered,
@@ -263,8 +259,8 @@ export default function LastSeen() {
     setItems(getLastSeen());
     toast?.(
       filterActive
-        ? `${movies.length} movie${movies.length === 1 ? "" : "s"} removed from history`
-        : "All watched movies removed from history",
+        ? t("lastSeen.toastMoviesRemoved", { count: movies.length })
+        : t("lastSeen.toastAllMoviesRemoved"),
     );
   }
 
@@ -294,7 +290,7 @@ export default function LastSeen() {
       }
     }
     setItems(getLastSeen());
-    if (removed > 0) toast?.(`${removed} removed from history`);
+    if (removed > 0) toast?.(t("lastSeen.toastSelectedRemoved", { count: removed }));
   }
 
   const visibleKeys = useMemo(
@@ -340,8 +336,8 @@ export default function LastSeen() {
     <div className="page">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Viewing history</p>
-          <h1>Last Seen</h1>
+          <p className="eyebrow">{t("lastSeen.eyebrow")}</p>
+          <h1>{t("lastSeen.title")}</h1>
         </div>
       </div>
 
@@ -350,17 +346,16 @@ export default function LastSeen() {
           <CollectionSkeleton variant="history" count={3} />
         ) : items.length === 0 ? (
           <div className="empty-state">
-            <h3>No history yet</h3>
+            <h3>{t("lastSeen.emptyTitle")}</h3>
             <p>
-              Movies and episodes you finish or mark as watched will appear
-              here.
+              {t("lastSeen.emptyDescription")}
             </p>
             <div className="empty-state-actions">
               <Link to="/movies" className="empty-state-action">
-                Browse Movies
+                {t("lastSeen.browseMovies")}
               </Link>
               <Link to="/tv" className="empty-state-action">
-                Explore TV Shows
+                {t("lastSeen.exploreTvShows")}
               </Link>
             </div>
           </div>
@@ -370,12 +365,12 @@ export default function LastSeen() {
               <input
                 type="text"
                 className={styles.lastSeenSearch}
-                placeholder="Filter by title..."
+                placeholder={t("lastSeen.filterPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label="Filter by title"
+                aria-label={t("lastSeen.filterLabel")}
               />
-              <TypeToggle value={filterType} options={TYPE_TABS} onChange={setFilterType} />
+              <TypeToggle value={filterType} options={typeTabs} onChange={setFilterType} />
               <FilterDropdown
                 className={styles.lastSeenSortSelect}
                 icon={
@@ -396,14 +391,14 @@ export default function LastSeen() {
                 }
                 value={`${sortBy}-${sortDir}`}
                 options={[
-                  { value: "recent-desc", label: "Recently added" },
-                  { value: "recent-asc", label: "Oldest added" },
-                  { value: "title-asc", label: "Title A–Z" },
-                  { value: "title-desc", label: "Title Z–A" },
-                  { value: "episodes-desc", label: "Most episodes" },
-                  { value: "episodes-asc", label: "Fewest episodes" },
+                  { value: "recent-desc", label: t("lastSeen.sortRecentlyAdded") },
+                  { value: "recent-asc", label: t("lastSeen.sortOldestAdded") },
+                  { value: "title-asc", label: t("lastSeen.sortTitleAsc") },
+                  { value: "title-desc", label: t("lastSeen.sortTitleDesc") },
+                  { value: "episodes-desc", label: t("lastSeen.sortMostEpisodes") },
+                  { value: "episodes-asc", label: t("lastSeen.sortFewestEpisodes") },
                 ]}
-                placeholder="Recently added"
+                placeholder={t("lastSeen.sortRecentlyAdded")}
                 onSelect={(v: string) => {
                   const [field, dir] = v.split("-");
                   setSortBy(field);
@@ -413,7 +408,7 @@ export default function LastSeen() {
             </div>
             <div className={styles.lastSeenMeta}>
               <span className={styles.lastSeenCount}>
-                {combined.length} of {total} titles
+                {t("lastSeen.count", { visible: combined.length, total })}
               </span>
               <div className={styles.lastSeenMetaActions}>
                 {hasActiveFilter && (
@@ -428,18 +423,18 @@ export default function LastSeen() {
                       setPage(0);
                     }}
                   >
-                    Clear filters
+                    {t("lastSeen.clearFilters")}
                   </button>
                 )}
                 <button
                   className={`${styles.lastSeenMetaBtn} ${selectMode ? styles.active : ""}`}
                   onClick={toggleSelectMode}
                   aria-pressed={selectMode}
-                  aria-label={selectMode ? "Done" : "Select"}
-                  title={selectMode ? "Exit selection" : "Select multiple titles"}
+                  aria-label={selectMode ? t("common.done") : t("common.select")}
+                  title={selectMode ? t("lastSeen.exitSelection") : t("lastSeen.selectTitle")}
                 >
                   <SelectIcon />
-                  {selectMode ? "Done" : "Select"}
+                  {selectMode ? t("common.done") : t("common.select")}
                 </button>
               </div>
             </div>
@@ -458,10 +453,9 @@ export default function LastSeen() {
 
             {!selectedSeries && hasNoMatches && (
               <div className="empty-state">
-                <h3>No matches</h3>
+                <h3>{t("lastSeen.noMatchesTitle")}</h3>
                 <p>
-                  No titles match your current filters. Try a different search
-                  or clear the filters.
+                  {t("lastSeen.noMatchesDescription")}
                 </p>
               </div>
             )}
@@ -487,8 +481,8 @@ export default function LastSeen() {
                             <span className="media-card-year">
                               {show.episodes.length === 1 &&
                               !show.episodes[0].season
-                                ? "Watched"
-                                : `${show.episodes.length} episode${show.episodes.length === 1 ? "" : "s"}`}
+                                ? t("lastSeen.watched")
+                                : t("lastSeen.episodeCount", { count: show.episodes.length })}
                             </span>
                           </div>
                         </>
@@ -504,7 +498,7 @@ export default function LastSeen() {
                               className={bulkStyles.selectBox}
                               checked={selectedKeys.has(key)}
                               onChange={() => toggleKey(key)}
-                              aria-label={`Select ${show.title}`}
+                              aria-label={t("lastSeen.selectItem", { title: show.title })}
                             />
                           )}
                           <Link
@@ -518,14 +512,14 @@ export default function LastSeen() {
                               className={styles.lastSeenViewBtn}
                               onClick={() => showSeriesEpisodes(show)}
                             >
-                              View
+                              {t("lastSeen.view")}
                             </button>
                           )}
                           {!selectMode && (
                             <button
                               className="wl-remove"
                               onClick={() => handleRemoveShow(show.id)}
-                              title="Remove all episodes"
+                              title={t("lastSeen.removeAllEpisodes")}
                             >
                               <CloseIcon />
                             </button>
@@ -544,7 +538,7 @@ export default function LastSeen() {
                             className={bulkStyles.selectBox}
                             checked={selectedKeys.has(key)}
                             onChange={() => toggleKey(key)}
-                            aria-label={`Select ${item.title || `Movie ${item.id}`}`}
+                            aria-label={t("lastSeen.selectItem", { title: item.title || t("lastSeen.movieFallback", { id: item.id }) })}
                           />
                         )}
                         <Link to={`/movie/${item.id}`}>
@@ -563,7 +557,7 @@ export default function LastSeen() {
                           <button
                             className="wl-remove"
                             onClick={() => handleRemove(item)}
-                            title="Remove"
+                            title={t("common.remove")}
                           >
                             <CloseIcon />
                           </button>
@@ -577,7 +571,7 @@ export default function LastSeen() {
                     className="watch-toggle danger"
                     onClick={handleRemoveAllMovies}
                   >
-                    Remove all
+                    {t("lastSeen.removeAll")}
                   </button>
                 )}
                 {totalPages > 1 && (
@@ -598,7 +592,7 @@ export default function LastSeen() {
                     onClick={backToSeries}
                     className={styles.lastSeenBackBtn}
                   >
-                    &larr; Back to series
+                    &larr; {t("lastSeen.backToSeries")}
                   </button>
                   <h3 className={styles.lastSeenDetailTitle}>
                     {selectedSeries.title}
@@ -620,8 +614,8 @@ export default function LastSeen() {
                         </h3>
                         <p className={styles.lastSeenSeriesSubtitle}>
                           {watchedEpisodeCount(selectedSeries) === 0
-                            ? "Watched"
-                            : `${watchedEpisodeCount(selectedSeries)} watched episode${watchedEpisodeCount(selectedSeries) === 1 ? "" : "s"}`}
+                            ? t("lastSeen.watched")
+                            : t("lastSeen.watchedEpisodeCount", { count: watchedEpisodeCount(selectedSeries) })}
                         </p>
                       </div>
                     </div>
@@ -630,13 +624,13 @@ export default function LastSeen() {
                         to={`/tv/${selectedSeries.id}`}
                         className={styles.lastSeenSeriesLink}
                       >
-                        Open show
+                        {t("lastSeen.openShow")}
                       </Link>
                       <button
                         className="watch-toggle danger"
                         onClick={() => handleRemoveShow(selectedSeries.id)}
                       >
-                        Remove all
+                        {t("lastSeen.removeAll")}
                       </button>
                     </div>
                   </div>
@@ -652,14 +646,18 @@ export default function LastSeen() {
                           className={styles.lastSeenEpisode}
                         >
                           <span className={styles.lsLabel}>
-                            {formatEpisodeLabel(item)}
+                            {item.season && item.episode
+                              ? `S${item.season}E${item.episode}`
+                              : item.season == null && item.episode == null
+                                ? t("lastSeen.series")
+                                : t("lastSeen.episode")}
                           </span>
-                          <span className={styles.lsMeta}>Watched</span>
+                          <span className={styles.lsMeta}>{t("lastSeen.watched")}</span>
                         </Link>
                         <button
                           className={styles.lsRemove}
                           onClick={() => handleRemove(item)}
-                          title="Remove"
+                          title={t("common.remove")}
                         >
                           <CloseIcon />
                         </button>

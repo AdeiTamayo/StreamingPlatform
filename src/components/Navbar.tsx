@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, type ReactNode } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import useClickOutside from '../hooks/useClickOutside';
 import { useAuth } from '../hooks/useAuth';
 import { getSearchHistory, removeSearchHistory } from '../api/storage';
@@ -7,38 +8,42 @@ import Notifications from './Notifications';
 import AccountButton from './AccountButton/AccountButton';
 import styles from './Navbar.module.css';
 
-const PUBLIC_NAV_ITEMS = [
+interface NavItem {
+  to: string;
+  labelKey: string;
+  icon: ReactNode;
+}
+
+const PUBLIC_NAV_ITEMS: NavItem[] = [
   {
     to: '/',
-    label: 'Home',
+    labelKey: 'nav.home',
     icon: <><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></>,
   },
   {
     to: '/movies',
-    label: 'Movies',
+    labelKey: 'nav.movies',
     icon: <><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18" /><line x1="7" y1="2" x2="7" y2="22" /><line x1="17" y1="2" x2="17" y2="22" /><line x1="2" y1="12" x2="22" y2="12" /><line x1="2" y1="7" x2="7" y2="7" /><line x1="2" y1="17" x2="7" y2="17" /><line x1="17" y1="7" x2="22" y2="7" /><line x1="17" y1="17" x2="22" y2="17" /></>,
   },
   {
     to: '/tv',
-    label: 'TV Shows',
+    labelKey: 'nav.tvShows',
     icon: <><rect x="2" y="7" width="20" height="15" rx="2" ry="2" /><polyline points="17 2 12 7 7 2" /></>,
   },
 ];
 
-const PERSONAL_NAV_ITEMS = [
+const PERSONAL_NAV_ITEMS: NavItem[] = [
   {
     to: '/watch-later',
-    label: 'Watch Later',
+    labelKey: 'nav.watchLater',
     icon: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" /></>,
   },
   {
     to: '/last-seen',
-    label: 'Last Seen',
+    labelKey: 'nav.lastSeen',
     icon: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>,
   },
 ];
-
-type NavItem = typeof PUBLIC_NAV_ITEMS[number];
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -84,6 +89,7 @@ const Navbar = memo(function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  const { t } = useTranslation();
 
   const sidebarRef = useClickOutside(() => {
     if (menuOpen) {
@@ -380,9 +386,9 @@ const Navbar = memo(function Navbar() {
         >
           {item.icon}
         </svg>
-        <span>{item.label}</span>
-      </Link>
-    );
+          <span>{t(item.labelKey)}</span>
+        </Link>
+      );
   }
 
   return (
@@ -393,7 +399,7 @@ const Navbar = memo(function Navbar() {
           scrolled ? styles.scrolled : '',
           hidden ? styles.hidden : '',
         ].join(' ')}
-        aria-label="Primary"
+        aria-label={t('nav.primary')}
       >
         <div className={styles.navbarInner}>
           <div className={styles.navLinks}>
@@ -405,7 +411,7 @@ const Navbar = memo(function Navbar() {
             className={styles.navbarSearch}
             onSubmit={handleSubmit}
             role="search"
-            aria-label="Search"
+            aria-label={t('nav.search')}
           >
             <span
               className={
@@ -418,8 +424,8 @@ const Navbar = memo(function Navbar() {
             <input
               ref={searchRef}
               type="search"
-              placeholder="Search... (/)"
-              aria-label="Search"
+              placeholder={t('nav.searchPlaceholder')}
+              aria-label={t('nav.search')}
               autoComplete="off"
               role="combobox"
               aria-expanded={showNavSuggest}
@@ -444,7 +450,7 @@ const Navbar = memo(function Navbar() {
                 <div
                   className={styles.navSuggestList}
                   role="listbox"
-                  aria-label="Recent searches"
+                  aria-label={t('nav.recentSearches')}
                   id="nav-suggest-list"
                 >
                   {navSuggestions.map((h, hi) => (
@@ -472,8 +478,8 @@ const Navbar = memo(function Navbar() {
                       <button
                         type="button"
                         className={styles.navSuggestRemove}
-                        aria-label={`Remove "${h}" from search history`}
-                        title="Remove from history"
+                        aria-label={t('nav.removeFromHistory', { query: h })}
+                        title={t('nav.removeFromHistoryTitle')}
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => removeSuggestion(h)}
                       >
@@ -494,8 +500,8 @@ const Navbar = memo(function Navbar() {
                 type="button"
                 className={styles.searchToggleBtn}
                 onClick={toggleSearch}
-                aria-label="Search"
-                title="Search (/)"
+                aria-label={t('nav.search')}
+                title={t('nav.search')}
               >
                 <svg
                   width="20"
@@ -524,7 +530,7 @@ const Navbar = memo(function Navbar() {
                 type="submit"
                 className={styles.searchGoBtn}
               >
-                Go
+                {t('nav.go')}
               </button>
             )}
           </form>
@@ -539,7 +545,7 @@ const Navbar = memo(function Navbar() {
                   ? styles.active
                   : '',
               ].join(' ')}
-              aria-label="Settings"
+              aria-label={t('nav.settings')}
               aria-current={isActive('/settings') ? 'page' : undefined}
             >
               <svg
@@ -568,7 +574,7 @@ const Navbar = memo(function Navbar() {
         onClick={() =>
           setMenuOpen((previous) => !previous)
         }
-        aria-label="Toggle menu"
+        aria-label={t('nav.toggleMenu')}
         aria-expanded={menuOpen}
         aria-controls="sidebar-menu"
       >
@@ -595,16 +601,16 @@ const Navbar = memo(function Navbar() {
         ].join(' ')}
         ref={sidebarRef}
         inert={!menuOpen}
-        aria-label="Sidebar navigation"
+        aria-label={t('nav.sidebarNav')}
       >
-        <nav className={styles.sidebarNav} aria-label="Sidebar">
+        <nav className={styles.sidebarNav} aria-label={t('nav.sidebar')}>
           <div className={styles.sidebarHeader}>
-            <span className={styles.sidebarTitle}>Menu</span>
+            <span className={styles.sidebarTitle}>{t('nav.menu')}</span>
             <button
               type="button"
               className={styles.sidebarClose}
               onClick={() => setMenuOpen(false)}
-              aria-label="Close menu"
+              aria-label={t('nav.closeMenu')}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -612,7 +618,7 @@ const Navbar = memo(function Navbar() {
               </svg>
             </button>
           </div>
-          <span className={styles.sidebarSectionLabel}>Browse</span>
+          <span className={styles.sidebarSectionLabel}>{t('nav.browse')}</span>
           {PUBLIC_NAV_ITEMS.map((item, index) => (
             <Link
               key={item.to}
@@ -643,7 +649,7 @@ const Navbar = memo(function Navbar() {
                   {item.icon}
                 </svg>
               </span>
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </Link>
           ))}
 
@@ -676,7 +682,7 @@ const Navbar = memo(function Navbar() {
                   {item.icon}
                 </svg>
               </span>
-              <span>{item.label}</span>
+              <span>{t(item.labelKey)}</span>
             </Link>
           ))}
 
@@ -706,7 +712,7 @@ const Navbar = memo(function Navbar() {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
               </span>
-              <span>Settings</span>
+              <span>{t('nav.settings')}</span>
             </Link>
           )}
 
@@ -723,12 +729,12 @@ const Navbar = memo(function Navbar() {
           className={styles.sidebarSearch}
           onSubmit={handleSubmit}
           role="search"
-          aria-label="Search"
+          aria-label={t('nav.search')}
         >
           <input
             type="search"
-            placeholder="Search..."
-            aria-label="Search"
+            placeholder={t('nav.searchPlaceholderShort')}
+            aria-label={t('nav.search')}
             value={query}
             onChange={(e) =>
               setQuery(e.target.value)
@@ -741,7 +747,7 @@ const Navbar = memo(function Navbar() {
           />
 
           <button type="submit">
-            Search
+            {t('nav.search')}
           </button>
         </form>
       </aside>

@@ -1,15 +1,17 @@
-import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { usePageTitle } from '../i18n/usePageTitle';
 
 export default function NotFound() {
-  useEffect(() => { document.title = '404 - StreamFlow'; }, []);
+  const { t } = useTranslation();
+  usePageTitle(t('notFound.title'));
 
   return (
     <div className="page">
       <div className="empty-state">
-        <h3>Page not found</h3>
-        <p>The page you're looking for doesn't exist.</p>
-        <Link to="/" className="empty-state-action">Go home</Link>
+        <h3>{t('notFound.title')}</h3>
+        <p>{t('notFound.description')}</p>
+        <Link to="/" className="empty-state-action">{t('notFound.goHome')}</Link>
       </div>
     </div>
   );

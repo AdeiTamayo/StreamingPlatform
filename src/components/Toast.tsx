@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, ReactNode } from 'react';
-import { ToastContext } from './useToast';
+import { useTranslation } from 'react-i18next';
+import { ToastContext, type ToastOptions } from './useToast';
 import CloseIcon from './CloseIcon';
 import styles from './Toast.module.css';
 
@@ -16,6 +17,7 @@ const DEFAULT_DURATION = 3000;
 const ERROR_DURATION = 6000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const timersRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -28,9 +30,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const addToast = useCallback((message: string, duration = DEFAULT_DURATION) => {
+  const addToast = useCallback((message: string, durationOrOptions?: number | ToastOptions) => {
+    const options = typeof durationOrOptions === 'object' ? durationOrOptions : undefined;
+    const duration = typeof durationOrOptions === 'number'
+      ? durationOrOptions
+      : options?.duration ?? DEFAULT_DURATION;
     const id = ++toastId;
-    const isError = ERROR_PATTERN.test(message);
+    const isError = options?.kind === 'error'
+      || (options?.kind !== 'info' && ERROR_PATTERN.test(message));
     const effectiveDuration = isError ? Math.max(duration, ERROR_DURATION) : duration;
     setToasts((prev) => [...prev, { id, message, isError }]);
     const timer = setTimeout(() => {
@@ -50,18 +57,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={addToast}>
       {children}
       <div className={styles.toastContainer}>
-        {toasts.map((t) => (
+        {toasts.map((toast) => (
           <div
-            key={t.id}
-            className={`${styles.toast}${t.isError ? ` ${styles.toastError}` : ''}`}
+            key={toast.id}
+            className={`${styles.toast}${toast.isError ? ` ${styles.toastError}` : ''}`}
             role="alert"
           >
-            <span className={styles.toastMessage}>{t.message}</span>
+            <span className={styles.toastMessage}>{toast.message}</span>
             <button
               type="button"
               className={styles.toastDismiss}
-              onClick={() => dismiss(t.id)}
-              aria-label="Dismiss notification"
+              onClick={() => dismiss(toast.id)}
+              aria-label={t('common.dismissNotification')}
             >
               <CloseIcon size={12} />
             </button>

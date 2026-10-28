@@ -1,5 +1,6 @@
 import { useState, useEffect, memo } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { imageUrl } from "../api/tmdb";
 import {
   isWatched,
@@ -21,6 +22,7 @@ interface MediaCardProps {
 }
 
 const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
+  const { t } = useTranslation();
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const isMovie = !!(item as TMDBMovie).title;
@@ -94,7 +96,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
       <Link
         to={linkTo}
         className="media-card-link"
-        aria-label={`Open ${title}${year ? ` (${year})` : ''}`}
+        aria-label={year ? t('media.openWithYear', { title, year }) : t('media.open', { title })}
       >
         <div className={`media-card-poster${loaded ? " loaded" : ""}`}>
           {!loaded && <div className="media-card-skeleton" />}
@@ -123,7 +125,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
           )}
           {loaded && !isPerson && (
             <span className={`media-card-type ${type}`}>
-              {type === "tv" ? "TV" : "Movie"}
+              {type === "tv" ? t('media.tv') : t('media.movie')}
             </span>
           )}
         </div>
@@ -143,7 +145,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
                       ? `${year}-${tvStatus.endYear}`
                       : year)}
                   {!isMovie && tvStatus?.episodes
-                    ? `${year ? " \u00b7 " : ""}${tvStatus.episodes} episodes`
+                    ? `${year ? " \u00b7 " : ""}${t('media.episodes', { count: tvStatus.episodes })}`
                     : ""}
                 </span>
               )}
@@ -156,8 +158,8 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
           <button
             className={`media-card-wl ${inWL ? "active" : ""}`}
             onClick={toggleWL}
-            title={inWL ? "Remove from Watch Later" : "Add to Watch Later"}
-            aria-label={inWL ? `Remove ${title} from Watch Later` : `Add ${title} to Watch Later`}
+            title={inWL ? t('media.removeWatchLater') : t('media.addWatchLater')}
+            aria-label={inWL ? t('media.removeWatchLaterLabel', { title }) : t('media.addWatchLaterLabel', { title })}
             aria-pressed={inWL}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
@@ -167,12 +169,12 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             onClick={toggleWatched}
             title={
               isWatchedState
-                ? "Unmark watched"
+                ? t('media.unmarkSeen')
                 : isMovie
-                  ? "Mark as seen"
-                  : "Mark series as seen"
+                  ? t('media.markSeen')
+                  : t('media.markSeriesSeen')
             }
-            aria-label={isWatchedState ? `Mark ${title} as unwatched` : `Mark ${title} as watched`}
+            aria-label={isWatchedState ? t('media.markUnwatchedLabel', { title }) : t('media.markWatchedLabel', { title })}
             aria-pressed={isWatchedState}
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 7.5 5.5 10.5 11.5 3.5"/></svg>

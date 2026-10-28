@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   getOmdbRatingByTitle,
   peekOmdbRatingByTmdb,
   type ImdbRating,
 } from "../api/omdb";
 import { getMovieDetail, getTVDetail } from "../api/tmdb";
+import { formatRatingTitle } from "../utils/format";
 import type { MediaType } from "../types";
 
 /**
@@ -32,6 +34,7 @@ export default function RatingBadge({
   className?: string;
   fallbackRating?: string | null;
 }) {
+  const { t } = useTranslation();
   const [imdbRating, setImdbRating] = useState<ImdbRating | null>(() => {
     const peek = peekOmdbRatingByTmdb(id);
     return peek.state === "cached" ? peek.rating : null;
@@ -76,14 +79,17 @@ export default function RatingBadge({
   const display = imdbRating ? imdbRating.rating : fetchedTmdb ?? fallbackRating;
   if (!display) return null;
 
+  const tooltip = formatRatingTitle(t, {
+    imdbRating: imdbRating?.rating,
+    imdbVotes: imdbRating?.votes,
+    tomatoes: imdbRating?.tomatoes,
+    tmdbRating: display,
+  });
+
   return (
     <span
       className={className}
-      title={
-        imdbRating
-          ? `IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ""}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ""}`
-          : `TMDB rating ${display}/10`
-      }
+      title={tooltip}
     >
       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" />
