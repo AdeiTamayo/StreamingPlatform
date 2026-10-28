@@ -1,4 +1,5 @@
 import { useId, type KeyboardEvent, type Ref } from 'react';
+import { useTranslation } from 'react-i18next';
 import FilterDropdown from './FilterDropdown';
 
 interface SelectOption {
@@ -157,7 +158,7 @@ export default function SearchBar({
   query,
   onQueryChange,
   onSearch,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder,
   countryValue = '',
   onCountryChange,
   countryOptions = [],
@@ -187,6 +188,7 @@ export default function SearchBar({
   ariaActiveDescendant,
   searchOverlay,
 }: SearchBarProps) {
+  const { t } = useTranslation();
   const headingId = useId();
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -215,8 +217,8 @@ export default function SearchBar({
                   ref={inputRef}
                   value={query}
                   onChange={(e) => onQueryChange(e.target.value)}
-                  placeholder={searchPlaceholder}
-                  aria-label="Search"
+                  placeholder={searchPlaceholder ?? t('nav.searchPlaceholderShort')}
+                  aria-label={t('searchBar.searchLabel')}
                   autoComplete="off"
                   role={combobox ? 'combobox' : undefined}
                   aria-autocomplete={combobox ? 'list' : undefined}
@@ -232,7 +234,7 @@ export default function SearchBar({
                     type="button"
                     className="clear-input"
                     onClick={() => onQueryChange('')}
-                    aria-label="Clear search"
+                    aria-label={t('searchBar.clearSearch')}
                   >
                     {X_ICON}
                   </button>
@@ -243,7 +245,7 @@ export default function SearchBar({
 
             {sortOptions.length > 0 && (
               <SearchSelectField
-                label="Sort results"
+                label={t('searchBar.sortResults')}
                 value={sortValue}
                 options={sortOptions}
                 onChange={onSortChange}
@@ -252,7 +254,7 @@ export default function SearchBar({
 
             {genreOptions.length > 0 && (
               <SearchSelectField
-                label="Genre"
+                label={t('searchBar.genre')}
                 value={genreValue}
                 options={genreOptions}
                 onChange={onGenreChange}
@@ -267,7 +269,7 @@ export default function SearchBar({
                 aria-expanded={showMore}
               >
                 {SLIDERS_ICON}
-                <span>{showMore ? 'Fewer filters' : 'More filters'}</span>
+                <span>{showMore ? t('searchBar.fewerFilters') : t('searchBar.moreFilters')}</span>
                 {showMore ? CHEVRON_UP : CHEVRON_DOWN}
               </button>
             )}
@@ -277,12 +279,12 @@ export default function SearchBar({
             <div className="secondary-panel">
               <div className="secondary-heading">
                 <div>
-                  <h2>{isSearchContext ? 'Refine your results' : 'Additional filters'}</h2>
-                  {isSearchContext && <p>Fine-tune your search with more options.</p>}
+                  <h2>{isSearchContext ? t('searchBar.refineTitle') : t('searchBar.additionalFilters')}</h2>
+                  {isSearchContext && <p>{t('searchBar.refineSubtitle')}</p>}
                 </div>
                 {(onClearFilters || activeFilters.length > 0) && (
                   <button type="button" className="clear-filters" onClick={onClearFilters}>
-                    {BIN_ICON} Clear all
+                    {BIN_ICON} {t('searchBar.clearAll')}
                   </button>
                 )}
               </div>
@@ -290,7 +292,7 @@ export default function SearchBar({
               <div className="secondary-grid">
                 {countryOptions.length > 0 && (
                   <SearchSelectField
-                    label="Country"
+                    label={t('searchBar.country')}
                     value={countryValue}
                     options={countryOptions}
                     onChange={onCountryChange}
@@ -301,14 +303,14 @@ export default function SearchBar({
               </div>
 
               {activeFilters.length > 0 && (
-                <div className="active-filters" aria-label="Active filters">
+                <div className="active-filters" aria-label={t('searchBar.activeFilters')}>
                   {activeFilters.map((filter) => (
                     <button
                       key={filter.key}
                       type="button"
                       className="filter-chip"
                       onClick={() => onRemoveFilter?.(filter.key)}
-                      aria-label={`Remove filter: ${filter.label}`}
+                      aria-label={t('searchBar.removeFilter', { label: filter.label })}
                     >
                       {filter.label}
                       {X_ICON}

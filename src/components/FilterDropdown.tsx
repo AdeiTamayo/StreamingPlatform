@@ -1,4 +1,5 @@
 import { useMemo, useState, useId, useCallback, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import useClickOutside from '../hooks/useClickOutside';
 import useDropdownSearch from '../hooks/useDropdownSearch';
 import useDropdownKeys from '../hooks/useDropdownKeys';
@@ -15,6 +16,7 @@ interface FilterDropdownProps {
 }
 
 export default function FilterDropdown({ value, options, placeholder, onSelect, className = '', icon }: FilterDropdownProps) {
+    const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const close = useCallback(() => setOpen(false), []);
     const ref = useClickOutside(close);
@@ -57,7 +59,7 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
             </button>
             {open && (
                 <div id={menuId} className="custom-select-menu filter-select-menu" role="listbox" aria-label={placeholder}>
-                    {filtered.length === 0 && <div className="custom-select-empty" role="status">No matches</div>}
+                    {filtered.length === 0 && <div className="custom-select-empty" role="status">{t('common.noMatches')}</div>}
                     {filtered.map((option, index) => {
                         const key = option.value || option.label;
                         const isHighlighted = search ? key === highlightKey : index === activeIndex;
