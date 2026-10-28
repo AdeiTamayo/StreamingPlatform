@@ -101,7 +101,3 @@
   width: 11px;
   height: 11px;
 }
-
-.detail-rating :global(.rating-votes) {
-  display: none;
-}

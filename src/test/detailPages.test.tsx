@@ -497,6 +497,91 @@ describe('TVDetail episode URL sync', () => {
   });
 });
 
+// Ratings may fall back to TMDB when OMDb/Cinemeta have no score for a title
+// (e.g. a series that just premiered). The badge must still take the user to
+// IMDb instead of rendering as inert text.
+describe('detail rating links to IMDb', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('TVDetail links the TMDB fallback rating to the IMDb title when the external id is known', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('api.themoviedb.org/3/tv/213375?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...SHOW,
+            id: 213375,
+            name: 'VisionQuest',
+            imdb_id: undefined,
+            vote_average: 8.603,
+            vote_count: 194,
+          }),
+        });
+      }
+      if (url.includes('/tv/213375/external_ids')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ imdb_id: 'tt23112594' }) });
+      }
+      if (url.includes('/tv/213375/season/1')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(SEASON) });
+      }
+      return mockFetchImpl(url);
+    }));
+
+    render(
+      <MemoryRouter initialEntries={['/tv/213375']}>
+        <Routes>
+          <Route path="/tv/:id" element={<TVDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      const link = screen.getByRole('link', { name: /TMDB rating 8\.6 out of 10, 194 votes/ });
+      expect(link).toHaveAttribute('href', 'https://www.imdb.com/title/tt23112594/');
+    }, { timeout: 5000 });
+    expect(screen.getByRole('link', { name: /TMDB rating 8\.6/ })).toHaveTextContent('(194)');
+  });
+
+  it('MovieDetail links the TMDB fallback rating to an IMDb search when no IMDb id exists', async () => {
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('api.themoviedb.org/3/movie/603?')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            ...MOVIE,
+            id: 603,
+            title: 'The Matrix',
+            imdb_id: undefined,
+            vote_average: 8.2,
+            vote_count: 26000,
+          }),
+        });
+      }
+      return mockFetchImpl(url);
+    }));
+
+    render(
+      <MemoryRouter initialEntries={['/movie/603']}>
+        <Routes>
+          <Route path="/movie/:id" element={<MovieDetail />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const link = await screen.findByRole('link', { name: /TMDB rating 8\.2 out of 10, 26k votes/ }, { timeout: 5000 });
+    expect(link).toHaveAttribute('href', 'https://www.imdb.com/find/?q=The%20Matrix');
+    expect(link).toHaveTextContent('(26k)');
+  });
+});
+
 // Each rating used to call setState on its own, re-rendering the whole page
 // once per episode (N renders per season). The badges must land in a handful
 // of commits instead.

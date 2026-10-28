@@ -156,10 +156,6 @@
   height: 11px;
 }
 
-.detail-rating :global(.rating-votes) {
-  display: none;
-}
-
 /* Episode list */
 .browse-header {
   display: flex;

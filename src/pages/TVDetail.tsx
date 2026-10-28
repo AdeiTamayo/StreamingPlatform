@@ -829,23 +829,28 @@ export default function TVDetail() {
                   href={`https://www.imdb.com/title/${imdbId}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${imdbRating.votes} votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}`}
-                  aria-label={`IMDb rating ${imdbRating.rating} out of 10${imdbRating.votes ? `, ${imdbRating.votes} votes` : ''}`}
+                  title={`IMDb ${imdbRating.rating}/10${imdbRating.votes ? ` \u00b7 ${formatVotes(imdbRating.votes)} votes` : show.vote_count > 0 ? ` \u00b7 ${formatVotes(String(show.vote_count))} TMDB votes` : ''}${imdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${imdbRating.tomatoes}` : ''}`}
+                  aria-label={`IMDb rating ${imdbRating.rating} out of 10${imdbRating.votes ? `, ${formatVotes(imdbRating.votes)} votes` : show.vote_count > 0 ? `, ${formatVotes(String(show.vote_count))} TMDB votes` : ''}. Open on IMDb`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{imdbRating.rating}</span>
-                  {imdbRating.votes && <span className="rating-votes">({formatVotes(imdbRating.votes)})</span>}
+                  {(imdbRating.votes || show.vote_count > 0) && (
+                    <span className="rating-votes">({imdbRating.votes ? formatVotes(imdbRating.votes) : formatVotes(String(show.vote_count))})</span>
+                  )}
                 </a>
               ) : (!imdbId || imdbResolved) && show.vote_average > 0 ? (
-                <span
+                <a
                   className={`${styles.detailRating} badge rating rating-tmdb`}
-                  title={`TMDB rating ${show.vote_average.toFixed(1)}/10${show.vote_count ? ` \u00b7 ${formatVotes(String(show.vote_count))} votes` : ''}`}
-                  aria-label={`TMDB rating ${show.vote_average.toFixed(1)} out of 10${show.vote_count ? `, ${show.vote_count} votes` : ''}`}
+                  href={imdbId ? `https://www.imdb.com/title/${imdbId}/` : `https://www.imdb.com/find/?q=${encodeURIComponent(show.name)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`TMDB rating ${show.vote_average.toFixed(1)}/10${show.vote_count ? ` \u00b7 ${formatVotes(String(show.vote_count))} votes` : ''} \u00b7 Open on IMDb`}
+                  aria-label={`TMDB rating ${show.vote_average.toFixed(1)} out of 10${show.vote_count ? `, ${formatVotes(String(show.vote_count))} votes` : ''}. Open on IMDb`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{show.vote_average.toFixed(1)}</span>
                   {show.vote_count > 0 && <span className="rating-votes">({formatVotes(String(show.vote_count))})</span>}
-                </span>
+                </a>
               ) : null}
               {metaNodes.length > 0 && (
                 <span className="detail-meta-line">{metaNodes}</span>

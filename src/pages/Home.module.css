@@ -94,8 +94,8 @@
   color: #fde047;
 }
 
-/* Hero rating matches the detail pages: just the star and the score, no pill
-   and no vote count (the votes stay in the title tooltip). */
+/* Hero rating matches the detail pages: just the star, the score and the
+   vote count, no pill. */
 .hero-rating:global(.badge.rating) {
   background: transparent;
   border: none;
@@ -109,10 +109,6 @@
 .hero-rating svg {
   width: 11px;
   height: 11px;
-}
-
-.hero-rating :global(.rating-votes) {
-  display: none;
 }
 
 .hero-facts {

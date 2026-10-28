@@ -119,6 +119,7 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
               type={type}
               className="media-card-rating"
               fallbackRating={rating}
+              fallbackVotes={item.vote_count}
             />
           )}
           {loaded && !isPerson && (

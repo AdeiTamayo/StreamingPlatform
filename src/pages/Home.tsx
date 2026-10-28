@@ -377,11 +377,13 @@ export default function Home() {
               {heroImdbRating ? (
                 <span
                   className={`badge rating rating-imdb ${styles.heroRating}`}
-                  title={`IMDb ${heroImdbRating.rating}/10${heroImdbRating.votes ? ` \u00b7 ${heroImdbRating.votes} votes` : ''}${heroImdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${heroImdbRating.tomatoes}` : ''}`}
+                  title={`IMDb ${heroImdbRating.rating}/10${heroImdbRating.votes ? ` \u00b7 ${formatVotes(heroImdbRating.votes)} votes` : hero.vote_count ? ` \u00b7 ${formatVotes(String(hero.vote_count))} TMDB votes` : ''}${heroImdbRating.tomatoes ? ` \u00b7 Rotten Tomatoes ${heroImdbRating.tomatoes}` : ''}`}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" /></svg>
                   <span className="rating-source">{heroImdbRating.rating}</span>
-                  {heroImdbRating.votes && <span className="rating-votes">({formatVotes(heroImdbRating.votes)})</span>}
+                  {(heroImdbRating.votes || hero.vote_count > 0) && (
+                    <span className="rating-votes">({heroImdbRating.votes ? formatVotes(heroImdbRating.votes) : formatVotes(String(hero.vote_count))})</span>
+                  )}
                 </span>
               ) : hero.vote_average > 0 ? (
                 <span
