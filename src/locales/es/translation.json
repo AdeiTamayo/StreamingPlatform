@@ -18,6 +18,50 @@
     "reload": "Recargar",
     "dismissNotification": "Descartar notificación"
   },
+  "media": {
+    "movie": "Película",
+    "tv": "Serie",
+    "series": "Serie",
+    "tvSeries": "Serie de TV",
+    "episodes_one": "{{count}} episodio",
+    "episodes_other": "{{count}} episodios",
+    "open": "Abrir {{title}}",
+    "openWithYear": "Abrir {{title}} ({{year}})",
+    "addWatchLater": "Añadir a Ver más tarde",
+    "removeWatchLater": "Quitar de Ver más tarde",
+    "addWatchLaterLabel": "Añadir {{title}} a Ver más tarde",
+    "removeWatchLaterLabel": "Quitar {{title}} de Ver más tarde",
+    "markSeen": "Marcar como vista",
+    "markSeriesSeen": "Marcar serie como vista",
+    "unmarkSeen": "Desmarcar como vista",
+    "markWatchedLabel": "Marcar {{title}} como vista",
+    "markUnwatchedLabel": "Marcar {{title}} como no vista"
+  },
+  "carousel": {
+    "label": "Carrusel multimedia",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "previousLabel": "{{label}} anterior",
+    "nextLabel": "{{label}} siguiente"
+  },
+  "pagination": {
+    "label": "Paginación",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente",
+    "prev": "Anterior",
+    "next": "Siguiente",
+    "pageOf": "Página {{page}} de {{total}}",
+    "goTo": "Ir a",
+    "goToPage": "Ir a la página",
+    "go": "Ir"
+  },
+  "rating": {
+    "imdb": "IMDb {{rating}}/10",
+    "tmdb": "Puntuación TMDB {{rating}}/10",
+    "votes_one": "{{value}} voto",
+    "votes_other": "{{value}} votos",
+    "rottenTomatoes": "Rotten Tomatoes {{value}}"
+  },
   "errors": {
     "somethingWentWrong": "Algo salió mal",
     "unexpected": "Se produjo un error inesperado. Inténtalo de nuevo."
@@ -172,6 +216,41 @@
       "errorsPartial": "No se pudieron cargar algunos estrenos. Se muestran los datos disponibles.",
       "errorsFailed": "No se pudieron cargar los estrenos. Inténtalo de nuevo."
     }
+  },
+  "home": {
+    "title": "Inicio",
+    "search": "Buscar",
+    "play": "Reproducir",
+    "featuredItems": "Contenido destacado",
+    "showItem": "Mostrar elemento {{number}}",
+    "continueWatching": "Seguir viendo",
+    "filterByType": "Filtrar por tipo",
+    "all": "Todos",
+    "allCount": "Todos ({{count}})",
+    "movies": "Películas",
+    "moviesCount": "Películas ({{count}})",
+    "series": "Series",
+    "seriesCount": "Series ({{count}})",
+    "nothingInCategory": "No hay nada en esta categoría",
+    "trendingThisWeek": "Tendencias de esta semana",
+    "filterTrendingByType": "Filtrar tendencias por tipo",
+    "trendingErrorTitle": "No se pudieron cargar las tendencias",
+    "trendingErrorBody": "Comprueba tu conexión y actualiza la página.",
+    "trendingEmptyTitle": "No hay tendencias ahora mismo",
+    "trendingEmptyBody": "Prueba otro filtro o vuelve más tarde.",
+    "browseByGenre": "Explorar por género",
+    "movieGenres": "géneros de películas",
+    "tvGenres": "géneros de series",
+    "movieFallback": "Película {{id}}",
+    "showFallback": "Serie {{id}}",
+    "seriesWithEpisode": "Serie · T{{season}}E{{episode}}",
+    "restartTitle": "Reiniciar desde el principio",
+    "restartLabel": "Reiniciar {{title}} desde el principio",
+    "removeCwTitle": "Quitar de Seguir viendo",
+    "removeCwLabel": "Quitar {{title}} de Seguir viendo",
+    "toastTrendingFailed": "No se pudieron cargar las tendencias",
+    "toastRemovedCw": "Eliminado de Seguir viendo",
+    "toastRestarting": "Reiniciando desde el principio"
   },
   "toast": {
     "tmdbCacheCleared": "Caché de TMDB borrada",

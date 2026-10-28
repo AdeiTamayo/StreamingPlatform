@@ -18,6 +18,50 @@
     "reload": "Birkargatu",
     "dismissNotification": "Baztertu jakinarazpena"
   },
+  "media": {
+    "movie": "Filma",
+    "tv": "Telesaila",
+    "series": "Telesaila",
+    "tvSeries": "TB telesaila",
+    "episodes_one": "{{count}} atal",
+    "episodes_other": "{{count}} atal",
+    "open": "Ireki {{title}}",
+    "openWithYear": "Ireki {{title}} ({{year}})",
+    "addWatchLater": "Gehitu Geroago ikusi-ra",
+    "removeWatchLater": "Kendu Geroago ikusi-tik",
+    "addWatchLaterLabel": "Gehitu {{title}} Geroago ikusi-ra",
+    "removeWatchLaterLabel": "Kendu {{title}} Geroago ikusi-tik",
+    "markSeen": "Markatu ikusita",
+    "markSeriesSeen": "Markatu telesaila ikusita",
+    "unmarkSeen": "Kendu ikusita-marka",
+    "markWatchedLabel": "Markatu {{title}} ikusita",
+    "markUnwatchedLabel": "Markatu {{title}} ikusi gabe"
+  },
+  "carousel": {
+    "label": "Multimedia karusela",
+    "previous": "Aurrekoa",
+    "next": "Hurrengoa",
+    "previousLabel": "{{label}} aurrekoa",
+    "nextLabel": "{{label}} hurrengoa"
+  },
+  "pagination": {
+    "label": "Orrialdeketa",
+    "previousPage": "Aurreko orrialdea",
+    "nextPage": "Hurrengo orrialdea",
+    "prev": "Aurrekoa",
+    "next": "Hurrengoa",
+    "pageOf": "{{total}} orrialdetik {{page}}. orrialdea",
+    "goTo": "Joan",
+    "goToPage": "Joan orrialdera",
+    "go": "Joan"
+  },
+  "rating": {
+    "imdb": "IMDb {{rating}}/10",
+    "tmdb": "TMDB puntuazioa {{rating}}/10",
+    "votes_one": "{{value}} boto",
+    "votes_other": "{{value}} boto",
+    "rottenTomatoes": "Rotten Tomatoes {{value}}"
+  },
   "errors": {
     "somethingWentWrong": "Zerbait oker joan da",
     "unexpected": "Ustekabeko errore bat gertatu da. Saiatu berriro."
@@ -172,6 +216,41 @@
       "errorsPartial": "Estreinaldi batzuk ezin izan dira kargatu. Eskuragarri dauden datuak erakusten ari dira.",
       "errorsFailed": "Ezin izan dira estreinaldiak kargatu. Saiatu berriro."
     }
+  },
+  "home": {
+    "title": "Hasiera",
+    "search": "Bilatu",
+    "play": "Erreproduzitu",
+    "featuredItems": "Nabarmendutako elementuak",
+    "showItem": "Erakutsi {{number}}. elementua",
+    "continueWatching": "Ikusten jarraitu",
+    "filterByType": "Iragazi motaren arabera",
+    "all": "Guztiak",
+    "allCount": "Guztiak ({{count}})",
+    "movies": "Filmak",
+    "moviesCount": "Filmak ({{count}})",
+    "series": "Telesailak",
+    "seriesCount": "Telesailak ({{count}})",
+    "nothingInCategory": "Ez dago ezer kategoria honetan",
+    "trendingThisWeek": "Aste honetako joerak",
+    "filterTrendingByType": "Iragazi joerak motaren arabera",
+    "trendingErrorTitle": "Ezin izan dira joerak kargatu",
+    "trendingErrorBody": "Egiaztatu zure konexioa eta freskatu orria.",
+    "trendingEmptyTitle": "Ez dago joerarik oraintxe",
+    "trendingEmptyBody": "Probatu beste iragazki bat edo itzuli geroago.",
+    "browseByGenre": "Arakatu generoaren arabera",
+    "movieGenres": "film generoak",
+    "tvGenres": "telesail generoak",
+    "movieFallback": "{{id}}. filma",
+    "showFallback": "{{id}}. telesaila",
+    "seriesWithEpisode": "Telesaila · S{{season}}E{{episode}}",
+    "restartTitle": "Hasi berriro hasieratik",
+    "restartLabel": "Hasi {{title}} berriro hasieratik",
+    "removeCwTitle": "Kendu Ikusten jarraitu-tik",
+    "removeCwLabel": "Kendu {{title}} Ikusten jarraitu-tik",
+    "toastTrendingFailed": "Ezin izan dira joerak kargatu",
+    "toastRemovedCw": "Kendu egin da Ikusten jarraitu-tik",
+    "toastRestarting": "Hasieratik berrabiarazten"
   },
   "toast": {
     "tmdbCacheCleared": "TMDB cachea garbitu da",

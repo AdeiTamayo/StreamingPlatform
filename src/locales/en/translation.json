@@ -18,6 +18,50 @@
     "reload": "Reload",
     "dismissNotification": "Dismiss notification"
   },
+  "media": {
+    "movie": "Movie",
+    "tv": "TV",
+    "series": "Series",
+    "tvSeries": "TV Series",
+    "episodes_one": "{{count}} episode",
+    "episodes_other": "{{count}} episodes",
+    "open": "Open {{title}}",
+    "openWithYear": "Open {{title}} ({{year}})",
+    "addWatchLater": "Add to Watch Later",
+    "removeWatchLater": "Remove from Watch Later",
+    "addWatchLaterLabel": "Add {{title}} to Watch Later",
+    "removeWatchLaterLabel": "Remove {{title}} from Watch Later",
+    "markSeen": "Mark as seen",
+    "markSeriesSeen": "Mark series as seen",
+    "unmarkSeen": "Unmark watched",
+    "markWatchedLabel": "Mark {{title}} as watched",
+    "markUnwatchedLabel": "Mark {{title}} as unwatched"
+  },
+  "carousel": {
+    "label": "Media carousel",
+    "previous": "Previous",
+    "next": "Next",
+    "previousLabel": "Previous {{label}}",
+    "nextLabel": "Next {{label}}"
+  },
+  "pagination": {
+    "label": "Pagination",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "prev": "Prev",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{total}}",
+    "goTo": "Go to",
+    "goToPage": "Go to page",
+    "go": "Go"
+  },
+  "rating": {
+    "imdb": "IMDb {{rating}}/10",
+    "tmdb": "TMDB rating {{rating}}/10",
+    "votes_one": "{{value}} vote",
+    "votes_other": "{{value}} votes",
+    "rottenTomatoes": "Rotten Tomatoes {{value}}"
+  },
   "errors": {
     "somethingWentWrong": "Something went wrong",
     "unexpected": "An unexpected error occurred. Please try again."
@@ -172,6 +216,41 @@
       "errorsPartial": "Some releases could not be loaded. Displaying available data.",
       "errorsFailed": "Failed to load releases. Please try again."
     }
+  },
+  "home": {
+    "title": "Home",
+    "search": "Search",
+    "play": "Play",
+    "featuredItems": "Featured items",
+    "showItem": "Show item {{number}}",
+    "continueWatching": "Continue Watching",
+    "filterByType": "Filter by type",
+    "all": "All",
+    "allCount": "All ({{count}})",
+    "movies": "Movies",
+    "moviesCount": "Movies ({{count}})",
+    "series": "Series",
+    "seriesCount": "Series ({{count}})",
+    "nothingInCategory": "Nothing in this category",
+    "trendingThisWeek": "Trending This Week",
+    "filterTrendingByType": "Filter trending by type",
+    "trendingErrorTitle": "Couldn’t load trending",
+    "trendingErrorBody": "Check your connection, then refresh the page.",
+    "trendingEmptyTitle": "No trending titles right now",
+    "trendingEmptyBody": "Try a different filter or come back a little later.",
+    "browseByGenre": "Browse by genre",
+    "movieGenres": "movie genres",
+    "tvGenres": "TV genres",
+    "movieFallback": "Movie {{id}}",
+    "showFallback": "Show {{id}}",
+    "seriesWithEpisode": "Series · S{{season}}E{{episode}}",
+    "restartTitle": "Restart from the beginning",
+    "restartLabel": "Restart {{title}} from the beginning",
+    "removeCwTitle": "Remove from Continue Watching",
+    "removeCwLabel": "Remove {{title}} from Continue Watching",
+    "toastTrendingFailed": "Failed to load trending",
+    "toastRemovedCw": "Removed from Continue Watching",
+    "toastRestarting": "Restarting from the beginning"
   },
   "toast": {
     "tmdbCacheCleared": "TMDB cache cleared",
