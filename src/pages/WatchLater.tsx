@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { usePageTitle } from "../i18n/usePageTitle";
 import {
   getWatchLater,
   removeWatchLater,
@@ -201,10 +203,9 @@ export default function WatchLater() {
   const [epItems, setEpItems] = useState<EpisodeWatchLaterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
-  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [calendarError, setCalendarError] = useState<"partial" | "failed" | null>(null);
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([]);
   const [calendarHasLoaded, setCalendarHasLoaded] = useState(false);
-  // Read once per mount; navigating back from Settings remounts the page.
   const [timeZone] = useState(getEffectiveTimezone);
   const todayStr = useMemo(
     () => toZonedDateString(Date.now(), timeZone),
@@ -236,7 +237,10 @@ export default function WatchLater() {
   const calendarInitedRef = useRef(false);
   const loadingCalendarRef = useRef(false);
   const toast = useToast();
+  const { t } = useTranslation();
   const { getSignal } = useAbortController();
+
+  usePageTitle(t("watchLater.title"));
 
   const fetchTVFutureEpisodes = useCallback(
     async (
@@ -596,18 +600,15 @@ export default function WatchLater() {
     // is (or is about to be) on screen even if the last flush hasn't
     // re-rendered yet.
     if (hasErrors && seenKeys.size > 0) {
-      setCalendarError(
-        "Some releases could not be loaded. Displaying available data.",
-      );
+      setCalendarError("partial");
     } else if (hasErrors && seenKeys.size === 0) {
-      setCalendarError("Failed to load releases. Please try again.");
+      setCalendarError("failed");
     }
     loadingCalendarRef.current = false;
     setLoadingCalendar(false);
   }, [fetchTVFutureEpisodes, fetchMovieRelease, getSignal]);
 
   useEffect(() => {
-    document.title = "Watch Later - StreamFlow";
     const wl = getWatchLater();
     const epwl = getEpisodeWatchLater();
     setItems(wl);
@@ -685,7 +686,7 @@ export default function WatchLater() {
         return type === "movie" ? c.type !== "movie" : c.type !== "episode";
       }),
     );
-    toast?.("Removed from Watch Later");
+    toast?.(t("watchLater.toastRemoved"));
   }
 
   function handleRemoveEp(
@@ -705,7 +706,7 @@ export default function WatchLater() {
           ),
       ),
     );
-    toast?.("Removed from Watch Later");
+    toast?.(t("watchLater.toastRemoved"));
   }
 
   const handleRemoveSelected = useCallback(
@@ -747,11 +748,11 @@ export default function WatchLater() {
       );
       toast?.(
         keys.length === 1
-          ? "Removed from Watch Later"
-          : `Removed ${keys.length} titles from Watch Later`,
+          ? t("watchLater.toastRemoved")
+          : t("watchLater.toastRemovedMany", { count: keys.length }),
       );
     },
-    [toast],
+    [toast, t],
   );
 
   // Single choke point for everything rendered: state is deduped here so
@@ -981,9 +982,10 @@ export default function WatchLater() {
           <section className="section">
             <div className={styles.calHeader}>
               <div>
-                <h2 className="section-title">Release Calendar</h2>
+                <h2 className="section-title">
+                  {t("watchLater.calendar.title")}
+                </h2>
               </div>
-
               <div className={styles.calHeaderActions}>
                 <div className={styles.calSkeletonBtn} />
                 <div className={styles.calSkeletonBtn} />
@@ -1027,13 +1029,13 @@ export default function WatchLater() {
         <section className="section">
           <div className={styles.calHeader}>
             <div>
-              <h2 className="section-title">Release Calendar</h2>
+              <h2 className="section-title">{t("watchLater.calendar.title")}</h2>
 
               <span className={styles.calSubtitle}>
                 {loadingCalendar && calendarHasLoaded
-                  ? " · Updating…"
+                  ? ` · ${t("watchLater.calendar.updating")}`
                   : loadingCalendar
-                    ? " · Loading…"
+                    ? ` · ${t("watchLater.calendar.loading")}`
                     : ""}
               </span>
             </div>
@@ -1049,15 +1051,15 @@ export default function WatchLater() {
 
                   setSelectedDate(todayStr);
                 }}
-              >
-                Today
-              </button>
+                >
+                  {t("watchLater.calendar.today")}
+                </button>
 
               <button
                 className={styles.viewToggle}
                 onClick={() => setView("list")}
               >
-                Back to List
+                {t("watchLater.calendar.backToList")}
               </button>
             </div>
           </div>
@@ -1067,7 +1069,11 @@ export default function WatchLater() {
               <button
                 className={styles.calNav}
                 onClick={prevMonth}
-                aria-label={`Previous month, ${getMonthName(calMonth === 0 ? 11 : calMonth - 1)} ${calMonth === 0 ? calYear - 1 : calYear}`}
+                aria-label={t("watchLater.calendar.previousMonth", {
+                  month:
+                    getMonthName(calMonth === 0 ? 11 : calMonth - 1),
+                  year: calMonth === 0 ? calYear - 1 : calYear,
+                })}
               >
                 ←
               </button>
@@ -1079,7 +1085,10 @@ export default function WatchLater() {
               <button
                 className={styles.calNav}
                 onClick={nextMonth}
-                aria-label={`Next month, ${getMonthName(calMonth === 11 ? 0 : calMonth + 1)} ${calMonth === 11 ? calYear + 1 : calYear}`}
+                aria-label={t("watchLater.calendar.nextMonth", {
+                  month: getMonthName(calMonth === 11 ? 0 : calMonth + 1),
+                  year: calMonth === 11 ? calYear + 1 : calYear,
+                })}
               >
                 →
               </button>
@@ -1107,7 +1116,10 @@ export default function WatchLater() {
 
                 const selected = cell.isSelected;
 
-                const cellLabel = `${cell.accessibleLabel}, ${releases.length} release${releases.length === 1 ? "" : "s"}${selected ? ", selected" : ""}`;
+                const cellLabel = `${t("watchLater.calendar.dayLabel", {
+                  date: cell.accessibleLabel,
+                  count: releases.length,
+                })}${selected ? t("watchLater.calendar.selectedSuffix") : ""}`;
                 return (
                   <button
                     key={cell.isoString}
@@ -1157,13 +1169,19 @@ export default function WatchLater() {
 
           {calendarError && (
             <div className={styles.calendarError} role="alert">
-              <span>{calendarError}</span>
+              <span>
+                {calendarError === "partial"
+                  ? t("watchLater.calendar.errorsPartial")
+                  : t("watchLater.calendar.errorsFailed")}
+              </span>
               <button
                 className={styles.retryBtn}
                 onClick={loadCalendarItems}
                 disabled={loadingCalendar}
               >
-                {loadingCalendar ? "Retrying..." : "Retry"}
+                {loadingCalendar
+                  ? t("watchLater.calendar.retrying")
+                  : t("common.retry")}
               </button>
             </div>
           )}
@@ -1174,15 +1192,12 @@ export default function WatchLater() {
                 <div className={styles.dayPanelHeader}>
                   <h3>{formatDate(selectedDate)}</h3>
 
-                  <span>
-                    {selectedItems.length} release
-                    {selectedItems.length !== 1 && "s"}
-                  </span>
+                  <span>{t("watchLater.calendar.releaseCount", { count: selectedItems.length })}</span>
                 </div>
 
                 {selectedItems.length === 0 ? (
                   <div className={styles.emptyDay}>
-                    Nothing releases on this day.
+                    {t("watchLater.calendar.nothingOnDay")}
                   </div>
                 ) : (
                   <div
@@ -1193,21 +1208,25 @@ export default function WatchLater() {
                         key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
                         className={styles.releaseCard}
                       >
-                        <img
-                          src={imageUrl(item.poster ?? null, "w185")}
-                          alt={`${item.title} poster`}
-                          loading="lazy"
-                          className={styles.releasePoster}
-                        />
+                          <img
+                            src={imageUrl(item.poster ?? null, "w185")}
+                            alt={t("watchLater.calendar.posterAlt", {
+                              title: item.title,
+                            })}
+                            loading="lazy"
+                            className={styles.releasePoster}
+                          />
 
                         <div className={styles.releaseInfo}>
                           <h4>{item.title}</h4>
 
                           <span>
                             {item.type === "movie"
-                              ? "Movie"
-                              : `Season ${item.season}
-                                   Episode ${item.episode}`}
+                              ? t("watchLater.movie")
+                              : t("watchLater.calendar.seasonEpisode", {
+                                  season: item.season,
+                                  episode: item.episode,
+                                })}
                             {item.airTimestamp != null && (
                               <>
                                 {" · "}
@@ -1233,9 +1252,9 @@ export default function WatchLater() {
                               ? `/movie/${item.id}`
                               : `/tv/${item.id}?season=${item.season}&episode=${item.episode}`
                           }
-                        >
-                          Open
-                        </Link>
+                          >
+                            {t("watchLater.open")}
+                          </Link>
                       </div>
                     ))}
                   </div>
@@ -1243,7 +1262,7 @@ export default function WatchLater() {
               </>
             ) : (
               <div className={styles.emptyDay}>
-                Select a day to see upcoming releases.
+                {t("watchLater.calendar.selectDay")}
               </div>
             )}
           </div>
@@ -1256,8 +1275,8 @@ export default function WatchLater() {
     <div className="page">
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Personal library</p>
-          <h1>Watch Later</h1>
+          <p className="eyebrow">{t("watchLater.eyebrow")}</p>
+          <h1>{t("watchLater.title")}</h1>
         </div>
       </div>
 
@@ -1266,20 +1285,17 @@ export default function WatchLater() {
           <CollectionSkeleton variant="grid" count={6} />
         ) : items.length === 0 && epItems.length === 0 ? (
           <div className="empty-state">
-            <h3>Nothing saved yet</h3>
-            <p>
-              Save movies, shows, or individual episodes to build your
-              personal watchlist and release calendar.
-            </p>
+            <h3>{t("watchLater.emptyTitle")}</h3>
+            <p>{t("watchLater.emptyDescription")}</p>
             <div className="empty-state-actions">
               <Link to="/movies" className="empty-state-action">
-                Browse Movies
+                {t("watchLater.browseMovies")}
               </Link>
               <Link to="/tv" className="empty-state-action">
-                Explore TV Shows
+                {t("watchLater.exploreTvShows")}
               </Link>
               <Link to="/" className="empty-state-action">
-                Browse Trending
+                {t("watchLater.browseTrending")}
               </Link>
             </div>
           </div>
@@ -1291,21 +1307,21 @@ export default function WatchLater() {
                   <input
                     type="text"
                     className={styles.wlSearch}
-                    placeholder="Filter by title..."
+                    placeholder={t("watchLater.filterPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
                       setPage(1);
                       setEpPage(1);
                     }}
-                    aria-label="Filter by title"
+                    aria-label={t("watchLater.filterLabel")}
                   />
                   <TypeToggle
                     value={filterType}
                     options={[
-                      { value: "all", label: "All" },
-                      { value: "movies", label: "Movies" },
-                      { value: "tv", label: "TV Shows" },
+                      { value: "all", label: t("watchLater.all") },
+                      { value: "movies", label: t("watchLater.movies") },
+                      { value: "tv", label: t("watchLater.tvShows") },
                     ]}
                     onChange={(v) => {
                       setFilterType(v);
@@ -1333,14 +1349,14 @@ export default function WatchLater() {
                     }
                     value={`${sortBy}-${sortDir}`}
                     options={[
-                      { value: "added-desc", label: "Recently added" },
-                      { value: "added-asc", label: "Oldest added" },
-                      { value: "title-asc", label: "Title A–Z" },
-                      { value: "title-desc", label: "Title Z–A" },
-                      { value: "year-desc", label: "Year (newest)" },
-                      { value: "year-asc", label: "Year (oldest)" },
+                      { value: "added-desc", label: t("watchLater.sortRecentlyAdded") },
+                      { value: "added-asc", label: t("watchLater.sortOldestAdded") },
+                      { value: "title-asc", label: t("watchLater.sortTitleAsc") },
+                      { value: "title-desc", label: t("watchLater.sortTitleDesc") },
+                      { value: "year-desc", label: t("watchLater.sortYearNewest") },
+                      { value: "year-asc", label: t("watchLater.sortYearOldest") },
                     ]}
-                    placeholder="Recently added"
+                    placeholder={t("watchLater.sortRecentlyAdded")}
                     onSelect={(v: string) => {
                       const [field, dir] = v.split("-");
                       setSortBy(field);
@@ -1352,7 +1368,10 @@ export default function WatchLater() {
                 </div>
                 <div className={styles.wlMeta}>
                   <span className={styles.wlCount}>
-                    {visibleTitleCount} of {totalTitleCount} titles
+                    {t("watchLater.count", {
+                      visible: visibleTitleCount,
+                      total: totalTitleCount,
+                    })}
                   </span>
                   <div className={styles.wlMetaActions}>
                     {unreleasedKeys.size > 0 && (
@@ -1361,8 +1380,8 @@ export default function WatchLater() {
                         onClick={() => setHideUnreleasedPosters((v) => !v)}
                         title={
                           hideUnreleasedPosters
-                            ? "Show unreleased titles"
-                            : "Hide unreleased titles"
+                            ? t("watchLater.showUnreleasedTitle")
+                            : t("watchLater.hideUnreleasedTitle")
                         }
                       >
                         <svg
@@ -1391,8 +1410,8 @@ export default function WatchLater() {
                           )}
                         </svg>
                         {hideUnreleasedPosters
-                          ? "Show unreleased"
-                          : "Hide unreleased"}
+                          ? t("watchLater.showUnreleased")
+                          : t("watchLater.hideUnreleased")}
                       </button>
                     )}
                     {(filterType !== "all" ||
@@ -1410,22 +1429,24 @@ export default function WatchLater() {
                           setEpPage(1);
                         }}
                       >
-                        Clear filters
+                        {t("watchLater.clearFilters")}
                       </button>
                     )}
                     <button
                       className={`${styles.wlMetaBtn} ${selectMode ? styles.active : ""}`}
                       onClick={toggleSelectMode}
                       aria-pressed={selectMode}
-                      aria-label={selectMode ? "Done" : "Select"}
+                      aria-label={
+                        selectMode ? t("common.done") : t("common.select")
+                      }
                       title={
                         selectMode
-                          ? "Exit selection"
-                          : "Select multiple titles"
+                          ? t("watchLater.exitSelection")
+                          : t("watchLater.selectTitle")
                       }
                     >
                       <SelectIcon />
-                      {selectMode ? "Done" : "Select"}
+                      {selectMode ? t("common.done") : t("common.select")}
                     </button>
                   </div>
                 </div>
@@ -1444,11 +1465,8 @@ export default function WatchLater() {
                 )}
                 {hasNoMatches && (
                   <div className="empty-state">
-                    <h3>No matches</h3>
-                    <p>
-                      No titles match your current filters. Try a different
-                      search or clear the filters.
-                    </p>
+                    <h3>{t("watchLater.noMatchesTitle")}</h3>
+                    <p>{t("watchLater.noMatchesDescription")}</p>
                   </div>
                 )}
                 {sortedItems.length > 0 && (
@@ -1467,7 +1485,9 @@ export default function WatchLater() {
                                 wlKey(item.type, item.id),
                               )}
                               onChange={() => toggleKey(wlKey(item.type, item.id))}
-                              aria-label={`Select ${item.title}`}
+                              aria-label={t("watchLater.selectItem", {
+                                title: item.title,
+                              })}
                             />
                           )}
                           <Link
@@ -1487,7 +1507,7 @@ export default function WatchLater() {
                                 className="media-card-rating"
                               />
                               <span className={`media-card-type ${item.type}`}>
-                                {item.type === "tv" ? "TV" : "Movie"}
+                                {item.type === "tv" ? t("watchLater.tv") : t("watchLater.movie")}
                               </span>
                             </div>
                             <div className="media-card-info">
@@ -1503,7 +1523,7 @@ export default function WatchLater() {
                             <button
                               className="wl-remove"
                               onClick={() => handleRemove(item.type, item.id)}
-                              title="Remove"
+                              title={t("common.remove")}
                             >
                               <CloseIcon />
                             </button>
@@ -1524,7 +1544,9 @@ export default function WatchLater() {
             )}
             {visibleEpItems.length > 0 && (
               <>
-                <h3 className="sub-section-title">Episodes</h3>
+                <h3 className="sub-section-title">
+                  {t("watchLater.episodes")}
+                </h3>
                 <div className="media-grid">
                   {epPageSlice.map((item) => {
                     const key = epKey(item.showId, item.season, item.episode);
@@ -1539,7 +1561,11 @@ export default function WatchLater() {
                             className={bulkStyles.selectBox}
                             checked={selectedKeys.has(key)}
                             onChange={() => toggleKey(key)}
-                            aria-label={`Select ${item.showTitle} S${item.season} E${item.episode}`}
+                            aria-label={t("watchLater.selectEpisode", {
+                              title: item.showTitle,
+                              season: item.season,
+                              episode: item.episode,
+                            })}
                           />
                         )}
                         <Link
@@ -1586,9 +1612,9 @@ export default function WatchLater() {
         {(items.length > 0 || epItems.length > 0) && (
           <div className={styles.upcomingBanner}>
             {loadingCalendar && calendarItems.length === 0 ? (
-              <span className={styles.upcomingToggleLabel}>
-                Loading releases…
-              </span>
+                <span className={styles.upcomingToggleLabel}>
+                  {t("watchLater.upcoming.loading")}
+                </span>
             ) : upcomingCalendarCount > 0 ? (
               <button
                 className={styles.upcomingToggle}
@@ -1610,7 +1636,9 @@ export default function WatchLater() {
                   <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <span className={styles.upcomingToggleLabel}>
-                  {upcomingCalendarCount} upcoming
+                  {t("watchLater.upcoming.count", {
+                    count: upcomingCalendarCount,
+                  })}
                   {loadingCalendar ? " ···" : ""}
                 </span>
                 <span className={styles.upcomingToggleArrow}>
@@ -1619,13 +1647,13 @@ export default function WatchLater() {
               </button>
             ) : (
               <span className={styles.upcomingToggleLabel}>
-                No upcoming releases
+                {t("watchLater.upcoming.none")}
               </span>
             )}
             <button
               className={styles.calIconBtn}
               onClick={() => setView("calendar")}
-              aria-label="View full calendar"
+              aria-label={t("watchLater.upcoming.viewCalendar")}
             >
               <svg
                 width="18"
@@ -1692,7 +1720,7 @@ export default function WatchLater() {
                       </div>
                       <div className={styles.upcomingItemDetail}>
                         {item.type === "movie"
-                          ? "Movie"
+                          ? t("watchLater.movie")
                           : `S${item.season} E${item.episode ?? "\u2014"}`}
                         {item.episodeTitle && (
                           <span> &middot; {item.episodeTitle}</span>
@@ -1718,7 +1746,7 @@ export default function WatchLater() {
                       }
                       className={styles.upcomingItemOpen}
                     >
-                      Open
+                      {t("watchLater.open")}
                     </Link>
                   </div>
                 ))}

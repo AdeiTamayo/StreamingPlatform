@@ -1,4 +1,5 @@
 import { Component, ErrorInfo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { logError } from '../utils/logger';
 
 interface ErrorBoundaryProps {
@@ -19,6 +20,25 @@ interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
   resetKey: string | number | undefined;
+}
+
+// Functional child so the fallback re-renders when the language changes; the
+// boundary itself is a class and cannot use hooks.
+function ErrorFallback({ onRetry, onReload }: { onRetry: () => void; onReload: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="page" role="alert">
+      <div className="empty-state">
+        <h3>{t('errors.somethingWentWrong')}</h3>
+        <p>{t('errors.unexpected')}</p>
+        <div className="empty-state-actions">
+          <button className="empty-state-action" onClick={onRetry}>{t('common.tryAgain')}</button>
+          <a className="empty-state-action" href="/">{t('common.goHome')}</a>
+          <button className="empty-state-action" onClick={onReload}>{t('common.reload')}</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -56,19 +76,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
-      return (
-        <div className="page" role="alert">
-          <div className="empty-state">
-            <h3>Something went wrong</h3>
-            <p>An unexpected error occurred. Please try again.</p>
-            <div className="empty-state-actions">
-              <button className="empty-state-action" onClick={this.handleRetry}>Try Again</button>
-              <a className="empty-state-action" href="/">Go home</a>
-              <button className="empty-state-action" onClick={this.handleReload}>Reload</button>
-            </div>
-          </div>
-        </div>
-      );
+      return <ErrorFallback onRetry={this.handleRetry} onReload={this.handleReload} />;
     }
     return this.props.children;
   }

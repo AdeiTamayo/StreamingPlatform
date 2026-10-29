@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface PaginationProps {
   page: number;
@@ -10,6 +11,7 @@ interface PaginationProps {
 }
 
 const Pagination = ({ page, totalPages, onChange, label, className, style }: PaginationProps) => {
+  const { t } = useTranslation();
   const [goTo, setGoTo] = useState('');
 
   // Clear the "Go to" field whenever the page changes from any source
@@ -33,10 +35,10 @@ const Pagination = ({ page, totalPages, onChange, label, className, style }: Pag
   }
 
   return (
-    <nav className={`pagination${className ? ` ${className}` : ''}`} style={style} aria-label="Pagination">
-      <button type="button" disabled={safePage <= 1} onClick={() => onChange(safePage - 1)} aria-label="Previous page">Prev</button>
-      <span aria-current="page" role="status" aria-live="polite">{label ?? `Page ${safePage} of ${totalPages}`}</span>
-      <button type="button" disabled={safePage >= totalPages} onClick={() => onChange(safePage + 1)} aria-label="Next page">Next</button>
+    <nav className={`pagination${className ? ` ${className}` : ''}`} style={style} aria-label={t('pagination.label')}>
+      <button type="button" disabled={safePage <= 1} onClick={() => onChange(safePage - 1)} aria-label={t('pagination.previousPage')}>{t('pagination.prev')}</button>
+      <span aria-current="page" role="status" aria-live="polite">{label ?? t('pagination.pageOf', { page: safePage, total: totalPages })}</span>
+      <button type="button" disabled={safePage >= totalPages} onClick={() => onChange(safePage + 1)} aria-label={t('pagination.nextPage')}>{t('pagination.next')}</button>
       <form className="pagination-go" onSubmit={handleGo}>
         <input
           className="pagination-input"
@@ -44,11 +46,11 @@ const Pagination = ({ page, totalPages, onChange, label, className, style }: Pag
           min={1}
           max={totalPages}
           value={goTo}
-          placeholder="Go to"
-          aria-label="Go to page"
+          placeholder={t('pagination.goTo')}
+          aria-label={t('pagination.goToPage')}
           onChange={(e) => setGoTo(e.target.value)}
         />
-        <button type="submit" disabled={!goTo.trim()}>Go</button>
+        <button type="submit" disabled={!goTo.trim()}>{t('pagination.go')}</button>
       </form>
     </nav>
   );

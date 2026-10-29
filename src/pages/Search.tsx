@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type KeyboardEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { searchMulti, searchMovies, searchTV, getPersonCredits, getMovieGenres, getTVGenres, getCountries, getLanguages } from '../api/tmdb';
 import MediaCard from '../components/MediaCard';
 import Pagination from '../components/Pagination';
@@ -10,36 +11,10 @@ import TypeToggle from '../components/TypeToggle';
 import type { PersonListPerson } from '../components/PersonList';
 import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
+import { usePageTitle } from '../i18n/usePageTitle';
 import type { TMDBMovie, TMDBSeries, TMDBPersonCredits, TMDBGenre, TMDBCountry, TMDBLanguage, FilterOption } from '../types';
 import SearchBar, { SearchSelectField } from '../components/SearchBar';
 import styles from './Search.module.css';
-
-const TYPE_TABS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'movie', label: 'Movies' },
-  { value: 'tv', label: 'TV Shows' },
-];
-
-const MOVIE_SORT_OPTIONS: FilterOption[] = [
-  { value: 'popularity.desc', label: 'Popularity' },
-  { value: 'vote_average.desc', label: 'Rating' },
-  { value: 'primary_release_date.desc', label: 'Release date (newest)' },
-  { value: 'primary_release_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_title.asc', label: 'Title A–Z' },
-];
-
-const TV_SORT_OPTIONS: FilterOption[] = [
-  { value: 'popularity.desc', label: 'Popularity' },
-  { value: 'vote_average.desc', label: 'Rating' },
-  { value: 'first_air_date.desc', label: 'Release date (newest)' },
-  { value: 'first_air_date.asc', label: 'Release date (oldest)' },
-  { value: 'original_name.asc', label: 'Title A–Z' },
-];
-
-const YEAR_OPTIONS: FilterOption[] = [
-  { value: '', label: 'Any year' },
-  ...Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i).map((y) => ({ value: String(y), label: String(y) })),
-];
 
 const PAGE_SIZE = 20;
 
@@ -71,6 +46,7 @@ function makeComparator(sortBy: string): (a: TMDBMovie | TMDBSeries, b: TMDBMovi
 }
 
 export default function Search() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const personId = searchParams.get('person') || '';
@@ -105,17 +81,40 @@ export default function Search() {
   const [showMore, setShowMore] = useState(false);
   const [pageHint, setPageHint] = useState('');
 
-  useEffect(() => {
-    if (personId) {
-      document.title = query.trim()
-        ? `Movies & TV featuring ${query.trim()} - StreamFlow`
-        : 'Movies & TV shows - StreamFlow';
-    } else if (query.trim()) {
-      document.title = `Search: ${query.trim()} - StreamFlow`;
-    } else {
-      document.title = 'Search - StreamFlow';
-    }
-  }, [query, personId]);
+  const typeTabs: FilterOption[] = [
+    { value: 'all', label: t('search.typeAll') },
+    { value: 'movie', label: t('search.typeMovies') },
+    { value: 'tv', label: t('search.typeTv') },
+  ];
+  const movieSortOptions: FilterOption[] = [
+    { value: 'popularity.desc', label: t('search.sortPopularity') },
+    { value: 'vote_average.desc', label: t('search.sortRating') },
+    { value: 'primary_release_date.desc', label: t('search.sortReleaseNewest') },
+    { value: 'primary_release_date.asc', label: t('search.sortReleaseOldest') },
+    { value: 'original_title.asc', label: t('search.sortTitleAsc') },
+  ];
+  const tvSortOptions: FilterOption[] = [
+    { value: 'popularity.desc', label: t('search.sortPopularity') },
+    { value: 'vote_average.desc', label: t('search.sortRating') },
+    { value: 'first_air_date.desc', label: t('search.sortReleaseNewest') },
+    { value: 'first_air_date.asc', label: t('search.sortReleaseOldest') },
+    { value: 'original_name.asc', label: t('search.sortTitleAsc') },
+  ];
+  const yearOptions: FilterOption[] = [
+    { value: '', label: t('search.anyYear') },
+    ...Array.from({ length: new Date().getFullYear() - 1899 }, (_, i) => new Date().getFullYear() - i)
+      .map((yearValue) => ({ value: String(yearValue), label: String(yearValue) })),
+  ];
+
+  usePageTitle(
+    personId
+      ? query.trim()
+        ? t('search.personDocumentTitle', { query: query.trim() })
+        : t('search.personDocumentTitlePlain')
+      : query.trim()
+        ? t('search.queryDocumentTitle', { query: query.trim() })
+        : t('search.documentTitle'),
+  );
   useEffect(() => { setHistory(getSearchHistory()); }, []);
 
   useEffect(() => {
@@ -275,11 +274,11 @@ export default function Search() {
       : results;
 
   const genreNames = Array.from(new Set([...genresMovie, ...genresTv].map((g) => g.name))).sort();
-  const genreOptions: FilterOption[] = [{ value: '', label: 'All genres' }, ...genreNames.map((name) => ({ value: name, label: name }))];
-  const countryOptions: FilterOption[] = [{ value: '', label: 'All countries' }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
-  const languageOptions: FilterOption[] = [{ value: '', label: 'Original language' }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
-  const sortOptions = tab === 'tv' ? TV_SORT_OPTIONS : MOVIE_SORT_OPTIONS;
-  const sortOptionList: FilterOption[] = [{ value: '', label: 'Sort by' }, ...sortOptions];
+  const genreOptions: FilterOption[] = [{ value: '', label: t('search.allGenres') }, ...genreNames.map((name) => ({ value: name, label: name }))];
+  const countryOptions: FilterOption[] = [{ value: '', label: t('search.allCountries') }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
+  const languageOptions: FilterOption[] = [{ value: '', label: t('search.originalLanguage') }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
+  const sortOptions = tab === 'tv' ? tvSortOptions : movieSortOptions;
+  const sortOptionList: FilterOption[] = [{ value: '', label: t('search.sortBy') }, ...sortOptions];
 
   const filtersActive = !!(country || genreFilter || year || sortBy || releaseDateFrom || releaseDateUntil || language || voteCount);
 
@@ -323,21 +322,21 @@ export default function Search() {
     if (personId || !filtersActive || loading || error) return;
     if (refinedEmpty && page > 1) {
       setPage(page - 1);
-      setPageHint(`No matches on page ${page}. Showing an earlier page.`);
+      setPageHint(t('search.pageHint', { page }));
     } else if (pageHint && (!refinedEmpty || page === 1)) {
       setPageHint('');
     }
   }, [personId, filtersActive, loading, error, refinedEmpty, page, pageHint]);
 
   const activeFilters = [
-    country ? { key: 'country', label: `Country: ${countryOptions.find((o) => o.value === country)?.label || country}` } : null,
-    genreFilter ? { key: 'genre', label: `Genre: ${genreFilter}` } : null,
-    year ? { key: 'year', label: `Year: ${year}` } : null,
-    sortBy ? { key: 'sortBy', label: `Sort: ${sortOptionList.find((o) => o.value === sortBy)?.label || sortBy}` } : null,
-    releaseDateFrom ? { key: 'from', label: `From: ${releaseDateFrom}` } : null,
-    releaseDateUntil ? { key: 'until', label: `Until: ${releaseDateUntil}` } : null,
-    language ? { key: 'language', label: `Language: ${languageOptions.find((o) => o.value === language)?.label || language}` } : null,
-    voteCount ? { key: 'votes', label: `Min votes: ${voteCount}` } : null,
+    country ? { key: 'country', label: t('search.filterCountry', { value: countryOptions.find((o) => o.value === country)?.label || country }) } : null,
+    genreFilter ? { key: 'genre', label: t('search.filterGenre', { value: genreFilter }) } : null,
+    year ? { key: 'year', label: t('search.filterYear', { value: year }) } : null,
+    sortBy ? { key: 'sortBy', label: t('search.filterSort', { value: sortOptionList.find((o) => o.value === sortBy)?.label || sortBy }) } : null,
+    releaseDateFrom ? { key: 'from', label: t('search.filterFrom', { value: releaseDateFrom }) } : null,
+    releaseDateUntil ? { key: 'until', label: t('search.filterUntil', { value: releaseDateUntil }) } : null,
+    language ? { key: 'language', label: t('search.filterLanguage', { value: languageOptions.find((o) => o.value === language)?.label || language }) } : null,
+    voteCount ? { key: 'votes', label: t('search.filterVotes', { value: voteCount }) } : null,
   ].filter((filter): filter is { key: string; label: string } => filter !== null);
 
   function removeFilter(key: string) {
@@ -372,7 +371,7 @@ export default function Search() {
 
   const suggestionsDropdown = showSuggestions ? (
     <div className={styles.searchSuggest}>
-      <div className={styles.searchSuggestLabel} id="search-suggest-label">Recent searches</div>
+      <div className={styles.searchSuggestLabel} id="search-suggest-label">{t('search.recentSearches')}</div>
       <div className={styles.searchSuggestBody}>
         <ul
           role="listbox"
@@ -404,8 +403,8 @@ export default function Search() {
               key={`remove-${q}`}
               type="button"
               className={styles.searchSuggestRemove}
-              aria-label={`Remove "${q}" from search history`}
-              title="Remove from history"
+              aria-label={t('nav.removeFromHistory', { query: q })}
+              title={t('nav.removeFromHistoryTitle')}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleRemoveHistory(q)}
             >
@@ -426,7 +425,7 @@ export default function Search() {
         query={input}
         onQueryChange={setInput}
         onSearch={handleSubmit}
-        searchPlaceholder="Search movies, TV shows..."
+        searchPlaceholder={t('search.placeholder')}
         countryValue={country}
         onCountryChange={(value) => { setCountry(value); setPage(1); }}
         countryOptions={countryOptions}
@@ -442,8 +441,10 @@ export default function Search() {
         onRemoveFilter={removeFilter}
         onClearFilters={clearFilters}
         isSearchContext={true}
-        title={personId ? (query ? `Movies & TV featuring "${query}"` : 'Movies & TV shows') : query ? `Search Results for "${query}"` : 'Search'}
-        subtitle="Discover something new"
+        title={personId
+          ? (query ? t('search.personTitle', { query }) : t('search.personTitleNoQuery'))
+          : query ? t('search.resultsTitle', { query }) : t('search.title')}
+        subtitle={t('search.subtitle')}
         inputRef={inputRef}
         onInputFocus={() => setSearchFocused(true)}
         onInputBlur={() => setSearchFocused(false)}
@@ -455,36 +456,36 @@ export default function Search() {
         searchOverlay={suggestionsDropdown}
       >
         <div className="field">
-          <span className="field-label">Release from</span>
-          <DatePickerField label="From" value={releaseDateFrom} placeholder="Select start date" onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
+          <span className="field-label">{t('search.releaseFrom')}</span>
+          <DatePickerField label={t('search.from')} value={releaseDateFrom} placeholder={t('search.selectStartDate')} onChange={(value) => { setReleaseDateFrom(value); setPage(1); }} />
         </div>
         <div className="field">
-          <span className="field-label">Release until</span>
-          <DatePickerField label="Until" value={releaseDateUntil} placeholder="Select end date" onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
+          <span className="field-label">{t('search.releaseUntil')}</span>
+          <DatePickerField label={t('search.until')} value={releaseDateUntil} placeholder={t('search.selectEndDate')} onChange={(value) => { setReleaseDateUntil(value); setPage(1); }} />
         </div>
-        <SearchSelectField label="Year" value={year} options={YEAR_OPTIONS} onChange={(value) => { setYear(value); setPage(1); }} />
-        <SearchSelectField label="Language" value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
+        <SearchSelectField label={t('search.year')} value={year} options={yearOptions} onChange={(value) => { setYear(value); setPage(1); }} />
+        <SearchSelectField label={t('search.language')} value={language} options={languageOptions} onChange={(value) => { setLanguage(value); setPage(1); }} />
         <div className="field">
-          <label className="field-label" htmlFor="search-min-votes">Minimum votes</label>
+          <label className="field-label" htmlFor="search-min-votes">{t('search.minimumVotes')}</label>
           <NumberStepper
             id="search-min-votes"
-            label="minimum votes"
+            label={t('search.minimumVotesLabel')}
             value={voteInput}
             onChange={setVoteInput}
             step={100}
-            placeholder="Any amount"
+            placeholder={t('search.anyAmount')}
           />
         </div>
-        {dateRangeInvalid && <p className="filter-error" role="alert">Start date must be on or before the end date.</p>}
+        {dateRangeInvalid && <p className="filter-error" role="alert">{t('search.dateRangeError')}</p>}
       </SearchBar>
 
       {!(isEmpty && !loading && !error) && (
         <div className={styles.searchFilterHeader}>
           <TypeToggle
             value={tab}
-            options={TYPE_TABS}
+            options={typeTabs}
             onChange={(value) => { setTab(value); setPage(1); }}
-            ariaLabel="Search categories"
+            ariaLabel={t('search.categories')}
           />
         </div>
       )}
@@ -492,8 +493,8 @@ export default function Search() {
       {!query && !searchFocused && history.length > 0 && (
         <div className={styles.searchHistory}>
           <div className={styles.searchHistoryHeader}>
-            <div className={styles.searchHistoryTitle}>Recent searches</div>
-            <button type="button" className={styles.searchHistoryClear} onClick={handleClearHistory}>Clear all</button>
+            <div className={styles.searchHistoryTitle}>{t('search.recentSearches')}</div>
+            <button type="button" className={styles.searchHistoryClear} onClick={handleClearHistory}>{t('search.clearAll')}</button>
           </div>
           <div className={styles.searchHistoryList}>
             {history.map((q) => (
@@ -502,8 +503,8 @@ export default function Search() {
                 <button
                   type="button"
                   className={styles.searchHistoryRemove}
-                  aria-label={`Remove "${q}" from search history`}
-                  title="Remove from history"
+                  aria-label={t('nav.removeFromHistory', { query: q })}
+                  title={t('nav.removeFromHistoryTitle')}
                   onClick={() => handleRemoveHistory(q)}
                 >
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -520,25 +521,25 @@ export default function Search() {
       {pageHint && <p className="page-hint" role="status">{pageHint}</p>}
       {error ? (
         <div className="empty-state" role="alert">
-          <h3>Search failed</h3>
-          <p>Check your connection and try again.</p>
+          <h3>{t('search.failedTitle')}</h3>
+          <p>{t('search.failedBody')}</p>
           <div className="empty-state-actions">
             <button type="button" className={styles.searchRetry} onClick={() => setRetryKey((n) => n + 1)}>
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         </div>
       ) : loading ? (
-        <div className={styles.searchStatus} role="status">Searching...</div>
+        <div className={styles.searchStatus} role="status">{t('search.searching')}</div>
       ) : !personId && !query.trim() ? (
-        <div className={styles.searchStatus}>Type above to search movies and TV shows</div>
+        <div className={styles.searchStatus}>{t('search.typeToSearch')}</div>
       ) : isEmpty ? (
         filtersActive && results.length > 0 ? (
           <div className="empty-state" role="status">
-            <h3>No matches for these filters</h3>
-            <p>Try removing a filter or widening the search.</p>
+            <h3>{t('search.noFilterMatchesTitle')}</h3>
+            <p>{t('search.noFilterMatchesBody')}</p>
             <div className="empty-state-actions">
-              <button type="button" className="empty-state-action" onClick={clearFilters}>Clear filters</button>
+              <button type="button" className="empty-state-action" onClick={clearFilters}>{t('search.clearFilters')}</button>
             </div>
           </div>
         ) : (
@@ -558,13 +559,13 @@ export default function Search() {
                 <line x1="16.5" y1="16.5" x2="21" y2="21" />
               </svg>
             </span>
-            <div className={styles.noResultsEyebrow}>Search complete</div>
+            <div className={styles.noResultsEyebrow}>{t('search.noResultsEyebrow')}</div>
             <h3 className={styles.noResultsTitle}>
               {personId ? (
-                'No credits found'
+                t('search.noCredits')
               ) : (
                 <>
-                  No results for{' '}
+                  {t('search.noResultsPrefix')}{' '}
                   <span className={styles.noResultsQuery}>
                     &ldquo;{query}&rdquo;
                   </span>
@@ -573,35 +574,35 @@ export default function Search() {
             </h3>
             <p className={styles.noResultsText}>
               {personId
-                ? 'Try a different person or explore one of these starting points.'
-                : 'Try a different title, check the spelling, or explore one of these starting points.'}
+                ? t('search.noCreditsBody')
+                : t('search.noResultsBody')}
             </p>
             <div className={styles.noResultsActions}>
               <Link
                 to="/"
                 className={`${styles.noResultsAction} ${styles.noResultsActionPrimary}`}
               >
-                Browse Trending
+                {t('search.browseTrending')}
               </Link>
               <Link to="/movies" className={styles.noResultsAction}>
-                Movies
+                {t('nav.movies')}
               </Link>
               <Link to="/tv" className={styles.noResultsAction}>
-                TV Shows
+                {t('nav.tvShows')}
               </Link>
             </div>
             {recoverySearches.length > 0 && (
               <div className={styles.searchRecovery}>
                 <div className={styles.searchRecoveryHead}>
                   <div className={styles.searchRecoveryTitle}>
-                    Recent searches
+                  {t('search.recentSearches')}
                   </div>
                   <button
                     type="button"
                     className={styles.searchRecoveryClear}
                     onClick={handleClearHistory}
                   >
-                    Clear history
+                    {t('search.clearHistory')}
                   </button>
                 </div>
                 <ul className={styles.searchRecoveryList}>
@@ -611,7 +612,7 @@ export default function Search() {
                         type="button"
                         className={styles.searchRecoveryLabel}
                         onClick={() => handleHistoryClick(q)}
-                        title={`Search again for "${q}"`}
+                        title={t('search.searchAgain', { query: q })}
                       >
                         <svg
                           className={styles.searchRecoveryIcon}
@@ -633,8 +634,8 @@ export default function Search() {
                       <button
                         type="button"
                         className={styles.searchRecoveryRemove}
-                        aria-label={`Remove "${q}" from search history`}
-                        title="Remove from history"
+                        aria-label={t('nav.removeFromHistory', { query: q })}
+                        title={t('nav.removeFromHistoryTitle')}
                         onClick={() => handleRemoveHistory(q)}
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -660,7 +661,7 @@ export default function Search() {
           )}
           {people.length > 0 && (
             <div className={styles.searchPeople}>
-              <h3 className={styles.searchPeopleTitle}>People</h3>
+              <h3 className={styles.searchPeopleTitle}>{t('search.people')}</h3>
               <PersonList people={people} />
             </div>
           )}
@@ -669,7 +670,7 @@ export default function Search() {
               page={safePage}
               totalPages={displayTotalPages}
               onChange={setPage}
-              label={`Page ${safePage} of ${displayTotalPages}`}
+              label={t('pagination.pageOf', { page: safePage, total: displayTotalPages })}
             />
           )}
         </>
