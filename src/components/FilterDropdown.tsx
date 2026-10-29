@@ -50,7 +50,17 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
                 aria-controls={menuId}
                 aria-label={current?.label || placeholder}
             >
-                <span className="custom-select-trigger-label">{current?.label || placeholder}</span>
+                <span className="custom-select-trigger-label">
+                    {current?.icon && (
+                        <img
+                            className="cs-option-icon"
+                            src={current.icon}
+                            alt=""
+                            aria-hidden="true"
+                        />
+                    )}
+                    {current?.label || placeholder}
+                </span>
                 {icon ? (
                     <span className="custom-select-trigger-icon" aria-hidden="true">{icon}</span>
                 ) : (
@@ -74,7 +84,17 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
                                     setOpen(false);
                                 }}
                             >
-                                {option.label}
+                                <span className="cs-item-label">
+                                    {option.icon && (
+                                        <img
+                                            className="cs-option-icon"
+                                            src={option.icon}
+                                            alt=""
+                                            aria-hidden="true"
+                                        />
+                                    )}
+                                    {option.label}
+                                </span>
                             </button>
                         );
                     })}

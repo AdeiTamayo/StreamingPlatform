@@ -436,9 +436,11 @@
     "openShow": "Telesaila ireki",
     "toastRemoved": "Historialetik kendu da",
     "toastSeriesRemoved": "Telesaila historialetik kendu da",
-    "toastMoviesRemoved": "{{count}} film historiatik kendu dira",
+    "toastMoviesRemoved_one": "{{count}} film kendu da historialetik",
+    "toastMoviesRemoved_other": "{{count}} film kendu dira historialetik",
     "toastAllMoviesRemoved": "Ikusitako film guztiak historialetik kendu dira",
-    "toastSelectedRemoved": "{{count}} elementu historialetik kendu dira"
+    "toastSelectedRemoved_one": "{{count}} kendu da historialetik",
+    "toastSelectedRemoved_other": "{{count}} kendu dira historialetik"
   },
   "movieDetail": {
     "notFound": "Filma ez da aurkitu",

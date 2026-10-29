@@ -551,7 +551,11 @@ export default function Home() {
                   className={`badge rating rating-imdb ${styles.heroRating}`}
                   title={formatRatingTitle(t, {
                     imdbRating: heroImdbRating.rating,
-                    imdbVotes: heroImdbRating.votes,
+                    imdbVotes:
+                      heroImdbRating.votes ||
+                      (hero.vote_count > 0
+                        ? formatVotes(String(hero.vote_count))
+                        : null),
                     tomatoes: heroImdbRating.tomatoes,
                   })}
                 >
@@ -565,9 +569,13 @@ export default function Home() {
                     <path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" />
                   </svg>
                   <span className="rating-source">{heroImdbRating.rating}</span>
-                  {heroImdbRating.votes && (
+                  {(heroImdbRating.votes || hero.vote_count > 0) && (
                     <span className="rating-votes">
-                      ({formatVotes(heroImdbRating.votes)})
+                      (
+                      {heroImdbRating.votes
+                        ? formatVotes(heroImdbRating.votes)
+                        : formatVotes(String(hero.vote_count))}
+                      )
                     </span>
                   )}
                 </span>

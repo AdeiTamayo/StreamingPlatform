@@ -406,10 +406,12 @@ export default function MovieDetail() {
   const imdbTitle = imdbRating
     ? [
         t("rating.imdb", { rating: imdbRating.rating }),
-        imdbRating.votes
+        imdbRating.votes || movie.vote_count
           ? t("rating.votes", {
-              count: imdbVotesCount,
-              value: imdbRating.votes,
+              count: imdbRating.votes ? imdbVotesCount : movie.vote_count,
+              value: imdbRating.votes
+                ? imdbRating.votes
+                : formatVotes(String(movie.vote_count)),
             })
           : "",
         imdbRating.tomatoes
@@ -422,10 +424,12 @@ export default function MovieDetail() {
   const imdbAria = imdbRating
     ? [
         t("movieDetail.imdbAria", { rating: imdbRating.rating }),
-        imdbRating.votes
+        imdbRating.votes || movie.vote_count
           ? t("rating.votes", {
-              count: imdbVotesCount,
-              value: imdbRating.votes,
+              count: imdbRating.votes ? imdbVotesCount : movie.vote_count,
+              value: imdbRating.votes
+                ? imdbRating.votes
+                : formatVotes(String(movie.vote_count)),
             })
           : "",
       ]
@@ -446,7 +450,10 @@ export default function MovieDetail() {
   const tmdbAria = [
     t("movieDetail.tmdbAria", { rating: movie.vote_average.toFixed(1) }),
     movie.vote_count
-      ? t("rating.votes", { count: movie.vote_count, value: movie.vote_count })
+      ? t("rating.votes", {
+          count: movie.vote_count,
+          value: formatVotes(String(movie.vote_count)),
+        })
       : "",
   ]
     .filter(Boolean)
@@ -486,15 +493,26 @@ export default function MovieDetail() {
                     <path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" />
                   </svg>
                   <span className="rating-source">{imdbRating.rating}</span>
-                  {imdbRating.votes && (
+                  {(imdbRating.votes || movie.vote_count > 0) && (
                     <span className="rating-votes">
-                      ({formatVotes(imdbRating.votes)})
+                      (
+                      {imdbRating.votes
+                        ? formatVotes(imdbRating.votes)
+                        : formatVotes(String(movie.vote_count))}
+                      )
                     </span>
                   )}
                 </a>
               ) : (!movie.imdb_id || imdbResolved) && movie.vote_average > 0 ? (
-                <span
+                <a
                   className={`${styles.detailRating} badge rating rating-tmdb`}
+                  href={
+                    movie.imdb_id
+                      ? `https://www.imdb.com/title/${movie.imdb_id}/`
+                      : `https://www.imdb.com/find/?q=${encodeURIComponent(movie.title)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
                   title={tmdbTitle}
                   aria-label={tmdbAria}
                 >
@@ -515,7 +533,7 @@ export default function MovieDetail() {
                       ({formatVotes(String(movie.vote_count))})
                     </span>
                   )}
-                </span>
+                </a>
               ) : null}
               {metaNodes.length > 0 && (
                 <span className="detail-meta-line">{metaNodes}</span>

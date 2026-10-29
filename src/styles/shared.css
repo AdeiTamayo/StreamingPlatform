@@ -1250,10 +1250,22 @@
 }
 
 .custom-select-trigger-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cs-option-icon {
+  width: 1.1rem;
+  height: 0.82rem;
+  flex-shrink: 0;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
 }
 
 .custom-select-trigger:hover {

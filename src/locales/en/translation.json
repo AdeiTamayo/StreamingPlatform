@@ -358,9 +358,11 @@
     "openShow": "Open show",
     "toastRemoved": "Removed from history",
     "toastSeriesRemoved": "Series removed from history",
-    "toastMoviesRemoved": "{{count}} movie(s) removed from history",
+    "toastMoviesRemoved_one": "{{count}} movie removed from history",
+    "toastMoviesRemoved_other": "{{count}} movies removed from history",
     "toastAllMoviesRemoved": "All watched movies removed from history",
-    "toastSelectedRemoved": "{{count}} removed from history"
+    "toastSelectedRemoved_one": "{{count}} removed from history",
+    "toastSelectedRemoved_other": "{{count}} removed from history"
   },
   "search": {
     "title": "Search",

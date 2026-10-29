@@ -1088,10 +1088,12 @@ export default function TVDetail() {
   const imdbTitle = imdbRating
     ? [
         t("rating.imdb", { rating: imdbRating.rating }),
-        imdbRating.votes
+        imdbRating.votes || show.vote_count
           ? t("rating.votes", {
-              count: votesNum(imdbRating.votes),
-              value: imdbRating.votes,
+              count: imdbRating.votes ? votesNum(imdbRating.votes) : show.vote_count,
+              value: imdbRating.votes
+                ? imdbRating.votes
+                : formatVotes(String(show.vote_count)),
             })
           : "",
         imdbRating.tomatoes
@@ -1104,10 +1106,12 @@ export default function TVDetail() {
   const imdbAria = imdbRating
     ? [
         t("tvDetail.imdbAria", { rating: imdbRating.rating }),
-        imdbRating.votes
+        imdbRating.votes || show.vote_count
           ? t("rating.votes", {
-              count: votesNum(imdbRating.votes),
-              value: imdbRating.votes,
+              count: imdbRating.votes ? votesNum(imdbRating.votes) : show.vote_count,
+              value: imdbRating.votes
+                ? imdbRating.votes
+                : formatVotes(String(show.vote_count)),
             })
           : "",
       ]
@@ -1128,7 +1132,10 @@ export default function TVDetail() {
   const tmdbAria = [
     t("tvDetail.tmdbAria", { rating: show.vote_average.toFixed(1) }),
     show.vote_count
-      ? t("rating.votes", { count: show.vote_count, value: show.vote_count })
+      ? t("rating.votes", {
+          count: show.vote_count,
+          value: formatVotes(String(show.vote_count)),
+        })
       : "",
   ]
     .filter(Boolean)
@@ -1252,15 +1259,26 @@ export default function TVDetail() {
                     <path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" />
                   </svg>
                   <span className="rating-source">{imdbRating.rating}</span>
-                  {imdbRating.votes && (
+                  {(imdbRating.votes || show.vote_count > 0) && (
                     <span className="rating-votes">
-                      ({formatVotes(imdbRating.votes)})
+                      (
+                      {imdbRating.votes
+                        ? formatVotes(imdbRating.votes)
+                        : formatVotes(String(show.vote_count))}
+                      )
                     </span>
                   )}
                 </a>
               ) : (!imdbId || imdbResolved) && show.vote_average > 0 ? (
-                <span
+                <a
                   className={`${styles.detailRating} badge rating rating-tmdb`}
+                  href={
+                    imdbId
+                      ? `https://www.imdb.com/title/${imdbId}/`
+                      : `https://www.imdb.com/find/?q=${encodeURIComponent(show.name)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
                   title={tmdbTitle}
                   aria-label={tmdbAria}
                 >
@@ -1281,7 +1299,7 @@ export default function TVDetail() {
                       ({formatVotes(String(show.vote_count))})
                     </span>
                   )}
-                </span>
+                </a>
               ) : null}
               {metaNodes.length > 0 && (
                 <span className="detail-meta-line">{metaNodes}</span>
