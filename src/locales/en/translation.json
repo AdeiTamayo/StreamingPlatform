@@ -157,10 +157,10 @@
     "series": "Series",
     "watchLaterCount": "Watch later",
     "dangerZone": "Danger Zone",
-    "dangerText": "Remove all local watch history, Continue Watching entries, cache, and your Watch Later list.",
-    "clearLocalData": "Clear local data",
+    "dangerText": "Permanently delete your watch history, Continue Watching entries, Watch Later list and search history from this device and from your cloud account, and clear the cache.",
+    "clearLocalData": "Delete all my data",
     "confirmTitle": "This action cannot be undone.",
-    "confirmBody": "All local information will be permanently removed.",
+    "confirmBody": "Your data will be deleted from this device and from your cloud account. Export a backup first if you might need it.",
     "deleteEverything": "Delete Everything",
     "cancel": "Cancel"
   },
@@ -303,7 +303,8 @@
     "importFailed": "Import failed",
     "loginToExport": "Log in to export Supabase data",
     "supabaseExported": "Supabase data exported",
-    "supabaseImported": "Supabase data imported successfully"
+    "supabaseImported": "Supabase data imported successfully",
+    "exportFailed": "Export failed. No backup file was created."
   },
   "searchBar": {
     "searchLabel": "Search",

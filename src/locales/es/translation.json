@@ -157,10 +157,10 @@
     "series": "Series",
     "watchLaterCount": "Ver más tarde",
     "dangerZone": "Zona de peligro",
-    "dangerText": "Elimina todo el historial local de reproducción, las entradas de Seguir viendo, la caché y tu lista de Ver más tarde.",
-    "clearLocalData": "Borrar datos locales",
+    "dangerText": "Elimina de forma permanente tu historial, las entradas de Seguir viendo, tu lista de Ver más tarde y el historial de búsqueda, tanto de este dispositivo como de tu cuenta en la nube, y vacía la caché.",
+    "clearLocalData": "Eliminar todos mis datos",
     "confirmTitle": "Esta acción no se puede deshacer.",
-    "confirmBody": "Toda la información local se eliminará de forma permanente.",
+    "confirmBody": "Tus datos se eliminarán de este dispositivo y de tu cuenta en la nube. Exporta antes una copia de seguridad si puedes necesitarla.",
     "deleteEverything": "Eliminar todo",
     "cancel": "Cancelar"
   },
@@ -303,7 +303,8 @@
     "importFailed": "Error al importar",
     "loginToExport": "Inicia sesión para exportar los datos de Supabase",
     "supabaseExported": "Datos de Supabase exportados",
-    "supabaseImported": "Datos de Supabase importados correctamente"
+    "supabaseImported": "Datos de Supabase importados correctamente",
+    "exportFailed": "Error al exportar. No se creó ningún archivo de copia de seguridad."
   },
   "searchBar": {
     "searchLabel": "Buscar",

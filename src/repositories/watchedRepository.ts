@@ -1,4 +1,4 @@
-import { requireSupabase, isUniqueViolation } from '../lib/supabase';
+import { requireSupabase, isUniqueViolation, fetchAllPages } from '../lib/supabase';
 import { withRetry } from '../utils/retry';
 import { enqueueWrite } from '../utils/offlineQueue';
 import type { WatchedRow, WatchedInsert } from '../types/database';
@@ -116,32 +116,30 @@ export const watchedRepository = {
     }
   },
 
-  async getAll(userId: string): Promise<WatchedRow[]> {
-    try {
-      const { data } = await withRetry(async () => {
+  // Complete, paginated download. Throws on failure so callers never mistake a
+  // partial result for the whole library.
+  async getAllStrict(userId: string): Promise<WatchedRow[]> {
+    return fetchAllPages<WatchedRow>((from, to) =>
+      withRetry(async () => {
         const res = await requireSupabase().from('watched')
-          .select('*')
+          .select('*', { count: 'exact' })
           .eq('user_id', userId)
-          .order('watched_at', { ascending: false });
+          .order('watched_at', { ascending: false })
+          .order('id')
+          .range(from, to);
         if (res.error) throw res.error;
         return res;
-      }, READ_RETRY);
-      return data ?? [];
+      }, READ_RETRY),
+    );
+  },
+
+  // Best-effort variant for UI code that can show an empty list on failure.
+  async getAll(userId: string): Promise<WatchedRow[]> {
+    try {
+      return await this.getAllStrict(userId);
     } catch {
       return [];
     }
-  },
-
-  async getAllStrict(userId: string): Promise<WatchedRow[]> {
-    const { data } = await withRetry(async () => {
-      const res = await requireSupabase().from('watched')
-        .select('*')
-        .eq('user_id', userId)
-        .order('watched_at', { ascending: false });
-      if (res.error) throw res.error;
-      return res;
-    }, READ_RETRY);
-    return data ?? [];
   },
 
   async clearShowHistory(userId: string, tmdbId: number): Promise<void> {

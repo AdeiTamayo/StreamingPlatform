@@ -371,7 +371,13 @@ export default function Settings() {
   }
 
   async function handleSupabaseExport() {
-    const data = await exportSupabaseData();
+    let data;
+    try {
+      data = await exportSupabaseData();
+    } catch {
+      toast?.(t("toast.exportFailed"), { kind: "error" });
+      return;
+    }
 
     if (!data) {
       toast?.(t("toast.loginToExport"));

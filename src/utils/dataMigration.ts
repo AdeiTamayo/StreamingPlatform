@@ -264,7 +264,10 @@ function mergeIntoIndex(indexKey: string, prefix: string, newKeys: string[]): vo
 // overwrite entries created locally while signed out. Each section writes
 // only what is missing locally, then merges the indices.
 
-const SYNC_FETCH_TIMEOUT_MS = 4000;
+// Downloads are paginated now, so a large library legitimately needs several
+// round trips. A timeout still yields null, which skips the destructive
+// reconcile instead of acting on partial data.
+const SYNC_FETCH_TIMEOUT_MS = 15_000;
 
 function withDeadline<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return new Promise((resolve) => {
@@ -282,14 +285,27 @@ function fetchWithDeadline<T>(promise: Promise<T>): Promise<T | null> {
   return withDeadline<T | null>(promise.catch(() => null), SYNC_FETCH_TIMEOUT_MS, null);
 }
 
-async function downloadSupabaseData(userId: string): Promise<void> {
-  // Strict fetches: null means failure/timeout so we can skip reconcile.
+interface RemoteSnapshot {
+  // null = the (paginated) fetch failed or timed out. Never treat null as
+  // "the server has nothing": it must not drive deletions.
+  watchedRows: Awaited<ReturnType<typeof watchedRepository.getAllStrict>> | null;
+  wlRows: Awaited<ReturnType<typeof watchLaterRepository.getAllStrict>> | null;
+  searchRows: Awaited<ReturnType<typeof searchHistoryRepository.getAll>>;
+  progressRows: Awaited<ReturnType<typeof progressRepository.getAllStrict>> | null;
+}
+
+async function fetchRemoteSnapshot(userId: string): Promise<RemoteSnapshot> {
   const [watchedRows, wlRows, searchRows, progressRows] = await Promise.all([
     fetchWithDeadline(watchedRepository.getAllStrict(userId)),
     fetchWithDeadline(watchLaterRepository.getAllStrict(userId)),
     searchHistoryRepository.getAll(userId).catch(() => []),
     fetchWithDeadline(progressRepository.getAllStrict(userId)),
   ]);
+  return { watchedRows, wlRows, searchRows, progressRows };
+}
+
+async function downloadSupabaseData(userId: string, prefetched?: RemoteSnapshot): Promise<void> {
+  const { watchedRows, wlRows, searchRows, progressRows } = prefetched ?? await fetchRemoteSnapshot(userId);
 
   // Track remote keys for reconcile.
   const remoteWatchedKeys = new Set<string>();
@@ -424,6 +440,30 @@ function addToEpwlIndex(key: string): void {
   localStorage.setItem(EP_WL_INDEX_KEY, JSON.stringify([...new Set([...index, key])]));
 }
 
+// True only when the downloaded snapshot contains every row this run uploaded.
+// Used to decide whether wiping the local pre-login copy is safe.
+function trackToken(type: string, id: number, season: number | null, episode: number | null): string {
+  return `${type}:${id}:${season ?? -1}:${episode ?? -1}`;
+}
+
+function serverHoldsUploadedRows(
+  snapshot: RemoteSnapshot,
+  watched: WatchedInsert[],
+  watchLater: Array<{ media_type: MediaType; tmdb_id: number; season: number | null; episode: number | null }>,
+): boolean {
+  if (watched.length > 0) {
+    if (!snapshot.watchedRows) return false;
+    const remote = new Set(snapshot.watchedRows.map((r) => trackToken(r.media_type, r.tmdb_id, r.season, r.episode)));
+    if (!watched.every((w) => remote.has(trackToken(w.media_type, w.tmdb_id, w.season ?? null, w.episode ?? null)))) return false;
+  }
+  if (watchLater.length > 0) {
+    if (!snapshot.wlRows) return false;
+    const remote = new Set(snapshot.wlRows.map((r) => trackToken(r.media_type, r.tmdb_id, r.season, r.episode)));
+    if (!watchLater.every((w) => remote.has(trackToken(w.media_type, w.tmdb_id, w.season, w.episode)))) return false;
+  }
+  return true;
+}
+
 // Guards against concurrent migration runs (e.g. sign-in resolving while the
 // SIGNED_IN event fires too). Without this, two overlapping runs would upload
 // the same local rows twice - notifications have no unique constraint, so the
@@ -537,13 +577,18 @@ export const dataMigration = {
     // stored remotely. The next login retries the incomplete sections.
     // Local-only state is never wiped here (see clearMigratedData).
     if (hasData && !failed) {
-      clearMigratedData();
+      // Download first and wipe the local copy only once the server demonstrably
+      // holds every uploaded row. A timed-out or partial download must never
+      // leave the user with neither copy.
+      const snapshot = await fetchRemoteSnapshot(userId);
+      const verified = serverHoldsUploadedRows(snapshot, watchedItems, wlItems);
+      if (verified) clearMigratedData();
       try {
         localStorage.setItem(flagKey, 'true');
       } catch (err) {
         logError('dataMigration.flag', err);
       }
-      await this.syncFromSupabase(userId);
+      await this.syncFromSupabase(userId, snapshot);
     } else if (failed) {
       // Don't clear local data or set the flag; next login retries the
       // incomplete sections.
@@ -559,9 +604,9 @@ export const dataMigration = {
     }
   },
 
-  async syncFromSupabase(userId: string): Promise<void> {
+  async syncFromSupabase(userId: string, prefetched?: RemoteSnapshot): Promise<void> {
     try {
-      await downloadSupabaseData(userId);
+      await downloadSupabaseData(userId, prefetched);
     } catch {
       // Silently fail - localStorage data will still be available
     }
