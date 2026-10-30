@@ -26,7 +26,8 @@ import {
   importSupabaseData,
   isSupabaseBackupEmpty,
 } from "../api/storageBackup";
-import { getQueueSize } from "../utils/offlineQueue";
+import { getQueueSize, getDroppedCount, SYNC_DROPPED_EVENT } from "../utils/offlineQueue";
+import { dataMigration } from "../utils/dataMigration";
 import { useToast } from "../components/useToast";
 import { useAuth } from "../hooks/useAuth";
 import CheckIcon from "../components/CheckIcon";
@@ -175,6 +176,8 @@ export default function Settings() {
   const [usageError, setUsageError] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [queueSize, setQueueSize] = useState(getQueueSize());
+  const [droppedCount, setDroppedCount] = useState(getDroppedCount());
+  const [resyncing, setResyncing] = useState(false);
   const [videoSource, setVideoSourceState] = useState(getVideoSource());
   const [timeZone, setTimeZoneState] = useState(getTimezone());
   const [language, setLanguageState] = useState(getLanguage());
@@ -199,6 +202,31 @@ export default function Settings() {
       setUsageError(false);
     } catch {
       setUsageError(true);
+    }
+  }
+
+  useEffect(() => {
+    const refresh = () => setDroppedCount(getDroppedCount());
+    window.addEventListener(SYNC_DROPPED_EVENT, refresh);
+    return () => window.removeEventListener(SYNC_DROPPED_EVENT, refresh);
+  }, []);
+
+  async function retrySync() {
+    if (!user || resyncing) return;
+    setResyncing(true);
+    try {
+      const recovered = await dataMigration.resync(user.id);
+      setDroppedCount(getDroppedCount());
+      setQueueSize(getQueueSize());
+      setStats(getStats());
+      if (recovered) {
+        markSaved();
+        toast?.(t("toast.syncRecovered"));
+      } else {
+        toast?.(t("toast.syncStillFailing"), { kind: "error" });
+      }
+    } finally {
+      setResyncing(false);
     }
   }
 
@@ -695,6 +723,21 @@ export default function Settings() {
                         : t("settings.empty")
                     }
                   />
+
+                  {droppedCount > 0 && (
+                    <Row
+                      label={t("settings.unsyncedChanges")}
+                      value={t("settings.unsyncedCount", { count: droppedCount })}
+                    >
+                      <button
+                        className={styles.pill}
+                        onClick={retrySync}
+                        disabled={resyncing}
+                      >
+                        {t("settings.retrySync")}
+                      </button>
+                    </Row>
+                  )}
                 </>
               )
             )}

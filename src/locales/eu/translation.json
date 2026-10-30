@@ -162,7 +162,10 @@
     "confirmTitle": "Ekintza hau ezin da desegin.",
     "confirmBody": "Zure datuak gailu honetatik eta hodeiko kontutik ezabatuko dira. Esportatu babeskopia bat lehenago behar baduzu.",
     "deleteEverything": "Dena ezabatu",
-    "cancel": "Utzi"
+    "cancel": "Utzi",
+    "unsyncedChanges": "Sinkronizatu gabeko aldaketak",
+    "unsyncedCount": "{{count}} ezin izan dira sinkronizatu",
+    "retrySync": "Berriro saiatu sinkronizazioa"
   },
   "watchLater": {
     "eyebrow": "Liburutegi pertsonala",
@@ -304,7 +307,10 @@
     "loginToExport": "Hasi saioa Supabaseko datuak esportatzeko",
     "supabaseExported": "Supabaseko datuak esportatu dira",
     "supabaseImported": "Supabaseko datuak behar bezala inportatu dira",
-    "exportFailed": "Esportazioak huts egin du. Ez da babeskopia-fitxategirik sortu."
+    "exportFailed": "Esportazioak huts egin du. Ez da babeskopia-fitxategirik sortu.",
+    "syncDropped": "Aldaketa batzuk ezin izan dira zure kontuarekin sinkronizatu. Ireki Ezarpenak berriro saiatzeko.",
+    "syncRecovered": "Dena sinkronizatuta dago berriro.",
+    "syncStillFailing": "Sinkronizazioak hutsegiten jarraitzen du. Zure datuak gailu honetan gordetzen dira; saiatu berriro geroago."
   },
   "searchBar": {
     "searchLabel": "Bilatu",

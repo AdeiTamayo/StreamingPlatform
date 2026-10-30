@@ -1,11 +1,70 @@
 import { requireSupabase } from '../lib/supabase';
 import { logError } from './logger';
+import { isPermanentError } from './retry';
 
 const OFFLINE_QUEUE_KEY = 'supabase_offline_queue';
 export { OFFLINE_QUEUE_KEY };
-const MAX_QUEUE_SIZE = 200;
+// Sized for a long offline session (marking several seasons watched queues one
+// op per episode). ~250 bytes per op keeps this well inside the localStorage
+// quota; if it is ever exceeded the loss is recorded, never silent.
+const MAX_QUEUE_SIZE = 1000;
 const MAX_OP_ATTEMPTS = 5;
 const RETRY_INTERVAL_MS = 60_000;
+
+// Persisted record of writes that were dropped without reaching the server
+// (queue overflow, retries exhausted, or a permanent server rejection). While
+// it is present the local library may hold rows the cloud never received, so
+// the sign-in reconcile must not delete local data, and the UI warns the user.
+// It is cleared only after a successful full re-upload (dataMigration.resync).
+export const SYNC_DROPPED_KEY = 'supabase_sync_dropped';
+export const SYNC_DROPPED_EVENT = 'streamflow:sync-dropped';
+
+export interface DroppedMarker {
+  count: number;
+  lastAt: number;
+}
+
+export function getDroppedMarker(): DroppedMarker | null {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SYNC_DROPPED_KEY) || 'null');
+    if (raw && typeof raw.count === 'number' && raw.count > 0) {
+      return { count: raw.count, lastAt: typeof raw.lastAt === 'number' ? raw.lastAt : 0 };
+    }
+  } catch {
+    // corrupt marker: fall through. Treat a present-but-unreadable value as
+    // dirty rather than silently losing the warning.
+    if (localStorage.getItem(SYNC_DROPPED_KEY)) return { count: 1, lastAt: 0 };
+  }
+  return null;
+}
+
+export function getDroppedCount(): number {
+  return getDroppedMarker()?.count ?? 0;
+}
+
+export function clearDroppedMarker(): void {
+  try {
+    localStorage.removeItem(SYNC_DROPPED_KEY);
+  } catch {
+    // storage unavailable - nothing more to do
+  }
+}
+
+function recordDropped(count: number): void {
+  if (count <= 0) return;
+  try {
+    const prev = getDroppedCount();
+    localStorage.setItem(
+      SYNC_DROPPED_KEY,
+      JSON.stringify({ count: prev + count, lastAt: Date.now() }),
+    );
+  } catch (err) {
+    logError('offlineQueue.markDropped', err);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SYNC_DROPPED_EVENT, { detail: { count } }));
+  }
+}
 
 export interface QueuedOperation {
   id: string;
@@ -46,16 +105,21 @@ export function enqueueWrite(table: string, method: QueuedOperation['method'], d
     timestamp: Date.now(),
     attempts: 0,
   });
-  if (queue.length > MAX_QUEUE_SIZE) {
-    queue.splice(0, queue.length - MAX_QUEUE_SIZE);
-  }
+  const overflow = Math.max(0, queue.length - MAX_QUEUE_SIZE);
+  if (overflow > 0) queue.splice(0, overflow);
   try {
     saveQueue(queue);
-    return true;
   } catch (err) {
     logError('offlineQueue.enqueue', err);
     return false;
   }
+  // Recorded only once the queue is saved, so a failed save is not reported as
+  // both "not queued" and "dropped".
+  if (overflow > 0) {
+    logError('offlineQueue.overflow', { dropped: overflow });
+    recordDropped(overflow);
+  }
+  return true;
 }
 
 // Tables dropped as local-only (settings, notifications). Ops queued for them
@@ -74,23 +138,34 @@ interface FilterChain extends Promise<{ data: unknown; error: { code?: string } 
   in(column: string, value: unknown[]): FilterChain;
 }
 
-async function processOperation(op: QueuedOperation): Promise<boolean> {
+// 'done'      synced, or already in the desired state - remove from the queue.
+// 'retry'     transient failure (offline, 5xx, timeout) - keep and try again.
+// 'permanent' can never succeed (RLS denial, bad data, malformed op) - retrying
+//             only burns attempts, so it is dropped immediately and recorded.
+type OpOutcome = 'done' | 'retry' | 'permanent';
+
+function errorCode(err: unknown): string | undefined {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+async function processOperation(op: QueuedOperation): Promise<OpOutcome> {
   try {
-    if (DROPPED_TABLES.has(op.table)) return true;
+    if (DROPPED_TABLES.has(op.table)) return 'done';
     switch (op.method) {
       case 'insert':
       case 'upsert': {
         if (op.table === 'progress') {
           const d = op.data as Record<string, unknown>;
-          if ((d.media_type !== 'movie' && d.media_type !== 'tv') || !Number.isFinite(Number(d.tmdb_id))) return true;
+          if ((d.media_type !== 'movie' && d.media_type !== 'tv') || !Number.isFinite(Number(d.tmdb_id))) return 'done';
         }
         const { error } = await requireSupabase().from(op.table as never)[op.method](op.data as never);
         if (error) throw error;
-        return true;
+        return 'done';
       }
       case 'update': {
         const { id, userId, ...rest } = op.data as Record<string, unknown>;
-        if (id == null && userId == null) return false;
+        if (id == null && userId == null) return 'permanent';
         let query = requireSupabase().from(op.table as never).update(rest as never) as unknown as FilterChain;
         if (id != null) {
           query = query.eq('id', id as string);
@@ -99,11 +174,11 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
         }
         const { error } = await query;
         if (error) throw error;
-        return true;
+        return 'done';
       }
       case 'delete': {
         const d = op.data as Record<string, unknown>;
-        if (d.id == null && d.userId == null) return false;
+        if (d.id == null && d.userId == null) return 'permanent';
         let query = requireSupabase().from(op.table as never).delete() as unknown as FilterChain;
         if (d.id != null) {
           query = query.eq('id', d.id as string);
@@ -137,13 +212,18 @@ async function processOperation(op: QueuedOperation): Promise<boolean> {
         }
         const { error } = await query;
         if (error) throw error;
-        return true;
+        return 'done';
       }
       default:
-        return false;
+        return 'permanent';
     }
-  } catch {
-    return false;
+  } catch (err) {
+    // Unique violation on a write: the row is already there, which is exactly
+    // the state the op wanted. Retrying would fail identically five times.
+    if ((op.method === 'insert' || op.method === 'upsert') && errorCode(err) === '23505') {
+      return 'done';
+    }
+    return isPermanentError(err) ? 'permanent' : 'retry';
   }
 }
 
@@ -196,14 +276,19 @@ async function runSyncPass(): Promise<void> {
   // enqueued concurrently keeps its place via the merge below.
   const resolved = new Set<string>();
   const attempts = new Map<string, number>();
+  let dropped = 0;
 
   for (const op of queue) {
     // Never replay another user's writes under this session; leave them
     // queued without burning attempts.
     if (isForeignOp(op)) continue;
-    const success = await processOperation(op);
-    if (success) {
+    const outcome = await processOperation(op);
+    if (outcome === 'done') {
       resolved.add(op.id);
+    } else if (outcome === 'permanent') {
+      logError('offlineQueue.rejected', { table: op.table, method: op.method });
+      resolved.add(op.id);
+      dropped++;
     } else {
       const next = op.attempts + 1;
       if (next > MAX_OP_ATTEMPTS) {
@@ -211,6 +296,7 @@ async function runSyncPass(): Promise<void> {
         // visible instead of silent.
         logError('offlineQueue.drop', { table: op.table, method: op.method, attempts: next });
         resolved.add(op.id);
+        dropped++;
       } else {
         attempts.set(op.id, next);
       }
@@ -234,6 +320,8 @@ async function runSyncPass(): Promise<void> {
     // Queue write failed (e.g. quota) - in-memory attempt bumps are lost and
     // the next pass retries from the persisted state.
   }
+  // One notification per pass, however many ops were dropped.
+  recordDropped(dropped);
 }
 
 let syncInited = false;

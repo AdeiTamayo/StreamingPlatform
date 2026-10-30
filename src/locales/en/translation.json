@@ -162,7 +162,10 @@
     "confirmTitle": "This action cannot be undone.",
     "confirmBody": "Your data will be deleted from this device and from your cloud account. Export a backup first if you might need it.",
     "deleteEverything": "Delete Everything",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "unsyncedChanges": "Unsynced changes",
+    "unsyncedCount": "{{count}} could not be synced",
+    "retrySync": "Retry sync"
   },
   "watchLater": {
     "eyebrow": "Personal library",
@@ -304,7 +307,10 @@
     "loginToExport": "Log in to export Supabase data",
     "supabaseExported": "Supabase data exported",
     "supabaseImported": "Supabase data imported successfully",
-    "exportFailed": "Export failed. No backup file was created."
+    "exportFailed": "Export failed. No backup file was created.",
+    "syncDropped": "Some changes could not be synced to your account. Open Settings to retry.",
+    "syncRecovered": "Everything is synced again.",
+    "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later."
   },
   "searchBar": {
     "searchLabel": "Search",

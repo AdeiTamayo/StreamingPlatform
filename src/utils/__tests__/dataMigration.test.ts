@@ -16,7 +16,10 @@ vi.mock('../../repositories/watchedRepository', () => ({
       return repoState.watched;
     },
     markBatch: async (items: Array<Record<string, unknown>>) => {
-      repoState.watched = items.map((i) => ({ ...i }));
+      // A queued write was NOT persisted: only a successful write reaches the
+      // fake server, otherwise the snapshot would contain rows the real one
+      // would not and reconcile tests could not tell a guard from luck.
+      if (!repoState.queued) repoState.watched = items.map((i) => ({ ...i }));
       return { queued: repoState.queued };
     },
   },
@@ -29,7 +32,7 @@ vi.mock('../../repositories/watchLaterRepository', () => ({
       return repoState.watchLater;
     },
     add: async (row: Record<string, unknown>) => {
-      repoState.watchLater.push({ ...row });
+      if (!repoState.queued) repoState.watchLater.push({ ...row });
       return { queued: repoState.queued };
     },
   },
@@ -49,6 +52,7 @@ vi.mock('../../repositories/progressRepository', () => ({
 }));
 
 import { dataMigration } from '../dataMigration';
+import { SYNC_DROPPED_KEY, getDroppedCount } from '../offlineQueue';
 
 beforeEach(() => {
   localStorage.clear();
@@ -114,5 +118,56 @@ describe('upload outcome', () => {
     await dataMigration.migrateFromLocalStorage('user-1');
     expect(localStorage.getItem('watched:movie-603')).not.toBeNull();
     expect(localStorage.getItem('supabase_data_migrated:user-1')).toBe('true');
+  });
+});
+
+// Writes dropped from the offline queue never reached the server, so the local
+// library can legitimately hold rows the snapshot lacks. Reconcile treats the
+// server as authoritative for deletions, which would turn that into data loss.
+describe('dropped writes', () => {
+  const FLAG = 'supabase_data_migrated:user-1';
+  const key = 'watched:movie-603';
+
+  beforeEach(() => {
+    localStorage.setItem(FLAG, 'true');
+    localStorage.setItem(
+      key,
+      JSON.stringify({ type: 'movie', id: 603, title: 'The Matrix', watchedAt: Date.now() }),
+    );
+    // Server snapshot is empty: the row was never uploaded.
+    repoState.watched = [];
+  });
+
+  it('control: without a marker, reconcile removes a local row the server lacks', async () => {
+    repoState.queued = true;
+    await dataMigration.migrateFromLocalStorage('user-1');
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('keeps the local row and the marker while the re-upload still fails', async () => {
+    localStorage.setItem(SYNC_DROPPED_KEY, JSON.stringify({ count: 2, lastAt: 1 }));
+    repoState.queued = true; // upload parked in the queue again = not persisted
+    await dataMigration.migrateFromLocalStorage('user-1');
+    expect(localStorage.getItem(key)).not.toBeNull();
+    expect(getDroppedCount()).toBe(2);
+  });
+
+  it('re-uploads on sign-in and clears the marker once everything is stored', async () => {
+    localStorage.setItem(SYNC_DROPPED_KEY, JSON.stringify({ count: 2, lastAt: 1 }));
+    repoState.queued = false;
+    await dataMigration.migrateFromLocalStorage('user-1');
+    expect(repoState.watched).toHaveLength(1);
+    expect(localStorage.getItem(key)).not.toBeNull();
+    expect(getDroppedCount()).toBe(0);
+  });
+
+  it('resync() reports whether recovery fully succeeded', async () => {
+    localStorage.setItem(SYNC_DROPPED_KEY, JSON.stringify({ count: 1, lastAt: 1 }));
+    repoState.queued = true;
+    expect(await dataMigration.resync('user-1')).toBe(false);
+    expect(getDroppedCount()).toBe(1);
+    repoState.queued = false;
+    expect(await dataMigration.resync('user-1')).toBe(true);
+    expect(getDroppedCount()).toBe(0);
   });
 });

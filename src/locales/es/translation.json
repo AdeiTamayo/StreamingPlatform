@@ -162,7 +162,10 @@
     "confirmTitle": "Esta acción no se puede deshacer.",
     "confirmBody": "Tus datos se eliminarán de este dispositivo y de tu cuenta en la nube. Exporta antes una copia de seguridad si puedes necesitarla.",
     "deleteEverything": "Eliminar todo",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "unsyncedChanges": "Cambios sin sincronizar",
+    "unsyncedCount": "{{count}} no se pudieron sincronizar",
+    "retrySync": "Reintentar sincronización"
   },
   "watchLater": {
     "eyebrow": "Biblioteca personal",
@@ -304,7 +307,10 @@
     "loginToExport": "Inicia sesión para exportar los datos de Supabase",
     "supabaseExported": "Datos de Supabase exportados",
     "supabaseImported": "Datos de Supabase importados correctamente",
-    "exportFailed": "Error al exportar. No se creó ningún archivo de copia de seguridad."
+    "exportFailed": "Error al exportar. No se creó ningún archivo de copia de seguridad.",
+    "syncDropped": "Algunos cambios no se pudieron sincronizar con tu cuenta. Abre Ajustes para reintentar.",
+    "syncRecovered": "Todo está sincronizado de nuevo.",
+    "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde."
   },
   "searchBar": {
     "searchLabel": "Buscar",
