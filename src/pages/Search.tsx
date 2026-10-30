@@ -12,6 +12,7 @@ import type { PersonListPerson } from '../components/PersonList';
 import { getSearchHistory, addSearchHistory, removeSearchHistory } from '../api/storage';
 import { useAbortController } from '../hooks/useAbortController';
 import { usePageTitle } from '../i18n/usePageTitle';
+import { localizedGenreName } from '../utils/genres';
 import type { TMDBMovie, TMDBSeries, TMDBPersonCredits, TMDBGenre, TMDBCountry, TMDBLanguage, FilterOption } from '../types';
 import SearchBar, { SearchSelectField } from '../components/SearchBar';
 import styles from './Search.module.css';
@@ -273,8 +274,18 @@ export default function Search() {
       ? results.filter((item) => (item as { media_type?: string }).media_type !== 'person')
       : results;
 
-  const genreNames = Array.from(new Set([...genresMovie, ...genresTv].map((g) => g.name))).sort();
-  const genreOptions: FilterOption[] = [{ value: '', label: t('search.allGenres') }, ...genreNames.map((name) => ({ value: name, label: name }))];
+  // Key by TMDB id (stable across languages) and show the translated label;
+  // movie and TV share several ids, so dedupe before sorting.
+  const genresById = new Map<number, TMDBGenre>();
+  for (const g of [...genresMovie, ...genresTv]) {
+    if (!genresById.has(g.id)) genresById.set(g.id, g);
+  }
+  const genreOptions: FilterOption[] = [
+    { value: '', label: t('search.allGenres') },
+    ...Array.from(genresById.values())
+      .map((g) => ({ value: String(g.id), label: localizedGenreName(g, t) }))
+      .sort((a, b) => a.label.localeCompare(b.label)),
+  ];
   const countryOptions: FilterOption[] = [{ value: '', label: t('search.allCountries') }, ...countries.map((c) => ({ value: c.iso_3166_1, label: c.english_name }))];
   const languageOptions: FilterOption[] = [{ value: '', label: t('search.originalLanguage') }, ...languages.map((l) => ({ value: l.iso_639_1, label: l.english_name }))];
   const sortOptions = tab === 'tv' ? tvSortOptions : movieSortOptions;
@@ -282,15 +293,9 @@ export default function Search() {
 
   const filtersActive = !!(country || genreFilter || year || sortBy || releaseDateFrom || releaseDateUntil || language || voteCount);
 
-  function genreIdFor(name: string, mediaType: string): number | undefined {
-    const list = mediaType === 'tv' ? genresTv : genresMovie;
-    return list.find((g) => g.name === name)?.id;
-  }
-
   const refinedMedia = (() => {
     if (!filtersActive) return filteredMedia;
     const list = filteredMedia.filter((item) => {
-      const mt = (item as { media_type?: string }).media_type || tab;
       if (country && !(((item as { origin_country?: string[] }).origin_country) || []).includes(country)) return false;
       if (language && item.original_language !== language) return false;
       const date = dateOf(item);
@@ -298,10 +303,7 @@ export default function Search() {
       if (releaseDateFrom && (!date || date < releaseDateFrom)) return false;
       if (releaseDateUntil && (!date || date > releaseDateUntil)) return false;
       if (voteCount && (item.vote_count || 0) < Number(voteCount)) return false;
-      if (genreFilter) {
-        const gid = genreIdFor(genreFilter, mt);
-        if (gid == null || !(item.genre_ids || []).includes(gid)) return false;
-      }
+      if (genreFilter && !(item.genre_ids || []).includes(Number(genreFilter))) return false;
       return true;
     });
     if (sortBy) list.sort(makeComparator(sortBy));
@@ -330,7 +332,7 @@ export default function Search() {
 
   const activeFilters = [
     country ? { key: 'country', label: t('search.filterCountry', { value: countryOptions.find((o) => o.value === country)?.label || country }) } : null,
-    genreFilter ? { key: 'genre', label: t('search.filterGenre', { value: genreFilter }) } : null,
+    genreFilter ? { key: 'genre', label: t('search.filterGenre', { value: genreOptions.find((o) => o.value === genreFilter)?.label || genreFilter }) } : null,
     year ? { key: 'year', label: t('search.filterYear', { value: year }) } : null,
     sortBy ? { key: 'sortBy', label: t('search.filterSort', { value: sortOptionList.find((o) => o.value === sortBy)?.label || sortBy }) } : null,
     releaseDateFrom ? { key: 'from', label: t('search.filterFrom', { value: releaseDateFrom }) } : null,

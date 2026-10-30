@@ -291,7 +291,10 @@
     "reality": "Reality",
     "sciFiFantasy": "Sci-Fi & Fantasy",
     "soap": "Soap",
-    "warPolitics": "War & Politics"
+    "warPolitics": "War & Politics",
+    "tvMovie": "TV Movie",
+    "news": "News",
+    "talk": "Talk"
   },
   "toast": {
     "tmdbCacheCleared": "TMDB cache cleared",

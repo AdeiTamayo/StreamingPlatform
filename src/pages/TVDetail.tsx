@@ -17,6 +17,7 @@ import {
 } from "../api/tmdb";
 import { getTVEmbedUrl, getSourceLabel, SOURCE_KEYS } from "../api/vidsrc";
 import { getImdbRating, type ImdbRating } from "../api/omdb";
+import { localizedGenreName } from "../utils/genres";
 import { isEpisodeReleased } from "../api/tvmaze";
 import {
   isWatched,
@@ -1078,7 +1079,7 @@ export default function TVDetail() {
   const genres =
     show.genres
       ?.slice(0, 3)
-      .map((g) => g.name)
+      .map((g) => localizedGenreName(g, t))
       .join(", ") || "";
   const recommendations = show.recommendations?.results?.slice(0, 24) || [];
 

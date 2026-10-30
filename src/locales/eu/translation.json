@@ -292,7 +292,10 @@
     "reality": "Errealitate-ikuskizuna",
     "sciFiFantasy": "Zientzia-fikzioa eta fantasia",
     "soap": "Telenobela",
-    "warPolitics": "Gerra eta politika"
+    "warPolitics": "Gerra eta politika",
+    "tvMovie": "Telebistako filma",
+    "news": "Albisteak",
+    "talk": "Elkarrizketa-saioa"
   },
   "toast": {
     "tmdbCacheCleared": "TMDB cachea garbitu da",

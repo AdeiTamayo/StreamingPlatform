@@ -291,7 +291,10 @@
     "reality": "Reality",
     "sciFiFantasy": "Ciencia ficción y fantasía",
     "soap": "Telenovela",
-    "warPolitics": "Guerra y política"
+    "warPolitics": "Guerra y política",
+    "tvMovie": "Película de TV",
+    "news": "Noticias",
+    "talk": "Programa de debate"
   },
   "toast": {
     "tmdbCacheCleared": "Caché de TMDB borrada",

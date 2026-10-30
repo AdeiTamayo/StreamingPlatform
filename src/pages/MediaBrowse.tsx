@@ -17,6 +17,7 @@ import Pagination from "../components/Pagination";
 import DatePickerField from "../components/DatePickerField";
 import NumberStepper from "../components/NumberStepper";
 import useSearchFilter from "../hooks/useSearchFilter";
+import { localizedGenreName } from "../utils/genres";
 import type {
   MediaType,
   TMDBGenre,
@@ -152,7 +153,7 @@ export default function MediaBrowse({ type }: MediaBrowseProps) {
   ];
   const genreOptions: FilterOption[] = [
     { value: "", label: t("search.allGenres") },
-    ...genres.map((g) => ({ value: String(g.id), label: g.name })),
+    ...genres.map((g) => ({ value: String(g.id), label: localizedGenreName(g, t) })),
   ];
   const languageOptions: FilterOption[] = [
     { value: "", label: t("search.originalLanguage") },

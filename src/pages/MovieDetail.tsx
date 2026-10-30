@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { getMovieDetail, imageUrl } from "../api/tmdb";
 import { getMovieEmbedUrl, getSourceLabel, SOURCE_KEYS } from "../api/vidsrc";
 import { getImdbRating, type ImdbRating } from "../api/omdb";
+import { localizedGenreName } from "../utils/genres";
 import {
   isWatched,
   markWatched,
@@ -372,7 +373,7 @@ export default function MovieDetail() {
   const genres =
     movie.genres
       ?.slice(0, 3)
-      .map((g) => g.name)
+      .map((g) => localizedGenreName(g, t))
       .join(", ") || "";
   const recommendations = movie.recommendations?.results?.slice(0, 24) || [];
 
