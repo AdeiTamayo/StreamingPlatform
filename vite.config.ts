@@ -98,5 +98,14 @@ export default defineConfig((config) => ({
     // default. unstubGlobals restores any per-test fetch stub back to that
     // guard after each test instead of leaking it (or the real fetch).
     unstubGlobals: true,
+    // Fixed dummy keys: tests must pass on forks and clean clones without any
+    // secrets, and must never use (or depend on) a developer's real .env keys.
+    // They only need to be non-empty so the app treats the providers as
+    // configured; every network call is stubbed (see setup.ts), and tests that
+    // need the "no key" path override with vi.stubEnv.
+    env: {
+      VITE_TMDB_API_KEY: 'test-tmdb-key',
+      VITE_OMDB_API_KEY: 'test-omdb-key',
+    },
   },
 }))

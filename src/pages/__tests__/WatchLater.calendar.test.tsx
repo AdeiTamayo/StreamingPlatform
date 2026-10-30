@@ -6,7 +6,7 @@ import { addWatchLater, setUpcomingOpen, UPCOMING_OPEN_KEY } from '../../api/sto
 import { getMovieDetail, getTVDetail, getSeasonDetails, getTVExternalIds } from '../../api/tmdb';
 import { getEpisodeAirInstant } from '../../api/tvmaze';
 import { setTimezone } from '../../api/storage';
-import { generateCalendarGrid, formatISODate } from '../../utils/calendar';
+import { generateCalendarGrid, formatISODate, toZonedDateString } from '../../utils/calendar';
 
 vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
@@ -503,17 +503,26 @@ describe('WatchLater calendar integration', () => {
     // is deterministic regardless of the machine's zone.
     const probe = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 12);
     const deviceOffset = zoneOffsetHours(Intl.DateTimeFormat().resolvedOptions().timeZone, probe);
-    setTimezone(deviceOffset <= 2 ? 'Pacific/Kiritimati' : 'Pacific/Pago_Pago');
+    const calendarZone = deviceOffset <= 2 ? 'Pacific/Kiritimati' : 'Pacific/Pago_Pago';
+    setTimezone(calendarZone);
 
     renderWatchLater();
     await switchToCalendarView();
 
-    const todayIso = formatISODate(now);
+    // The page preselects today *in the calendar zone*, which is a different
+    // calendar day from the device's whenever the zones are 12h+ apart and the
+    // clock is past the offset boundary. Deriving the expectation from the
+    // device date made this test pass or fail depending on the time of day it
+    // ran, so compute it in the same zone the page uses.
+    const todayIso = toZonedDateString(Date.now(), calendarZone);
     const [y, m, d] = todayIso.split('-').map(Number);
     // Weekday of the calendar date itself, in the test's locale - the label
     // must agree with it (a one-day shift always changes the weekday).
+    // timeZone: 'UTC' matters: without it a device west of UTC renders the
+    // UTC-midnight instant as the previous day (same as the page's formatDate).
     const expectedWeekday = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
       weekday: 'short',
+      timeZone: 'UTC',
     });
 
     await waitFor(() => {
@@ -521,7 +530,7 @@ describe('WatchLater calendar integration', () => {
         (h) => h.textContent?.includes(expectedWeekday),
       );
       expect(label, `a heading showing weekday "${expectedWeekday}"`).toBeDefined();
-      expect(label!.textContent).toMatch(new RegExp(`\\b${now.getDate()}\\b`));
+      expect(label!.textContent).toMatch(new RegExp(`\\b${d}\\b`));
     });
   }, 20000);
 });

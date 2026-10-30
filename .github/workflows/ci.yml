@@ -37,11 +37,10 @@ jobs:
       - name: Dependency audit
         run: npm audit --audit-level=high
 
+      # No secrets here on purpose: vite.config.ts injects dummy keys for the
+      # test run, so tests are hermetic and pass on forks and fresh clones.
       - name: Test
         run: npm test
-        env:
-          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
-          VITE_OMDB_API_KEY: ${{ secrets.VITE_OMDB_API_KEY }}
 
       # VITE_OMDB_API_KEY is required here too: a bundle built without it makes
       # getOmdbRatingByTitle return null for every card, so every IMDb badge
