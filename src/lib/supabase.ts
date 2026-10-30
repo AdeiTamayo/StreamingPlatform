@@ -31,6 +31,48 @@ export function requireSupabase() {
   return supabase;
 }
 
+// PostgREST caps a response (Supabase default: 1,000 rows), so a plain
+// select('*') silently truncates larger libraries. Callers that treat the
+// result as the complete set (sync reconcile, backups) must page instead.
+const PAGE_SIZE = 1000;
+const MAX_PAGED_ROWS = 50_000;
+
+interface PageResult<T> {
+  data: T[] | null;
+  error: unknown;
+  count?: number | null;
+}
+
+/**
+ * Downloads every row by walking `.range()` pages. `fetchPage` must request an
+ * exact count (`select('*', { count: 'exact' })`) and use a deterministic order
+ * (a unique tiebreaker such as `id`), otherwise rows can repeat or be skipped
+ * between pages. Offsets advance by the rows actually returned, so a server cap
+ * smaller than PAGE_SIZE still yields the full set. Throws on any page error:
+ * a partial result is never returned.
+ */
+export async function fetchAllPages<T>(
+  fetchPage: (from: number, to: number) => PromiseLike<PageResult<T>>,
+  pageSize = PAGE_SIZE,
+  maxRows = MAX_PAGED_ROWS,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (;;) {
+    const res = await fetchPage(rows.length, rows.length + pageSize - 1);
+    if (res.error) throw res.error;
+    const page = res.data ?? [];
+    rows.push(...page);
+    if (page.length === 0) break;
+    if (res.count != null) {
+      if (rows.length >= res.count) break;
+    } else if (page.length < pageSize) {
+      break;
+    }
+    if (rows.length >= maxRows) throw new Error('Too many rows to download');
+  }
+  return rows;
+}
+
 // Postgres unique-violation (duplicate row). Repositories use it to tell
 // "already exists" apart from real failures without resorting to `any`.
 // Unwraps RetryError so it also works when the error came out of withRetry.

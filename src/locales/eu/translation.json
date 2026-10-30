@@ -1,4 +1,3 @@
-
 {
   "app": {
     "brand": "StreamFlow",
@@ -159,10 +158,10 @@
     "series": "Telesailak",
     "watchLaterCount": "Geroago ikusteko",
     "dangerZone": "Arrisku-eremua",
-    "dangerText": "Ezabatu tokiko ikusitakoen historia, ikusten jarraitzeko zerrendako elementuak, cachea eta Geroago ikusteko zerrendako elementu guztiak.",
-    "clearLocalData": "Tokiko datuak garbitu",
+    "dangerText": "Ezabatu betiko zure ikusitakoen historia, ikusten jarraitzeko sarrerak, Geroago ikusteko zerrenda eta bilaketa-historia, bai gailu honetatik bai hodeiko kontutik, eta garbitu cachea.",
+    "clearLocalData": "Nire datu guztiak ezabatu",
     "confirmTitle": "Ekintza hau ezin da desegin.",
-    "confirmBody": "Tokiko datu guztiak behin betiko ezabatuko dira.",
+    "confirmBody": "Zure datuak gailu honetatik eta hodeiko kontutik ezabatuko dira. Esportatu babeskopia bat lehenago behar baduzu.",
     "deleteEverything": "Dena ezabatu",
     "cancel": "Utzi"
   },
@@ -308,7 +307,8 @@
     "importFailed": "Inportazioak huts egin du",
     "loginToExport": "Hasi saioa Supabaseko datuak esportatzeko",
     "supabaseExported": "Supabaseko datuak esportatu dira",
-    "supabaseImported": "Supabaseko datuak behar bezala inportatu dira"
+    "supabaseImported": "Supabaseko datuak behar bezala inportatu dira",
+    "exportFailed": "Esportazioak huts egin du. Ez da babeskopia-fitxategirik sortu."
   },
   "searchBar": {
     "searchLabel": "Bilatu",

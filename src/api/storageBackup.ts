@@ -59,15 +59,18 @@ export function isSupabaseBackupWithinLimits(data: unknown): boolean {
   return true;
 }
 
+// Returns null when signed out. Rejects when any table cannot be downloaded in
+// full: a backup built from a failed or truncated read would look valid while
+// silently missing data, so the caller must show the failure instead.
 export async function exportSupabaseData(): Promise<SupabaseBackupData | null> {
   const userId = getCurrentUserId();
   if (!userId) return null;
 
   const [watched, watchLater, searchHistory, progress] = await Promise.all([
-    watchedRepository.getAll(userId),
-    watchLaterRepository.getAll(userId),
-    searchHistoryRepository.getAll(userId),
-    progressRepository.getAll(userId),
+    watchedRepository.getAllStrict(userId),
+    watchLaterRepository.getAllStrict(userId),
+    searchHistoryRepository.getAllStrict(userId),
+    progressRepository.getAllStrict(userId),
   ]);
 
   return {

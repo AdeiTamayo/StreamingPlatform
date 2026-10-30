@@ -51,18 +51,24 @@ export const searchHistoryRepository = {
     }
   },
 
+  // Throws on failure (used by backups, which must not export an empty list
+  // that merely reflects a failed read).
+  async getAllStrict(userId: string): Promise<SearchHistoryRow[]> {
+    const { data } = await withRetry(async () => {
+      const res = await requireSupabase().from('search_history')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(MAX_HISTORY);
+      if (res.error) throw res.error;
+      return res;
+    }, READ_RETRY);
+    return data ?? [];
+  },
+
   async getAll(userId: string): Promise<SearchHistoryRow[]> {
     try {
-      const { data } = await withRetry(async () => {
-        const res = await requireSupabase().from('search_history')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(MAX_HISTORY);
-        if (res.error) throw res.error;
-        return res;
-      }, READ_RETRY);
-      return data ?? [];
+      return await this.getAllStrict(userId);
     } catch {
       return [];
     }
