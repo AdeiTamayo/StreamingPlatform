@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getWatchedEpisodeSet } from '../api/storage';
 import SelectDropdown from './SelectDropdown';
 import type { TMDBEpisode } from '../types';
@@ -12,10 +13,13 @@ interface EpisodeDropdownProps {
 }
 
 export default function EpisodeDropdown({ showId, season, episode, episodes, onSelect }: EpisodeDropdownProps) {
+  const { t } = useTranslation();
   const watchedSet = useMemo(() => getWatchedEpisodeSet(showId, season), [showId, season]);
 
   const current = episodes.find((e) => e.episode_number === episode);
-  const triggerLabel = current ? `${current.episode_number}. ${current.name}` : `Episode ${episode}`;
+  const triggerLabel = current
+    ? `${current.episode_number}. ${current.name}`
+    : t('episodeDropdown.episodeN', { episode });
 
   const options = useMemo(
     () =>
@@ -33,11 +37,11 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
             </span>
           ),
           trailing: watched ? (
-            <span className="cs-check" aria-hidden="true" title="Watched">&#10003;</span>
+            <span className="cs-check" aria-hidden="true" title={t('episodeDropdown.watched')}>&#10003;</span>
           ) : undefined,
         };
       }),
-    [episodes, watchedSet],
+    [episodes, watchedSet, t],
   );
 
   return (
@@ -45,7 +49,7 @@ export default function EpisodeDropdown({ showId, season, episode, episodes, onS
       value={episode}
       options={options}
       onSelect={onSelect}
-      menuLabel="Select episode"
+      menuLabel={t('episodeDropdown.menuLabel')}
       triggerLabel={triggerLabel}
     />
   );

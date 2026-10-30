@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getSearchHistory, removeSearchHistory } from '../api/storage';
 import Notifications from './Notifications';
 import AccountButton from './AccountButton/AccountButton';
+import LanguageSwitcher from './LanguageSwitcher';
 import styles from './Navbar.module.css';
 
 interface NavItem {
@@ -534,6 +535,7 @@ const Navbar = memo(function Navbar() {
               </button>
             )}
           </form>
+          <LanguageSwitcher className={styles.navLanguage} />
           <AccountButton />
 
           {isAuthenticated && (
@@ -715,6 +717,11 @@ const Navbar = memo(function Navbar() {
               <span>{t('nav.settings')}</span>
             </Link>
           )}
+
+          <div className={styles.sidebarLanguage}>
+            <span className={styles.sidebarSectionLabel}>{t('nav.language')}</span>
+            <LanguageSwitcher />
+          </div>
 
           <AccountButton sidebar />
         </nav>

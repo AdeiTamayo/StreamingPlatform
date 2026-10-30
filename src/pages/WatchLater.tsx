@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { usePageTitle } from "../i18n/usePageTitle";
+import i18n, { toBcp47 } from "../i18n";
 import {
   getWatchLater,
   removeWatchLater,
@@ -107,12 +108,15 @@ function formatDate(dateStr: string) {
   // toZonedDateString), so render exactly that date. Interpreting it as a
   // device-local noon and re-formatting in another zone (the old code) shifts
   // the label by a day whenever the two zones are 12h+ apart.
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
+    toBcp47(i18n.resolvedLanguage || i18n.language),
+    {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    },
+  );
 }
 
 function calendarKey(item: CalendarItem) {
@@ -1588,7 +1592,7 @@ export default function WatchLater() {
                                 item.episode,
                               )
                             }
-                            title="Remove"
+                            title={t("common.remove")}
                           >
                             <CloseIcon />
                           </button>

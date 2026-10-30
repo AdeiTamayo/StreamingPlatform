@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import CloseIcon from '../CloseIcon';
 import LoginForm from './LoginForm';
@@ -11,10 +12,10 @@ type AuthMode = 'login' | 'register' | 'forgot';
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
-const MODE_TITLES: Record<AuthMode, { title: string; subtitle: string }> = {
-  login: { title: 'Sign In', subtitle: 'Welcome back. Sign in to sync your library.' },
-  register: { title: 'Create Account', subtitle: 'Sync your watch history across devices.' },
-  forgot: { title: 'Reset Password', subtitle: 'We will email you a link to reset it.' },
+const MODE_KEYS: Record<AuthMode, { title: string; subtitle: string }> = {
+  login: { title: 'auth.signInTitle', subtitle: 'auth.signInSubtitle' },
+  register: { title: 'auth.registerTitle', subtitle: 'auth.registerSubtitle' },
+  forgot: { title: 'auth.forgotTitle', subtitle: 'auth.forgotSubtitle' },
 };
 
 function getFocusable(container: HTMLElement): HTMLElement[] {
@@ -24,6 +25,7 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
 }
 
 export default function AuthModal() {
+  const { t } = useTranslation();
   const { isAuthModalOpen, closeAuthModal } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const modalRef = useRef<HTMLDivElement>(null);
@@ -91,7 +93,8 @@ export default function AuthModal() {
 
   if (!isAuthModalOpen) return null;
 
-  const { title, subtitle } = MODE_TITLES[mode];
+  const { title, subtitle } = MODE_KEYS[mode];
+  const titleText = t(title);
 
   return (
     <div
@@ -112,15 +115,15 @@ export default function AuthModal() {
           type="button"
           className={styles.closeBtn}
           onClick={closeAuthModal}
-          aria-label={`Close ${title} dialog`}
+          aria-label={t('auth.closeDialog', { title: titleText })}
         >
           <CloseIcon size={18} />
         </button>
 
         <h2 className={styles.title} id="auth-modal-title">
-          {title}
+          {titleText}
         </h2>
-        <p className={styles.subtitle}>{subtitle}</p>
+        <p className={styles.subtitle}>{t(subtitle)}</p>
 
         <div className={styles.body}>
           {mode === 'login' && (

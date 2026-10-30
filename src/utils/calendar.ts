@@ -1,3 +1,5 @@
+import i18n, { toBcp47 } from '../i18n';
+
 export interface CalendarCell {
   date: Date;
   isCurrentMonth: boolean;
@@ -20,21 +22,11 @@ export interface CalendarGrid {
   weeks: CalendarCell[][];
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTHS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
+const MONTH_REFERENCE_YEAR = 2024;
+
+function appLocale(): string {
+  return toBcp47(i18n.resolvedLanguage || i18n.language);
+}
 
 function getDayIndex(date: Date): number {
   const day = date.getDay();
@@ -50,17 +42,18 @@ function toISOString(date: Date): string {
 }
 
 function formatAccessibleLabel(date: Date, isCurrentMonth: boolean, viewedYear: number, viewedMonth: number): string {
-  const dayName = date.toLocaleDateString(undefined, { weekday: 'long' });
-  const monthName = date.toLocaleDateString(undefined, { month: 'long' });
-  const day = date.getDate();
-  const year = date.getFullYear();
-
-  const base = `${dayName}, ${monthName} ${day}, ${year}`;
+  const locale = appLocale();
+  const base = date.toLocaleDateString(locale, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
   if (!isCurrentMonth) {
-    if (year < viewedYear || (year === viewedYear && date.getMonth() < viewedMonth)) {
-      return `${base}, previous month`;
+    if (date.getFullYear() < viewedYear || (date.getFullYear() === viewedYear && date.getMonth() < viewedMonth)) {
+      return `${base}, ${i18n.t('datePicker.previousMonthSuffix')}`;
     }
-    return `${base}, next month`;
+    return `${base}, ${i18n.t('datePicker.nextMonthSuffix')}`;
   }
   return base;
 }
@@ -114,7 +107,7 @@ export function generateCalendarGrid(
     cells,
     year,
     month,
-    monthName: MONTHS[month],
+    monthName: getMonthName(month),
     firstDayOfMonth,
     lastDayOfMonth,
     weeks,
@@ -144,11 +137,18 @@ function createCell(
 }
 
 export function getMonthName(month: number): string {
-  return MONTHS[month];
+  return new Date(MONTH_REFERENCE_YEAR, month, 1).toLocaleDateString(appLocale(), { month: 'long' });
 }
 
 export function getWeekdays(): string[] {
-  return [...WEEKDAYS];
+  const locale = appLocale();
+  // 2024-01-01 is a Monday; walk forward to keep the Mon-first grid order.
+  const monday = new Date(MONTH_REFERENCE_YEAR, 0, 1);
+  return Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    return date.toLocaleDateString(locale, { weekday: 'short' });
+  });
 }
 
 export function navigateMonth(

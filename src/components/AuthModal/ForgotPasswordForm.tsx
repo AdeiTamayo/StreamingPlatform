@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage, isValidEmail } from './errors';
 import styles from './AuthModal.module.css';
@@ -8,6 +9,7 @@ interface ForgotPasswordFormProps {
 }
 
 export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFormProps) {
+  const { t } = useTranslation();
   const { resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
@@ -22,11 +24,11 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Enter your email address.');
+      setError(t('auth.errors.emailRequired'));
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setError('Enter a valid email address.');
+      setError(t('auth.errors.emailInvalid'));
       return;
     }
 
@@ -45,11 +47,10 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
     return (
       <div className={styles.form}>
         <p className={styles.success} role="status">
-          If an account exists for <strong>{email.trim()}</strong>, a password reset link has been
-          sent. Check your inbox.
+          <Trans i18nKey="auth.resetSent" values={{ email: email.trim() }} />
         </p>
         <button type="button" className={styles.button} onClick={onSwitchToLogin} autoFocus>
-          Back to Sign In
+          {t('auth.backToSignIn')}
         </button>
       </div>
     );
@@ -58,11 +59,11 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       <label className={styles.field}>
-        <span className={styles.label}>Email</span>
+        <span className={styles.label}>{t('auth.email')}</span>
         <input
           type="email"
           className={styles.input}
-          placeholder="you@example.com"
+          placeholder={t('auth.emailPlaceholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
@@ -77,13 +78,13 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
       {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
 
       <button type="submit" className={styles.button} disabled={submitting}>
-        {submitting ? 'Sending…' : 'Send Reset Link'}
+        {submitting ? t('auth.sending') : t('auth.sendResetLink')}
       </button>
 
       <p className={styles.switchRow}>
-        Remembered your password?{' '}
+        {t('auth.rememberedPassword')}{' '}
         <button type="button" className={styles.linkBtn} onClick={onSwitchToLogin} disabled={submitting}>
-          Sign in
+          {t('auth.signInLink')}
         </button>
       </p>
     </form>

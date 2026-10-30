@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import styles from "./BulkSelectBar.module.css";
 
 interface BulkSelectBarProps {
@@ -25,45 +26,47 @@ export default function BulkSelectBar({
   onKeep,
   onConfirmRemove,
 }: BulkSelectBarProps) {
+  const { t } = useTranslation();
+
   return (
-    <div className={styles.selectBar} role="toolbar" aria-label="Bulk selection">
+    <div className={styles.selectBar} role="toolbar" aria-label={t("bulkSelect.toolbar")}>
       <span className={styles.selectCount} role="status">
         {selectedCount === 0
-          ? "No titles selected"
-          : `${selectedCount} selected`}
+          ? t("bulkSelect.none")
+          : t("bulkSelect.selected", { count: selectedCount })}
       </span>
       {onSelectPage && (
         <button
           className={styles.selectAction}
           onClick={onSelectPage}
-          title="Select every title on this page"
+          title={t("bulkSelect.selectPageTitle")}
         >
-          Select page
+          {t("bulkSelect.selectPage")}
         </button>
       )}
       <button
         className={styles.selectAction}
         onClick={onClear}
         disabled={selectedCount === 0}
-        title="Clear the current selection"
+        title={t("bulkSelect.clearTitle")}
       >
-        Clear
+        {t("common.clear")}
       </button>
       {confirming ? (
         <>
           <button
             className={styles.selectRemove}
             onClick={onConfirmRemove}
-            title={`Remove ${selectedCount} selected ${selectedCount === 1 ? "title" : "titles"}`}
+            title={t("bulkSelect.confirmRemoveTitle", { count: selectedCount })}
           >
-            Confirm remove ({selectedCount})
+            {t("bulkSelect.confirmRemove", { count: selectedCount })}
           </button>
           <button
             className={styles.selectAction}
             onClick={onKeep}
-            title="Keep the selected titles"
+            title={t("bulkSelect.keepTitle")}
           >
-            Keep
+            {t("bulkSelect.keep")}
           </button>
         </>
       ) : (
@@ -71,10 +74,11 @@ export default function BulkSelectBar({
           className={styles.selectRemove}
           onClick={onRequestRemove}
           disabled={selectedCount === 0}
-          title="Remove the selected titles"
+          title={t("bulkSelect.removeSelectedTitle")}
         >
-          Remove selected
-          {selectedCount > 0 ? ` (${selectedCount})` : ""}
+          {selectedCount > 0
+            ? t("bulkSelect.removeSelectedWithCount", { count: selectedCount })
+            : t("bulkSelect.removeSelected")}
         </button>
       )}
     </div>

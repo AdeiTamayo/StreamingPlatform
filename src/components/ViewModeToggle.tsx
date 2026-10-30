@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 export type ViewMode = 'trailer' | 'player';
 
 interface ViewModeToggleProps {
@@ -11,12 +13,16 @@ interface ViewModeToggleProps {
 export default function ViewModeToggle({
   mode,
   onChange,
-  trailerLabel = 'Trailer',
-  playerLabel = 'Player',
+  trailerLabel,
+  playerLabel,
   className = '',
 }: ViewModeToggleProps) {
+  const { t } = useTranslation();
+  const trailer = trailerLabel ?? t('viewMode.trailer');
+  const player = playerLabel ?? t('viewMode.player');
+
   return (
-    <div className={`view-mode-toggle ${className}`.trim()} role="tablist" aria-label="Playback view">
+    <div className={`view-mode-toggle ${className}`.trim()} role="tablist" aria-label={t('viewMode.label')}>
       <button
         type="button"
         role="tab"
@@ -24,7 +30,7 @@ export default function ViewModeToggle({
         className={`view-mode-option${mode === 'trailer' ? ' active' : ''}`}
         onClick={() => onChange('trailer')}
       >
-        {trailerLabel}
+        {trailer}
       </button>
       <button
         type="button"
@@ -33,7 +39,7 @@ export default function ViewModeToggle({
         className={`view-mode-option${mode === 'player' ? ' active' : ''}`}
         onClick={() => onChange('player')}
       >
-        {playerLabel}
+        {player}
       </button>
     </div>
   );

@@ -594,6 +594,26 @@
   text-transform: uppercase;
 }
 
+.sidebarLanguage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0.75rem 0.75rem 0.5rem;
+}
+
+.sidebarLanguage .sidebarSectionLabel {
+  margin-left: 0;
+}
+
+.sidebarLanguage :global(.custom-select),
+.sidebarLanguage :global(.custom-select-trigger) {
+  width: 100%;
+}
+
+.navLanguage {
+  flex-shrink: 0;
+}
+
 
   /* -----------------------------
      Sidebar links

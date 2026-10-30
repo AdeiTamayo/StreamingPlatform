@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage, isValidEmail } from './errors';
 import styles from './AuthModal.module.css';
@@ -11,6 +12,7 @@ interface LoginFormProps {
 type FieldName = 'email' | 'password';
 
 export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: LoginFormProps) {
+  const { t } = useTranslation();
   const { signIn } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,17 +30,17 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Enter your email address.');
+      setError(t('auth.errors.emailRequired'));
       setErrorField('email');
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setError('Enter a valid email address.');
+      setError(t('auth.errors.emailInvalid'));
       setErrorField('email');
       return;
     }
     if (!password) {
-      setError('Enter your password.');
+      setError(t('auth.errors.passwordRequired'));
       setErrorField('password');
       return;
     }
@@ -56,11 +58,11 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       <label className={styles.field}>
-        <span className={styles.label}>Email</span>
+        <span className={styles.label}>{t('auth.email')}</span>
         <input
           type="email"
           className={styles.input}
-          placeholder="you@example.com"
+          placeholder={t('auth.emailPlaceholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
@@ -73,12 +75,12 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
       </label>
 
       <label className={styles.field}>
-        <span className={styles.label}>Password</span>
+        <span className={styles.label}>{t('auth.password')}</span>
         <div className={styles.inputWrap}>
           <input
             type={showPassword ? 'text' : 'password'}
             className={styles.input}
-            placeholder="••••••••"
+            placeholder={t('auth.passwordPlaceholder')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
@@ -91,17 +93,17 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
             type="button"
             className={styles.togglePassword}
             onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             aria-pressed={showPassword}
             disabled={submitting}
           >
-            {showPassword ? 'Hide' : 'Show'}
+            {showPassword ? t('auth.hide') : t('auth.show')}
           </button>
         </div>
       </label>
 
       <button type="button" className={styles.linkBtn} onClick={onSwitchToForgot} disabled={submitting}>
-        Forgot password?
+        {t('auth.forgotPassword')}
       </button>
 
       {error && <p id={errorId} className={styles.error} role="alert">{error}</p>}
@@ -112,13 +114,13 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
         disabled={submitting}
         aria-describedby={error && !errorField ? errorId : undefined}
       >
-        {submitting ? 'Signing in…' : 'Sign In'}
+        {submitting ? t('auth.signingIn') : t('auth.signIn')}
       </button>
 
       <p className={styles.switchRow}>
-        New to StreamFlow?{' '}
+        {t('auth.newToApp')}{' '}
         <button type="button" className={styles.linkBtn} onClick={onSwitchToRegister} disabled={submitting}>
-          Create an account
+          {t('auth.createAccountLink')}
         </button>
       </p>
     </form>

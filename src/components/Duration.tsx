@@ -1,7 +1,10 @@
+import { useTranslation } from "react-i18next";
 import { formatRuntime } from "../utils/format";
 
 /** Clock + runtime label, matching the detail-page duration style. */
 export default function Duration({ minutes }: { minutes: number | null | undefined }) {
+  // Subscribe to language changes so formatRuntime re-renders translated.
+  useTranslation();
   const label = formatRuntime(minutes);
   if (!label) return null;
   return (

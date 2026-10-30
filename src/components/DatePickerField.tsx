@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import useClickOutside from '../hooks/useClickOutside';
 import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, formatISODate, parseISODate } from '../utils/calendar';
+import i18n, { toBcp47 } from '../i18n';
 import styles from './DatePickerField.module.css';
 
 interface DatePickerFieldProps {
@@ -11,6 +13,7 @@ interface DatePickerFieldProps {
 }
 
 export default function DatePickerField({ label, value, onChange, placeholder }: DatePickerFieldProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'day' | 'month' | 'year'>('day');
   const [viewDate, setViewDate] = useState(() => {
@@ -215,7 +218,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
         <span className={styles.datePickerIcon} aria-hidden="true">&#128197;</span>
       </button>
       {open && (
-        <div className={styles.datePickerPopover} role="dialog" aria-label={`${label} picker`}>
+        <div className={styles.datePickerPopover} role="dialog" aria-label={t('datePicker.pickerLabel', { label })}>
           {view === 'day' && (
             <>
               <div className={styles.datePickerHeader}>
@@ -226,7 +229,10 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                     const { year, month } = navigateMonth(viewDate.getFullYear(), viewDate.getMonth(), 'prev');
                     setViewDate(new Date(year, month, 1));
                   }}
-                  aria-label={`Previous month, ${getMonthName(viewDate.getMonth() === 0 ? 11 : viewDate.getMonth() - 1)} ${viewDate.getMonth() === 0 ? viewDate.getFullYear() - 1 : viewDate.getFullYear()}`}
+                  aria-label={t('datePicker.previousMonth', {
+                    month: getMonthName(viewDate.getMonth() === 0 ? 11 : viewDate.getMonth() - 1),
+                    year: viewDate.getMonth() === 0 ? viewDate.getFullYear() - 1 : viewDate.getFullYear(),
+                  })}
                 >
                   &#10094;
                 </button>
@@ -235,7 +241,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                   className={styles.datePickerMonth}
                   onClick={() => setView('month')}
                 >
-                  {viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+                  {viewDate.toLocaleDateString(toBcp47(i18n.resolvedLanguage || i18n.language), { month: 'long', year: 'numeric' })}
                 </button>
                 <button
                   type="button"
@@ -244,7 +250,10 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                     const { year, month } = navigateMonth(viewDate.getFullYear(), viewDate.getMonth(), 'next');
                     setViewDate(new Date(year, month, 1));
                   }}
-                  aria-label={`Next month, ${getMonthName(viewDate.getMonth() === 11 ? 0 : viewDate.getMonth() + 1)} ${viewDate.getMonth() === 11 ? viewDate.getFullYear() + 1 : viewDate.getFullYear()}`}
+                  aria-label={t('datePicker.nextMonth', {
+                    month: getMonthName(viewDate.getMonth() === 11 ? 0 : viewDate.getMonth() + 1),
+                    year: viewDate.getMonth() === 11 ? viewDate.getFullYear() + 1 : viewDate.getFullYear(),
+                  })}
                 >
                   &#10095;
                 </button>
@@ -340,8 +349,8 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
           )}
 
           <div className={styles.datePickerFooter}>
-            <button type="button" className={styles.datePickerAction} onClick={() => { onChange(''); setOpen(false); setView('day'); triggerRef.current?.focus(); }}>Clear</button>
-            <button type="button" className={`${styles.datePickerAction} ${styles.primary}`} onClick={() => { onChange(formatISODate(new Date())); setOpen(false); setView('day'); triggerRef.current?.focus(); }}>Today</button>
+            <button type="button" className={styles.datePickerAction} onClick={() => { onChange(''); setOpen(false); setView('day'); triggerRef.current?.focus(); }}>{t('common.clear')}</button>
+            <button type="button" className={`${styles.datePickerAction} ${styles.primary}`} onClick={() => { onChange(formatISODate(new Date())); setOpen(false); setView('day'); triggerRef.current?.focus(); }}>{t('datePicker.today')}</button>
           </div>
         </div>
       )}

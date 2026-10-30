@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
 import { getErrorMessage, isValidEmail, validatePassword, MIN_PASSWORD_LENGTH } from './errors';
 import styles from './AuthModal.module.css';
@@ -10,6 +11,7 @@ interface RegisterFormProps {
 type FieldName = 'email' | 'password' | 'confirm';
 
 export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
+  const { t } = useTranslation();
   const { signUp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,23 +32,23 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
-      setError('Enter your email address.');
+      setError(t('auth.errors.emailRequired'));
       setErrorField('email');
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
-      setError('Enter a valid email address.');
+      setError(t('auth.errors.emailInvalid'));
       setErrorField('email');
       return;
     }
-    const passwordError = validatePassword(password);
+    const passwordError = validatePassword(password, t);
     if (passwordError) {
       setError(passwordError);
       setErrorField('password');
       return;
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('auth.errors.passwordMismatch'));
       setErrorField('confirm');
       return;
     }
@@ -68,10 +70,10 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
     return (
       <div className={styles.form}>
         <p className={styles.success} role="status">
-          Account created! Check your email to confirm your account, then sign in.
+          {t('auth.accountCreated')}
         </p>
         <button type="button" className={styles.button} onClick={onSwitchToLogin} autoFocus>
-          Back to Sign In
+          {t('auth.backToSignIn')}
         </button>
       </div>
     );
@@ -80,11 +82,11 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   return (
     <form className={styles.form} onSubmit={handleSubmit} noValidate>
       <label className={styles.field}>
-        <span className={styles.label}>Email</span>
+        <span className={styles.label}>{t('auth.email')}</span>
         <input
           type="email"
           className={styles.input}
-          placeholder="you@example.com"
+          placeholder={t('auth.emailPlaceholder')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           autoComplete="email"
@@ -97,12 +99,12 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       </label>
 
       <label className={styles.field}>
-        <span className={styles.label}>Password</span>
+        <span className={styles.label}>{t('auth.password')}</span>
         <div className={styles.inputWrap}>
           <input
             type={showPassword ? 'text' : 'password'}
             className={styles.input}
-            placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
+            placeholder={t('auth.newPasswordPlaceholder', { count: MIN_PASSWORD_LENGTH })}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
@@ -116,22 +118,22 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             type="button"
             className={styles.togglePassword}
             onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             aria-pressed={showPassword}
             disabled={submitting}
           >
-            {showPassword ? 'Hide' : 'Show'}
+            {showPassword ? t('auth.hide') : t('auth.show')}
           </button>
         </div>
       </label>
 
       <label className={styles.field}>
-        <span className={styles.label}>Confirm Password</span>
+        <span className={styles.label}>{t('auth.confirmPassword')}</span>
         <div className={styles.inputWrap}>
           <input
             type={showConfirmPassword ? 'text' : 'password'}
             className={styles.input}
-            placeholder="Repeat your password"
+            placeholder={t('auth.repeatPasswordPlaceholder')}
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
@@ -144,11 +146,11 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
             type="button"
             className={styles.togglePassword}
             onClick={() => setShowConfirmPassword((v) => !v)}
-            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            aria-label={showConfirmPassword ? t('auth.hidePassword') : t('auth.showPassword')}
             aria-pressed={showConfirmPassword}
             disabled={submitting}
           >
-            {showConfirmPassword ? 'Hide' : 'Show'}
+            {showConfirmPassword ? t('auth.hide') : t('auth.show')}
           </button>
         </div>
       </label>
@@ -161,13 +163,13 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         disabled={submitting}
         aria-describedby={error && !errorField ? errorId : undefined}
       >
-        {submitting ? 'Creating account…' : 'Create Account'}
+        {submitting ? t('auth.creatingAccount') : t('auth.signUp')}
       </button>
 
       <p className={styles.switchRow}>
-        Already have an account?{' '}
+        {t('auth.alreadyHaveAccount')}{' '}
         <button type="button" className={styles.linkBtn} onClick={onSwitchToLogin} disabled={submitting}>
-          Sign in
+          {t('auth.signInLink')}
         </button>
       </p>
     </form>
