@@ -17,6 +17,9 @@
   --accent: #9db8e7;
   --accent-bright: #c9d9f5;
   --blue: #6d9ff7;
+  --blue-rgb: 109, 159, 247;
+  --filter-active-border: rgba(var(--blue-rgb), 0.5);
+  --filter-active-bg: rgba(var(--blue-rgb), 0.12);
 
   /* Legacy aliases for backward compatibility during migration */
   --bg-elevated: rgba(16, 26, 42, 0.92);
@@ -97,6 +100,9 @@
   --accent: #3b7dd8;
   --accent-bright: #2a6bc4;
   --blue: #2a6bc4;
+  --blue-rgb: 42, 107, 196;
+  --filter-active-border: rgba(var(--blue-rgb), 0.45);
+  --filter-active-bg: rgba(var(--blue-rgb), 0.1);
 
   --bg-elevated: rgba(255, 255, 255, 0.94);
   --bg-card: rgba(255, 255, 255, 0.95);
@@ -277,14 +283,18 @@ select:focus-visible {
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: transparent;
-  color: var(--accent);
+  background: var(--field);
+  color: var(--muted);
 }
 
-.search-field:focus-within,
+.search-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14);
+}
+
 .field-control:focus-within {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(109,159,247,.14);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14);
 }
 
 .search-field input,
@@ -295,10 +305,11 @@ select:focus-visible {
   outline: 0;
   background: transparent;
   color: var(--foreground);
+  font-size: 14px;
 }
 
 .query-bar input::placeholder {
-  color: #8498bc;
+  color: var(--muted);
 }
 
 .clear-input {
@@ -332,12 +343,13 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 52px;
-  padding: 0 15px;
+  height: 44px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
   background: var(--field);
-  color: var(--accent-bright);
+  color: var(--muted-strong);
+  font-size: 14px;
 }
 
 .field-control select {
@@ -346,13 +358,13 @@ select:focus-visible {
   outline: 0;
   appearance: none;
   background: transparent;
-  color: var(--accent-bright);
+  color: inherit;
   cursor: pointer;
 }
 
 .field-control svg {
   flex: 0 0 auto;
-  color: #88a4d4;
+  color: var(--muted);
 }
 
 /* Reusable FilterDropdown used inside the query bar. */
@@ -367,19 +379,29 @@ select:focus-visible {
   justify-content: space-between;
   height: 44px;
   min-height: 44px;
-  padding: 0 12px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: transparent;
-  color: var(--accent-bright);
+  background: var(--field);
+  color: var(--muted-strong);
   font-size: 14px;
   font-weight: 500;
 }
 
-.query-select .custom-select-trigger:hover,
-.query-select .custom-select-trigger:focus {
-  border-color: var(--blue);
+.query-select .custom-select-trigger:hover {
+  border-color: var(--border-strong);
   background: var(--surface-overlay-hover);
+}
+
+/* Accent only when a non-default option is selected. */
+.query-select.has-value .custom-select-trigger {
+  border-color: var(--filter-active-border);
+  background: var(--filter-active-bg);
+  color: var(--accent-bright);
+}
+
+.query-select.has-value .cs-arrow {
+  color: var(--blue);
 }
 
 .query-select .custom-select-menu {
@@ -395,17 +417,18 @@ select:focus-visible {
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: transparent;
-  color: var(--accent);
+  background: var(--field);
+  color: var(--muted-strong);
   cursor: pointer;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .filter-toggle:hover,
 .filter-toggle.is-open {
-  border-color: rgba(125,166,238,.55);
-  background: rgba(109,159,247,.1);
-  color: var(--accent-bright);
+  border-color: var(--border-strong);
+  background: var(--surface-overlay-hover);
+  color: var(--foreground);
 }
 
 .secondary-panel {
@@ -440,7 +463,7 @@ select:focus-visible {
   gap: 7px;
   border: 0;
   background: transparent;
-  color: #8ea9d7;
+  color: var(--muted);
   font-size: 13px;
   cursor: pointer;
 }
@@ -456,7 +479,7 @@ select:focus-visible {
 }
 
 .date-control {
-  color: #8498bc;
+  color: var(--muted);
 }
 
 .date-prefix {
@@ -469,7 +492,7 @@ select:focus-visible {
 }
 
 .date-control input::placeholder {
-  color: #8498bc;
+  color: var(--muted);
 }
 
 .secondary-grid .filter-error {
@@ -496,15 +519,15 @@ select:focus-visible {
   align-items: center;
   gap: 7px;
   padding: 7px 10px;
-  border: 1px solid rgba(109,159,247,.28);
+  border: 1px solid var(--filter-active-border);
   border-radius: 999px;
-  background: rgba(109,159,247,.1);
-  color: #b7cdf3;
+  background: var(--filter-active-bg);
+  color: var(--accent-bright);
   font-size: 12px;
 }
 
 .filter-chip svg {
-  color: #7fa8ec;
+  color: var(--blue);
 }
 
 @media (max-width: 900px) {

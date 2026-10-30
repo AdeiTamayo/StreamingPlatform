@@ -28,6 +28,7 @@ export default function NumberStepper({
   const autoId = useId();
   const inputId = id ?? autoId;
   const numeric = value === '' ? null : Number(value);
+  const hasValue = value.trim() !== '';
   const atMin = numeric === null || numeric <= min;
   const atMax = numeric !== null && numeric >= max;
 
@@ -50,7 +51,7 @@ export default function NumberStepper({
   }
 
   return (
-    <div className={styles.stepper}>
+    <div className={`${styles.stepper} ${hasValue ? styles.hasValue : ''}`.trim()}>
       <button
         type="button"
         className={styles.btn}

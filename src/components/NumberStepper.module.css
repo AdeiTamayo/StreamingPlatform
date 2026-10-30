@@ -4,17 +4,23 @@
   gap: 0.25rem;
   width: 100%;
   min-width: 0;
-  height: 52px;
+  height: 44px;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 13px;
   background: var(--field);
+  color: var(--muted-strong);
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .stepper:focus-within {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px rgba(109, 159, 247, 0.14);
+  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.14);
+}
+
+.stepper.hasValue {
+  border-color: var(--filter-active-border);
+  background: var(--filter-active-bg);
 }
 
 .btn {
@@ -22,19 +28,23 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--accent);
+  color: var(--muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
 .btn:hover:not(:disabled) {
   background: var(--surface-overlay-hover);
-  color: var(--accent-bright);
+  color: var(--foreground);
+}
+
+.stepper.hasValue .btn {
+  color: var(--blue);
 }
 
 .btn:disabled {
@@ -55,12 +65,16 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: var(--text);
+  color: var(--foreground);
   font-family: inherit;
   font-size: 14px;
   text-align: center;
 }
 
+.stepper.hasValue .input {
+  color: var(--accent-bright);
+}
+
 .input::placeholder {
-  color: #8498bc;
+  color: var(--muted);
 }

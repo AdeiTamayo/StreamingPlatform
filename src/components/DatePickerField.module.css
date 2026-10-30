@@ -12,7 +12,7 @@
   gap: 0.75rem;
   width: auto;
   min-width: 0;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0.55rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -25,8 +25,8 @@
 }
 
 .date-picker-trigger:hover {
-  border-color: rgba(125, 211, 252, 0.22);
-  background: rgba(125, 211, 252, 0.08);
+  border-color: var(--border-strong);
+  background: var(--surface-overlay-hover);
 }
 
 .date-picker-value {
@@ -48,9 +48,10 @@
 }
 
 .date-picker-icon {
+  display: flex;
   flex: 0 0 auto;
-  font-size: 0.95rem;
-  opacity: 0.9;
+  align-items: center;
+  color: var(--muted);
 }
 
 .date-picker-popover {
@@ -63,7 +64,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 18px;
   background:
-    radial-gradient(circle at top, rgba(56, 189, 248, 0.12), transparent 38%),
+    radial-gradient(circle at top, rgba(var(--blue-rgb), 0.12), transparent 38%),
     linear-gradient(180deg, rgba(20, 31, 49, 0.98), rgba(11, 18, 30, 0.98));
   box-shadow: 0 24px 52px rgba(0, 0, 0, 0.34);
 }
@@ -95,7 +96,7 @@ button.date-picker-month {
 }
 
 button.date-picker-month:hover {
-  background: rgba(125, 211, 252, 0.12);
+  background: rgba(var(--blue-rgb), 0.12);
 }
 
 .date-picker-nav {
@@ -109,8 +110,8 @@ button.date-picker-month:hover {
 }
 
 .date-picker-nav:hover {
-  background: rgba(125, 211, 252, 0.12);
-  border-color: rgba(125, 211, 252, 0.18);
+  background: rgba(var(--blue-rgb), 0.12);
+  border-color: rgba(var(--blue-rgb), 0.18);
 }
 
 .date-picker-weekdays,
@@ -142,8 +143,8 @@ button.date-picker-month:hover {
 }
 
 .date-picker-cell:hover:not(.empty) {
-  background: rgba(125, 211, 252, 0.1);
-  border-color: rgba(125, 211, 252, 0.14);
+  background: rgba(var(--blue-rgb), 0.1);
+  border-color: rgba(var(--blue-rgb), 0.14);
 }
 
 .date-picker-cell.today {
@@ -163,8 +164,8 @@ button.date-picker-month:hover {
 
 .date-picker-cell.adjacentMonth:hover:not(.empty) {
   opacity: 0.8;
-  background: rgba(125, 211, 252, 0.08);
-  border-color: rgba(125, 211, 252, 0.12);
+  background: rgba(var(--blue-rgb), 0.08);
+  border-color: rgba(var(--blue-rgb), 0.12);
 }
 
 .date-picker-grid.months,
@@ -199,7 +200,7 @@ button.date-picker-month:hover {
 }
 
 .date-picker-action:hover {
-  background: rgba(125, 211, 252, 0.1);
+  background: rgba(var(--blue-rgb), 0.1);
   color: var(--text);
 }
 
@@ -219,7 +220,8 @@ button.date-picker-month:hover {
   width: 100%;
 }
 
-/* Inside the query bar's secondary filter grid, match .field-control sizing. */
+/* Inside the query bar's secondary filter grid, match the other filter
+   controls exactly (same height, radius, colours and font size). */
 :global(.secondary-grid) .date-picker {
   width: 100%;
   min-width: 0;
@@ -227,11 +229,31 @@ button.date-picker-month:hover {
 
 :global(.secondary-grid) .date-picker-trigger {
   width: 100%;
-  height: 52px;
-  min-height: 52px;
-  padding: 0 15px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
   border-radius: 13px;
   background: var(--field);
-  color: var(--accent-bright, var(--text));
+  color: var(--muted-strong);
   font-size: 14px;
+}
+
+:global(.secondary-grid) .date-picker-trigger:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-overlay-hover);
+}
+
+/* The field already has a visible label above it; the inline one is duplicate. */
+:global(.secondary-grid) .date-picker-inline-label {
+  display: none;
+}
+
+.date-picker.hasValue .date-picker-trigger {
+  border-color: var(--filter-active-border);
+  background: var(--filter-active-bg);
+  color: var(--accent-bright);
+}
+
+.date-picker.hasValue .date-picker-icon {
+  color: var(--blue);
 }

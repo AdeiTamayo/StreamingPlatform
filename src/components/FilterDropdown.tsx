@@ -25,6 +25,7 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
     const menuId = `fd-menu-${id}`;
 
     const current = useMemo(() => options.find((option) => option.value === value), [options, value]);
+    const hasValue = value !== '';
 
     const filtered = useMemo(() => {
         if (!search) return options;
@@ -41,7 +42,7 @@ export default function FilterDropdown({ value, options, placeholder, onSelect, 
     }, close);
 
     return (
-        <div className={`custom-select ${className}`.trim()} ref={ref}>
+        <div className={`custom-select ${hasValue ? 'has-value' : ''} ${className}`.trim()} ref={ref}>
             <button
                 className="custom-select-trigger"
                 onClick={() => setOpen((state) => !state)}
