@@ -632,7 +632,11 @@
     "previousMonth": "Aurreko hilabetea, {{month}} {{year}}",
     "nextMonth": "Hurrengo hilabetea, {{month}} {{year}}",
     "previousMonthSuffix": "aurreko hilabetea",
-    "nextMonthSuffix": "hurrengo hilabetea"
+    "nextMonthSuffix": "hurrengo hilabetea",
+    "previousYear": "Aurreko urtea",
+    "nextYear": "Hurrengo urtea",
+    "previousYears": "Aurreko {{count}} urte",
+    "nextYears": "Hurrengo {{count}} urte"
   },
   "bulkSelect": {
     "toolbar": "Hautaketa anizkoitza",

@@ -7,6 +7,8 @@ import {
   navigateMonth,
   getWeekdays,
   getMonthName,
+  getShortMonthName,
+  formatDisplayDate,
   toZonedDateString,
   isValidTimezone,
   getSystemTimezone,
@@ -225,6 +227,23 @@ describe('calendar utility', () => {
     it('returns correct month name', () => {
       expect(getMonthName(0)).toBe('January');
       expect(getMonthName(11)).toBe('December');
+    });
+  });
+
+  describe('getShortMonthName', () => {
+    it('returns the abbreviated month name', () => {
+      expect(getShortMonthName(0)).toBe('Jan');
+      expect(getShortMonthName(11)).toBe('Dec');
+    });
+  });
+
+  describe('formatDisplayDate', () => {
+    it('formats an ISO date for display', () => {
+      expect(formatDisplayDate('2025-02-15')).toBe('Feb 15, 2025');
+    });
+
+    it('returns the raw value when it is not a valid date', () => {
+      expect(formatDisplayDate('not-a-date')).toBe('not-a-date');
     });
   });
 

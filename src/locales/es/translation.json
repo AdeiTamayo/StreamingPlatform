@@ -632,7 +632,11 @@
     "previousMonth": "Mes anterior, {{month}} {{year}}",
     "nextMonth": "Mes siguiente, {{month}} {{year}}",
     "previousMonthSuffix": "mes anterior",
-    "nextMonthSuffix": "mes siguiente"
+    "nextMonthSuffix": "mes siguiente",
+    "previousYear": "Año anterior",
+    "nextYear": "Año siguiente",
+    "previousYears": "{{count}} años anteriores",
+    "nextYears": "{{count}} años siguientes"
   },
   "bulkSelect": {
     "toolbar": "Selección múltiple",

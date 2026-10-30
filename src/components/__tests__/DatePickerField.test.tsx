@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { isValidDate } from '../../utils/calendar';
 import DatePickerField from '../DatePickerField';
+import i18n from '../../i18n';
 
 describe('DatePickerField', () => {
   const defaultProps = {
@@ -15,11 +16,22 @@ describe('DatePickerField', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('renders trigger button with label and placeholder', () => {
     render(<DatePickerField {...defaultProps} />);
     const trigger = screen.getByRole('button', { name: /Test Date: Select date/i });
     expect(trigger).toBeInTheDocument();
     expect(trigger).toHaveTextContent('Select date');
+  });
+
+  it('formats the selected date in the active language', async () => {
+    await i18n.changeLanguage('es');
+    render(<DatePickerField {...defaultProps} value="2025-02-15" />);
+    const trigger = screen.getByRole('button', { name: /Test Date: 15 feb 2025/i });
+    expect(trigger).toHaveTextContent('15 feb 2025');
   });
 
   it('opens popover when trigger is clicked', async () => {
@@ -58,7 +70,7 @@ describe('DatePickerField', () => {
 
   it('shows adjacent month dates', async () => {
     render(<DatePickerField {...defaultProps} value="2025-02-15" />);
-    const trigger = screen.getByRole('button', { name: /Test Date: 2025-02-15/i });
+    const trigger = screen.getByRole('button', { name: /Test Date: Feb 15, 2025/i });
     fireEvent.click(trigger);
     // February 2025 starts on Saturday, so we should see Jan 27-31
     const adjacentCells = screen.getAllByText(/^(27|28|29|30|31)$/);
@@ -94,7 +106,7 @@ describe('DatePickerField', () => {
 
   it('Clear button clears the value', async () => {
     render(<DatePickerField {...defaultProps} value="2025-02-15" />);
-    const trigger = screen.getByRole('button', { name: /Test Date: 2025-02-15/i });
+    const trigger = screen.getByRole('button', { name: /Test Date: Feb 15, 2025/i });
     fireEvent.click(trigger);
     const clearBtn = screen.getByRole('button', { name: /Clear/i });
     fireEvent.click(clearBtn);
@@ -114,7 +126,7 @@ describe('DatePickerField', () => {
 
   it('navigates to previous month', async () => {
     render(<DatePickerField {...defaultProps} value="2025-02-15" />);
-    const trigger = screen.getByRole('button', { name: /Test Date: 2025-02-15/i });
+    const trigger = screen.getByRole('button', { name: /Test Date: Feb 15, 2025/i });
     fireEvent.click(trigger);
     const prevBtn = screen.getByRole('button', { name: /Previous month, January 2025/i });
     fireEvent.click(prevBtn);
@@ -124,7 +136,7 @@ describe('DatePickerField', () => {
 
   it('navigates to next month', async () => {
     render(<DatePickerField {...defaultProps} value="2025-02-15" />);
-    const trigger = screen.getByRole('button', { name: /Test Date: 2025-02-15/i });
+    const trigger = screen.getByRole('button', { name: /Test Date: Feb 15, 2025/i });
     fireEvent.click(trigger);
     const nextBtn = screen.getByRole('button', { name: /Next month, March 2025/i });
     fireEvent.click(nextBtn);
@@ -170,7 +182,7 @@ describe('DatePickerField', () => {
 
   it('adjacent month dates can be selected', async () => {
     render(<DatePickerField {...defaultProps} value="2025-02-15" />);
-    const trigger = screen.getByRole('button', { name: /Test Date: 2025-02-15/i });
+    const trigger = screen.getByRole('button', { name: /Test Date: Feb 15, 2025/i });
     fireEvent.click(trigger);
     // Click an adjacent month date (January date in February view)
     const adjacentBtns = screen.getAllByRole('button', { name: /January \d+, 2025/ });

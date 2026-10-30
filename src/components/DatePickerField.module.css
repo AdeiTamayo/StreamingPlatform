@@ -249,7 +249,7 @@ button.date-picker-month:hover {
 }
 
 .date-picker.hasValue .date-picker-trigger {
-  border-color: var(--filter-active-border);
+  border-color: var(--blue);
   background: var(--filter-active-bg);
   color: var(--accent-bright);
 }

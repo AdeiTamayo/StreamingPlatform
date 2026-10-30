@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useClickOutside from '../hooks/useClickOutside';
-import { generateCalendarGrid, getWeekdays, getMonthName, navigateMonth, formatISODate, parseISODate } from '../utils/calendar';
+import { generateCalendarGrid, getWeekdays, getMonthName, getShortMonthName, formatDisplayDate, navigateMonth, formatISODate, parseISODate } from '../utils/calendar';
 import i18n, { toBcp47 } from '../i18n';
 import styles from './DatePickerField.module.css';
 
@@ -202,6 +202,8 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
     setOpen((s) => !s);
   }
 
+  const displayValue = value ? formatDisplayDate(value) : placeholder;
+
   return (
     <div className={`${styles.datePicker} ${value ? styles.hasValue : ''}`.trim()} ref={ref}>
       <button
@@ -211,10 +213,10 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
         onClick={openPicker}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={`${label}: ${value || placeholder}`}
+        aria-label={`${label}: ${displayValue}`}
       >
         <span className={styles.datePickerInlineLabel}>{label}</span>
-        <span className={`${styles.datePickerValue} ${value ? '' : styles.empty}`}>{value || placeholder}</span>
+        <span className={`${styles.datePickerValue} ${value ? '' : styles.empty}`}>{displayValue}</span>
         <span className={styles.datePickerIcon} aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" />
@@ -290,14 +292,14 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
           {view === 'month' && (
             <>
               <div className={styles.datePickerHeader}>
-                <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 1, c.getMonth(), 1))}>&#10094;</button>
+                <button type="button" className={styles.datePickerNav} aria-label={t('datePicker.previousYear')} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 1, c.getMonth(), 1))}>&#10094;</button>
                 <button type="button" className={styles.datePickerMonth} onClick={() => setView('year')}>
                   {viewDate.getFullYear()}
                 </button>
-                <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 1, c.getMonth(), 1))}>&#10095;</button>
+                <button type="button" className={styles.datePickerNav} aria-label={t('datePicker.nextYear')} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 1, c.getMonth(), 1))}>&#10095;</button>
               </div>
               <div className={`${styles.datePickerGrid} ${styles.months}`} ref={gridRef}>
-                {getMonthName(0).slice(0, 3) && Array.from({ length: 12 }, (_, i) => {
+                {Array.from({ length: 12 }, (_, i) => {
                   const isCurrent = i === viewDate.getMonth();
                   return (
                     <button
@@ -313,7 +315,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                       aria-label={getMonthName(i)}
                       tabIndex={i === focusedCellIndex ? 0 : -1}
                     >
-                      {getMonthName(i).slice(0, 3)}
+                      {getShortMonthName(i)}
                     </button>
                   );
                 })}
@@ -324,11 +326,11 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
           {view === 'year' && (
             <>
               <div className={styles.datePickerHeader}>
-                <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 20, c.getMonth(), 1))}>&#10094;</button>
+                <button type="button" className={styles.datePickerNav} aria-label={t('datePicker.previousYears', { count: 20 })} onClick={() => setViewDate((c) => new Date(c.getFullYear() - 20, c.getMonth(), 1))}>&#10094;</button>
                 <span className={styles.datePickerMonth}>
                   {yearRangeStart} – {yearRangeStart + 19}
                 </span>
-                <button type="button" className={styles.datePickerNav} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 20, c.getMonth(), 1))}>&#10095;</button>
+                <button type="button" className={styles.datePickerNav} aria-label={t('datePicker.nextYears', { count: 20 })} onClick={() => setViewDate((c) => new Date(c.getFullYear() + 20, c.getMonth(), 1))}>&#10095;</button>
               </div>
               <div className={`${styles.datePickerGrid} ${styles.years}`} ref={gridRef}>
                 {Array.from({ length: 20 }, (_, i) => yearRangeStart + i).map((yr, i) => {

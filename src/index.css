@@ -18,8 +18,8 @@
   --accent-bright: #c9d9f5;
   --blue: #6d9ff7;
   --blue-rgb: 109, 159, 247;
-  --filter-active-border: rgba(var(--blue-rgb), 0.5);
-  --filter-active-bg: rgba(var(--blue-rgb), 0.12);
+  --filter-active-border: rgba(var(--blue-rgb), 0.8);
+  --filter-active-bg: rgba(var(--blue-rgb), 0.16);
 
   /* Legacy aliases for backward compatibility during migration */
   --bg-elevated: rgba(16, 26, 42, 0.92);
@@ -101,8 +101,8 @@
   --accent-bright: #2a6bc4;
   --blue: #2a6bc4;
   --blue-rgb: 42, 107, 196;
-  --filter-active-border: rgba(var(--blue-rgb), 0.45);
-  --filter-active-bg: rgba(var(--blue-rgb), 0.1);
+  --filter-active-border: rgba(var(--blue-rgb), 0.7);
+  --filter-active-bg: rgba(var(--blue-rgb), 0.12);
 
   --bg-elevated: rgba(255, 255, 255, 0.94);
   --bg-card: rgba(255, 255, 255, 0.95);
@@ -394,14 +394,22 @@ select:focus-visible {
 }
 
 /* Accent only when a non-default option is selected. */
-.query-select.has-value .custom-select-trigger {
-  border-color: var(--filter-active-border);
+.query-select.has-value .custom-select-trigger,
+.query-select.has-value .custom-select-trigger:hover {
+  border-color: var(--blue);
   background: var(--filter-active-bg);
   color: var(--accent-bright);
 }
 
 .query-select.has-value .cs-arrow {
   color: var(--blue);
+}
+
+/* Keep the selected option visibly marked while the menu is open. */
+.query-select .custom-select-item.active {
+  background: var(--filter-active-bg);
+  color: var(--accent-bright);
+  box-shadow: inset 2px 0 0 var(--blue);
 }
 
 .query-select .custom-select-menu {

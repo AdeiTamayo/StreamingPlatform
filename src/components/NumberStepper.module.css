@@ -19,7 +19,7 @@
 }
 
 .stepper.hasValue {
-  border-color: var(--filter-active-border);
+  border-color: var(--blue);
   background: var(--filter-active-bg);
 }
 

@@ -140,6 +140,18 @@ export function getMonthName(month: number): string {
   return new Date(MONTH_REFERENCE_YEAR, month, 1).toLocaleDateString(appLocale(), { month: 'long' });
 }
 
+/** Abbreviated month name in the active language (used by the month grid). */
+export function getShortMonthName(month: number): string {
+  return new Date(MONTH_REFERENCE_YEAR, month, 1).toLocaleDateString(appLocale(), { month: 'short' });
+}
+
+/** Formats a YYYY-MM-DD value for display in the active language. */
+export function formatDisplayDate(isoDate: string): string {
+  const date = parseISODate(isoDate);
+  if (!date) return isoDate;
+  return date.toLocaleDateString(appLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 export function getWeekdays(): string[] {
   const locale = appLocale();
   // 2024-01-01 is a Monday; walk forward to keep the Mon-first grid order.
