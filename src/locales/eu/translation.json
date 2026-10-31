@@ -610,7 +610,7 @@
     "alreadyHaveAccount": "Baduzu konturik?",
     "rememberedPassword": "Pasahitza gogoratu duzu?",
     "signInLink": "Hasi saioa",
-    "accountCreated": "Kontua sortu da! Egiaztatu zure posta elektronikoa kontua berresteko, eta gero hasi saioa.",
+    "accountCreated": "Kontua sortu da! Begiratu zure posta eta ireki berrespen-esteka. Hona itzuliko zaitu, saioa hasita.",
     "resetSent": "Kontu bat badago <strong>{{email}}</strong> helbiderako, pasahitza berrezartzeko esteka bidali da. Begiratu zure sarrera-ontzia.",
     "errors": {
       "emailRequired": "Idatzi zure posta elektronikoa.",
@@ -645,6 +645,10 @@
       "invalidTitle": "Esteka hau ezin da erabili",
       "invalidBody": "Pasahitza berrezartzeko esteka ez da baliozkoa, iraungi da edo dagoeneko erabili da. Eskatu berri bat jarraitzeko.",
       "requestNew": "Eskatu esteka berri bat"
+    },
+    "link": {
+      "expired": "Esteka hau iraungi da edo dagoeneko erabili da. Zure posta dagoeneko berretsita badago, hasi saioa; bestela, erregistratu berriro esteka berri bat jasotzeko.",
+      "confirmed": "Posta berretsi da. Saioa hasi duzu."
     }
   },
   "notifications": {
@@ -693,10 +697,52 @@
     "nextYears": "Hurrengo {{count}} urte",
     "dateFormat": "{{year}} {{month}} {{day}}",
     "accessibleDate": "{{weekday}}, {{year}} {{month}} {{day}}",
-    "monthsShort": ["urt.", "ots.", "mar.", "api.", "mai.", "eka.", "uzt.", "abu.", "ira.", "urr.", "aza.", "abe."],
-    "monthsLong": ["urtarrila", "otsaila", "martxoa", "apirila", "maiatza", "ekaina", "uztaila", "abuztua", "iraila", "urria", "azaroa", "abendua"],
-    "weekdaysShort": ["al.", "ar.", "az.", "og.", "or.", "lr.", "ig."],
-    "weekdaysLong": ["astelehena", "asteartea", "asteazkena", "osteguna", "ostirala", "larunbata", "igandea"]
+    "monthsShort": [
+      "urt.",
+      "ots.",
+      "mar.",
+      "api.",
+      "mai.",
+      "eka.",
+      "uzt.",
+      "abu.",
+      "ira.",
+      "urr.",
+      "aza.",
+      "abe."
+    ],
+    "monthsLong": [
+      "urtarrila",
+      "otsaila",
+      "martxoa",
+      "apirila",
+      "maiatza",
+      "ekaina",
+      "uztaila",
+      "abuztua",
+      "iraila",
+      "urria",
+      "azaroa",
+      "abendua"
+    ],
+    "weekdaysShort": [
+      "al.",
+      "ar.",
+      "az.",
+      "og.",
+      "or.",
+      "lr.",
+      "ig."
+    ],
+    "weekdaysLong": [
+      "astelehena",
+      "asteartea",
+      "asteazkena",
+      "osteguna",
+      "ostirala",
+      "larunbata",
+      "igandea"
+    ]
   },
   "bulkSelect": {
     "toolbar": "Hautaketa anizkoitza",

@@ -5,6 +5,7 @@ const authMock = vi.hoisted(() => ({
   updateUser: vi.fn(),
   signOut: vi.fn(),
   signInWithPassword: vi.fn(),
+  signUp: vi.fn(),
   getSession: vi.fn(),
 }));
 
@@ -18,6 +19,7 @@ import {
   PASSWORD_RESET_PATH,
   ACCOUNT_SETTINGS_PATH,
   DELETE_ACCOUNT_PATH,
+  SIGNUP_REDIRECT_PATH,
 } from '../authService';
 
 describe('authService password recovery', () => {
@@ -272,5 +274,27 @@ describe('authService deleteAccount', () => {
     await expect(authService.deleteAccount('Old!Password-1')).rejects.toMatchObject({
       message: 'Failed to fetch',
     });
+  });
+});
+
+describe('authService sign-up confirmation email', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authMock.signUp.mockResolvedValue({ data: { user: { id: 'u' }, session: null }, error: null });
+  });
+
+  it('asks Supabase to send the confirmation link back to the current origin', async () => {
+    await authService.signUp('a@b.co', 'N3w!Password-ok');
+    expect(authMock.signUp).toHaveBeenCalledWith({
+      email: 'a@b.co',
+      password: 'N3w!Password-ok',
+      options: { emailRedirectTo: `${window.location.origin}${SIGNUP_REDIRECT_PATH}` },
+    });
+    expect(SIGNUP_REDIRECT_PATH).toBe('/');
+  });
+
+  it('still hides whether an address is already registered', async () => {
+    authMock.signUp.mockResolvedValue({ data: null, error: { message: 'User already registered', code: 'user_already_exists' } });
+    await expect(authService.signUp('a@b.co', 'x')).resolves.toEqual({ user: null, session: null });
   });
 });

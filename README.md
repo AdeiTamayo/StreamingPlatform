@@ -214,6 +214,8 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 
    The reset email links to that page, where the user sets a new password. If the URL is not on the list, Supabase falls back to the *Site URL*: the app still detects the recovery session and moves to the set-new-password screen, but the link no longer lands on the intended route and may be rejected. Also check that *Site URL* is your production origin.
 
+   **Sign-up confirmation** uses the same list. The confirmation email links back to the origin the user registered from (`<origin>/`), so add `/` for every origin too (`http://localhost:5173/`, `https://your-production-domain/`, the preview wildcard). Set *Site URL* to your production origin: it is what Supabase falls back to when a redirect is not on the list, and while it is still `localhost` the confirmation emails will point there.
+
 ### Migrating existing local data
 
 If you already used the app before adding Supabase, run:
