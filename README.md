@@ -205,6 +205,13 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 3. Copy your project URL and anon key into `.env`
 
    Migrations already applied to a hosted project are **not** re-run when you edit the file — add a new numbered migration instead. `supabase db push` applies pending files if you use the Supabase CLI.
+4. **Allow the password-reset route.** In the Supabase dashboard open *Authentication → URL Configuration → Redirect URLs* and add `/reset-password` for every origin the app runs on, for example:
+
+   - `http://localhost:5173/reset-password`
+   - `https://your-production-domain/reset-password`
+   - `https://*-your-team.vercel.app/reset-password` (preview deployments, if you use them)
+
+   The reset email links to that page, where the user sets a new password. If the URL is not on the list, Supabase falls back to the *Site URL*: the app still detects the recovery session and moves to the set-new-password screen, but the link no longer lands on the intended route and may be rejected. Also check that *Site URL* is your production origin.
 
 ### Migrating existing local data
 

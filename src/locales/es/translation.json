@@ -314,7 +314,8 @@
     "exportFailed": "Error al exportar. No se creó ningún archivo de copia de seguridad.",
     "syncDropped": "Algunos cambios no se pudieron sincronizar con tu cuenta. Abre Ajustes para reintentar.",
     "syncRecovered": "Todo está sincronizado de nuevo.",
-    "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde."
+    "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde.",
+    "passwordUpdated": "Tu contraseña se ha actualizado."
   },
   "searchBar": {
     "searchLabel": "Buscar",
@@ -596,7 +597,25 @@
       "passwordLength": "La contraseña debe tener al menos {{count}} caracteres.",
       "passwordLetters": "La contraseña debe incluir letras mayúsculas y minúsculas.",
       "passwordNumber": "La contraseña debe incluir al menos un número.",
-      "passwordSymbol": "La contraseña debe incluir al menos un símbolo."
+      "passwordSymbol": "La contraseña debe incluir al menos un símbolo.",
+      "samePassword": "Elige una contraseña distinta de la actual.",
+      "weakPassword": "Esa contraseña es demasiado fácil de adivinar. Elige una más segura.",
+      "rateLimited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+      "sessionExpired": "Este enlace ha caducado o ya se usó. Solicita uno nuevo.",
+      "network": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+      "generic": "Algo salió mal. Inténtalo de nuevo."
+    },
+    "reset": {
+      "title": "Establece una nueva contraseña",
+      "subtitle": "Elige una nueva contraseña para tu cuenta.",
+      "newPassword": "Nueva contraseña",
+      "submit": "Guardar nueva contraseña",
+      "saving": "Guardando…",
+      "skip": "Ahora no",
+      "checking": "Comprobando tu enlace…",
+      "invalidTitle": "Este enlace no se puede usar",
+      "invalidBody": "El enlace para restablecer la contraseña no es válido, ha caducado o ya se usó. Solicita uno nuevo para continuar.",
+      "requestNew": "Solicitar un enlace nuevo"
     }
   },
   "notifications": {

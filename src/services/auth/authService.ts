@@ -3,14 +3,23 @@ import { requireSupabase, supabase } from '../../lib/supabase';
 export interface AuthError {
   message: string;
   code?: string;
+  /** Error class name (e.g. AuthSessionMissingError), which carries no `code`. */
+  name?: string;
 }
 
 function toAuthError(err: unknown): AuthError {
   if (err && typeof err === 'object' && 'message' in err) {
-    return { message: String((err as { message: unknown }).message), code: (err as { code?: string }).code };
+    const source = err as { message: unknown; code?: string; name?: string };
+    return { message: String(source.message), code: source.code, name: source.name };
   }
   return { message: String(err) };
 }
+
+// Path the password-reset email links to. It must be listed under
+// Authentication > URL Configuration > Redirect URLs in the Supabase project,
+// otherwise Supabase falls back to the Site URL (the recovery event is still
+// handled there, but the user lands on the home page first).
+export const PASSWORD_RESET_PATH = '/reset-password';
 
 function errorText(err: unknown): string {
   return err && typeof err === 'object' && 'message' in err
@@ -68,7 +77,7 @@ export const authService = {
   async resetPassword(email: string) {
     try {
       const { error } = await requireSupabase().auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/settings`,
+        redirectTo: `${window.location.origin}${PASSWORD_RESET_PATH}`,
       });
       if (error) throw error;
     } catch (err) {
@@ -76,6 +85,28 @@ export const authService = {
       // enumeration oracle.
       if (isUserNotFoundError(err)) return;
       throw toAuthError(err);
+    }
+  },
+
+  /**
+   * Sets a new password for the signed-in (recovery) session. Other devices are
+   * signed out afterwards: whoever had the old password, or a stolen session,
+   * must not stay logged in after the owner resets it. That step is best
+   * effort - the password change itself already succeeded, so a failure there
+   * must not be reported as a failed reset.
+   */
+  async updatePassword(newPassword: string) {
+    const client = requireSupabase();
+    try {
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+    } catch (err) {
+      throw toAuthError(err);
+    }
+    try {
+      await client.auth.signOut({ scope: 'others' });
+    } catch {
+      // keep the successful reset
     }
   },
 

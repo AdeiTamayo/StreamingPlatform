@@ -314,7 +314,8 @@
     "exportFailed": "Export failed. No backup file was created.",
     "syncDropped": "Some changes could not be synced to your account. Open Settings to retry.",
     "syncRecovered": "Everything is synced again.",
-    "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later."
+    "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later.",
+    "passwordUpdated": "Your password has been updated."
   },
   "searchBar": {
     "searchLabel": "Search",
@@ -596,7 +597,25 @@
       "passwordLength": "Password must be at least {{count}} characters.",
       "passwordLetters": "Password must include both uppercase and lowercase letters.",
       "passwordNumber": "Password must include at least one number.",
-      "passwordSymbol": "Password must include at least one symbol."
+      "passwordSymbol": "Password must include at least one symbol.",
+      "samePassword": "Choose a password different from your current one.",
+      "weakPassword": "That password is too easy to guess. Choose a stronger one.",
+      "rateLimited": "Too many attempts. Please wait a moment and try again.",
+      "sessionExpired": "This reset link has expired or was already used. Request a new one.",
+      "network": "Could not reach the server. Check your connection and try again.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "reset": {
+      "title": "Set a new password",
+      "subtitle": "Choose a new password for your account.",
+      "newPassword": "New password",
+      "submit": "Set new password",
+      "saving": "Saving…",
+      "skip": "Not now",
+      "checking": "Checking your reset link…",
+      "invalidTitle": "This link can't be used",
+      "invalidBody": "The password reset link is invalid, has expired, or was already used. Request a new one to continue.",
+      "requestNew": "Request a new link"
     }
   },
   "notifications": {

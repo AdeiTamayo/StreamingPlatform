@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const authServiceMock = vi.hoisted(() => ({
@@ -11,7 +11,10 @@ const authServiceMock = vi.hoisted(() => ({
   resetPassword: vi.fn(),
 }));
 
-vi.mock('../../services/auth/authService', () => ({ authService: authServiceMock }));
+vi.mock('../../services/auth/authService', () => ({
+  authService: authServiceMock,
+  PASSWORD_RESET_PATH: '/reset-password',
+}));
 
 import { AuthProvider } from '../AuthContext';
 import { useAuth } from '../../hooks/useAuth';
@@ -67,5 +70,79 @@ describe('AuthContext signOut', () => {
 
     await waitFor(() => expect(screen.getByTestId('auth').textContent).toBe('false'));
     await waitFor(() => expect(screen.getByTestId('path').textContent).toBe('/'));
+  });
+});
+
+describe('AuthContext password recovery', () => {
+  function RecoveryProbe() {
+    const { isPasswordRecovery, isAuthenticated, endPasswordRecovery, signOut } = useAuth();
+    const location = useLocation();
+    return (
+      <div>
+        <span data-testid="recovery">{String(isPasswordRecovery)}</span>
+        <span data-testid="authed">{String(isAuthenticated)}</span>
+        <span data-testid="where">{location.pathname}</span>
+        <button onClick={endPasswordRecovery}>end</button>
+        <button onClick={() => void signOut()}>out</button>
+      </div>
+    );
+  }
+
+  let emit: (event: string, session: unknown) => void;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authServiceMock.getSession.mockResolvedValue(null);
+    authServiceMock.signOut.mockResolvedValue(undefined);
+    authServiceMock.onAuthStateChange.mockImplementation(((cb: (e: string, s: unknown) => void) => {
+      emit = cb;
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    }) as never);
+  });
+
+  function renderAt(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <AuthProvider>
+          <RecoveryProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('flags recovery and moves to the reset route on PASSWORD_RECOVERY', async () => {
+    renderAt('/');
+    await waitFor(() => expect(authServiceMock.onAuthStateChange).toHaveBeenCalled());
+
+    act(() => emit('PASSWORD_RECOVERY', { user: { id: 'u1' } }));
+
+    await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('true'));
+    expect(screen.getByTestId('where').textContent).toBe('/reset-password');
+    expect(screen.getByTestId('authed').textContent).toBe('true');
+  });
+
+  it('does not flag recovery for a normal SIGNED_IN event', async () => {
+    renderAt('/');
+    await waitFor(() => expect(authServiceMock.onAuthStateChange).toHaveBeenCalled());
+
+    act(() => emit('SIGNED_IN', { user: { id: 'u1' } }));
+
+    await waitFor(() => expect(screen.getByTestId('authed').textContent).toBe('true'));
+    expect(screen.getByTestId('recovery').textContent).toBe('false');
+  });
+
+  it('clears the flag on endPasswordRecovery and on sign-out', async () => {
+    renderAt('/');
+    await waitFor(() => expect(authServiceMock.onAuthStateChange).toHaveBeenCalled());
+
+    act(() => emit('PASSWORD_RECOVERY', { user: { id: 'u1' } }));
+    await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('true'));
+    fireEvent.click(screen.getByText('end'));
+    expect(screen.getByTestId('recovery').textContent).toBe('false');
+
+    act(() => emit('PASSWORD_RECOVERY', { user: { id: 'u1' } }));
+    await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('true'));
+    fireEvent.click(screen.getByText('out'));
+    await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('false'));
   });
 });

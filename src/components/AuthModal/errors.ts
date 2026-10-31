@@ -36,3 +36,47 @@ export function validatePassword(password: string, t?: TFunction): string | null
   }
   return null;
 }
+
+interface ErrorLike {
+  message?: unknown;
+  code?: unknown;
+  name?: unknown;
+  status?: unknown;
+}
+
+/**
+ * Maps a Supabase/network auth error to translated copy. Raw server messages
+ * are English-only and can expose implementation detail, so anything not
+ * recognised falls back to a generic translated message instead.
+ */
+export function getLocalizedAuthError(err: unknown, t: TFunction): string {
+  const e = (err && typeof err === 'object' ? err : {}) as ErrorLike;
+  const code = typeof e.code === 'string' ? e.code : '';
+  const name = typeof e.name === 'string' ? e.name : '';
+  const message = typeof e.message === 'string' ? e.message : '';
+
+  if (code === 'same_password' || /different from the old password/i.test(message)) {
+    return t('auth.errors.samePassword');
+  }
+  if (code === 'weak_password') return t('auth.errors.weakPassword');
+  if (
+    code === 'over_request_rate_limit' ||
+    code === 'over_email_send_rate_limit' ||
+    e.status === 429
+  ) {
+    return t('auth.errors.rateLimited');
+  }
+  if (
+    code === 'session_not_found' ||
+    code === 'session_expired' ||
+    code === 'otp_expired' ||
+    name === 'AuthSessionMissingError' ||
+    /session missing/i.test(message)
+  ) {
+    return t('auth.errors.sessionExpired');
+  }
+  if (/failed to fetch|network|load failed/i.test(message)) {
+    return t('auth.errors.network');
+  }
+  return t('auth.errors.generic');
+}

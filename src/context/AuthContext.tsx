@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useCallback, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
-import { authService } from '../services/auth/authService';
+import { authService, PASSWORD_RESET_PATH } from '../services/auth/authService';
 import { dataMigration } from '../utils/dataMigration';
 import { setCurrentUserId } from '../api/storage';
 import { logError } from '../utils/logger';
@@ -16,7 +16,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [syncVersion, setSyncVersion] = useState(0);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const navigate = useNavigate();
+  // Under BrowserRouter useNavigate's identity changes with the location. The
+  // auth subscription must not be torn down and re-created on every
+  // navigation, so the handler reads the latest navigate through a ref.
+  const navigateRef = useRef(navigate);
+  useEffect(() => {
+    navigateRef.current = navigate;
+  }, [navigate]);
 
   const openAuthModal = useCallback(() => {
     setIsAuthModalOpen(true);
@@ -58,6 +66,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           setCurrentUserId(null);
           setAuth(null, null);
+        } else if (event === 'PASSWORD_RECOVERY' && supabaseSession?.user) {
+          // The reset link signs the user in with a recovery session but emits
+          // PASSWORD_RECOVERY instead of SIGNED_IN. Without handling it they
+          // end up logged in with no way to choose a new password. Migration is
+          // left to the getSession() path below, which also runs on this load.
+          setCurrentUserId(supabaseSession.user.id);
+          setAuth(supabaseSession.user, supabaseSession);
+          setIsAuthModalOpen(false);
+          setIsPasswordRecovery(true);
+          // Works even when Supabase fell back to the Site URL because the
+          // reset path is not in its redirect allow-list.
+          navigateRef.current(PASSWORD_RESET_PATH, { replace: true });
         } else if (event === 'TOKEN_REFRESHED' && supabaseSession?.user) {
           setCurrentUserId(supabaseSession.user.id);
           setAuth(supabaseSession.user, supabaseSession);
@@ -117,6 +137,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   }, [setAuth, runMigration]);
 
+  const updatePassword = useCallback(async (newPassword: string) => {
+    await authService.updatePassword(newPassword);
+    setIsPasswordRecovery(false);
+  }, []);
+
+  const endPasswordRecovery = useCallback(() => {
+    setIsPasswordRecovery(false);
+  }, []);
+
   const signOut = useCallback(async () => {
     // A failed remote sign-out (expired token, offline) must not strand the
     // user signed in locally: clear local state and the storage-layer user id
@@ -128,6 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setCurrentUserId(null);
       setAuth(null, null);
+      setIsPasswordRecovery(false);
       navigate('/');
     }
   }, [setAuth, navigate]);
@@ -144,6 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         resetPassword,
+        isPasswordRecovery,
+        updatePassword,
+        endPasswordRecovery,
         isAuthModalOpen,
         openAuthModal,
         closeAuthModal,

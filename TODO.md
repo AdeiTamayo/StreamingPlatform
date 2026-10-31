@@ -16,43 +16,53 @@ findings as pending until reproduced or otherwise verified.
 For audit findings, record one status: `Confirmed`,
 `Reproduced in tests`, `Potential`, or `Resolved`.
 
+**Progress note:** `fix/offline-queue` and `fix/password-recovery` have
+been merged into `main` (typecheck, lint, 432 tests and production build
+all pass). Items marked `Resolved` below reflect code that landed with
+those merges; items marked `Partial` still need work, and live Supabase
+verification has not been performed.
+
 ---
 
 ## 1. High-priority fixes and checks
 
 ### Data integrity, sync and backups
 
-- [ ] **H --- Clarify "Clear local data".** `clearAllData()`
-      (`src/api/storage.ts:1169–1191`) deletes all four Supabase tables
-      for the signed-in user, although the UI says "Clear local data".
-      Update the copy in English, Spanish and Basque, or split this into
-      separate "Clear this device" and "Delete cloud data" actions with
-      separate confirmations.
-- [ ] **H --- Paginate cloud downloads.** `getAllStrict` in
-      `watchedRepository`, `watchLaterRepository` and `progressRepository`
-      has no pagination. Supabase may limit results to 1,000 rows per
-      request, while the app allows up to 10,000 watched rows. Page with
-      `.range()` until a short page is returned.
-- [ ] **H --- Prevent destructive reconciliation after incomplete
-      downloads.** `downloadSupabaseData`
-      (`src/utils/dataMigration.ts:396–404`) treats the download as
-      authoritative and removes local keys missing from the response.
-      Never delete local records if a download failed or may be truncated.
-- [ ] **H --- Make cloud exports complete and fail visibly.**
-      `exportSupabaseData` (`src/api/storageBackup.ts:62–108`) uses
-      `getAll`, may hit the row limit and returns `[]` on errors. Use
-      paginated strict reads and report failures; never present a partial
-      or empty export as successful.
-- [ ] **H --- Prevent loss of offline writes.** The offline queue
-      drops operations beyond 200 and after five failed attempts
-      (`src/utils/offlineQueue.ts:49–51, 209–213`). Preserve a
-      dirty/pending marker, avoid deleting unsynced local data during
-      reconciliation, and clearly warn users when writes cannot be synced.
-- [ ] **H --- Complete password recovery.** `resetPassword` redirects
-      to `/settings` (`src/services/auth/authService.ts:68–80`), but the
-      audit found no completion flow handling `PASSWORD_RECOVERY` or
-      calling `updateUser`. Add a set-new-password screen and test the
-      full email-to-reset flow.
+- [x] **H --- Clarify "Clear local data".** — `Resolved`.
+      The control now reads "Delete all my data" / "Eliminar todos mis
+      datos" / "Nire datu guztiak ezabatu" in `src/locales/*`, so the copy
+      matches the fact that `clearAllData()` also deletes cloud rows.
+      Splitting device-only and cloud-only actions remains an optional UX
+      improvement.
+- [x] **H --- Paginate cloud downloads.** — `Resolved`.
+      `getAllStrict` in `watchedRepository`, `watchLaterRepository`,
+      `progressRepository` and `searchHistoryRepository` now pages with
+      `.range()` through `fetchAllPages` until a short page is returned,
+      and throws on failure.
+- [x] **H --- Prevent destructive reconciliation after incomplete
+      downloads.** — `Resolved`.
+      `fetchRemoteSnapshot` returns `null` when a section fails or times
+      out, and the reconcile step skips deletions for that section instead
+      of treating a partial download as authoritative.
+- [x] **H --- Make cloud exports complete and fail visibly.** — `Resolved`.
+      `exportSupabaseData` reads through `getAllStrict` and throws on
+      failure, so a partial or empty library can no longer be presented as
+      a successful export.
+- [x] **H --- Prevent loss of offline writes.** — `Resolved`.
+      The queue cap is now 1,000 operations; anything dropped (overflow,
+      exhausted retries or permanent rejection) is recorded under
+      `SYNC_DROPPED_KEY` and surfaced by `SyncDropNotice`. While that
+      marker is present the sign-in reconcile does not delete local data,
+      and Settings offers a retry (`dataMigration.resync`) that clears the
+      marker only after a successful re-upload.
+- [x] **H --- Complete password recovery.** — `Resolved` (automated
+      flow covered; live email round-trip still to be verified).
+      `resetPassword` now points at `PASSWORD_RESET_PATH`, `AuthContext`
+      handles the `PASSWORD_RECOVERY` event, and the new
+      `/reset-password` page calls `updateUser` and signs out other
+      sessions. Covered by `ResetPassword`, `authService` and
+      `AuthContext` tests. Sending a real recovery email and following the
+      link end-to-end in a deployed environment is still unverified.
 - [ ] **H --- Test cross-account data isolation.** Using two test
       accounts, verify `SELECT`, `INSERT`, `UPDATE` and `DELETE` isolation
       for every table, view, RPC/function and storage bucket. Attempt to
@@ -68,11 +78,11 @@ For audit findings, record one status: `Confirmed`,
       backups safely. Test duplicate IDs, invalid dates, unexpected fields
       and schema migrations. Failed imports must leave existing data
       unchanged.
-- [ ] **H --- Verify migration and recovery ordering.**
-      `clearMigratedData()` currently runs before the cloud download,
-      which has a four-second deadline
-      (`src/utils/dataMigration.ts:267, 540`). Download and validate
-      first; only clear migrated local data after successful recovery.
+- [x] **H --- Verify migration and recovery ordering.** — `Resolved` in
+      code. `clearMigratedData()` now runs only after the cloud download
+      has been fetched and validated; a failed or timed-out download skips
+      the destructive step. Live verification against a real account is
+      still recommended.
 - [ ] **H --- Verify viewing progress reliability (not a new
       feature).** Test existing watched status, episode/season actions,
       Continue Watching and resume behaviour after refresh, offline use,
@@ -127,11 +137,11 @@ For audit findings, record one status: `Confirmed`,
 
 ### Bugs, performance and resilience
 
-- [ ] **M --- Handle permanent offline-queue errors correctly.**
-      `processOperation` swallows errors (`offlineQueue.ts:145–147`); a
-      unique violation (`23505`) can consume all retries. Treat an
-      already-existing record as success where appropriate and stop
-      retrying permanent errors.
+- [x] **M --- Handle permanent offline-queue errors correctly.** —
+      `Resolved`. `processOperation` uses `isPermanentError` to stop
+      retrying failures that cannot succeed, treats a `23505` unique
+      violation as success where the row already exists, and records
+      genuinely dropped operations instead of swallowing them.
 - [ ] **M --- Batch bulk "unmark watched" operations.**
       `unmarkAllSeasonsWatched` (`storage.ts:820–826`) performs one delete
       per episode and repeatedly parses/rewrites an index. Batch deletes
@@ -145,10 +155,11 @@ For audit findings, record one status: `Confirmed`,
       labels across time zones. Reproduce the cause and freeze time with
       fake timers where appropriate; do not assume the root cause before
       investigation.
-- [ ] **M --- Add missing regression coverage.** The audit found no
-      test files referencing `storageBackup`, `progressRepository` or
-      `LoginForm`. Add tests for paginated downloads, backup
-      export/import, sync failure paths and authentication flows.
+- [ ] **M --- Add missing regression coverage.** — `Partial`.
+      `storageBackup`, `progressRepository`, `offlineQueue` error paths,
+      `ResetPassword` and `AuthContext` recovery are now covered.
+      `LoginForm` still has no tests, and the live sync/backup scenarios
+      below remain manual.
 - [ ] **M --- Review `/api/probe` resource limits.** In addition to
       abuse protection, test cache eviction, concurrent scans, timeout
       behaviour and error responses under failure conditions.
@@ -210,14 +221,14 @@ For audit findings, record one status: `Confirmed`,
 
 ### Existing features and UX
 
-- [ ] **M --- Add a visible sync status and recovery UI.** Show states
-      such as Synced, Syncing, Offline, Changes pending and Sync failed;
-      provide retry and explain unresolved writes. This improves the
-      existing offline queue rather than introducing a duplicate feature.
+- [ ] **M --- Add a visible sync status and recovery UI.** — `Partial`.
+      Settings now shows unsynced changes with a retry action, and a toast
+      warns when writes were dropped. The full state set (Synced,
+      Syncing, Offline, Changes pending, Sync failed) is still missing.
 - [ ] **M --- Improve backup/restore UX after fixing integrity
-      issues.** Validate the file, show a restore preview and explain
-      conflicts/errors. Never imply success when an export or restore is
-      incomplete.
+      issues.** — `Partial`. Exports are now strict and fail visibly, but
+      the restore preview and the explanation of conflicts/errors are
+      still to do.
 - [ ] **M --- Decide which preferences should sync.** Video source,
       timezone, language, upcoming-list state and notification preferences
       are currently described as local-only in the audit. Decide what
