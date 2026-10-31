@@ -37,6 +37,15 @@ interface ErrorLike {
   status?: unknown;
 }
 
+/** True for Supabase's wrong-email-or-password error (code or legacy message). */
+export function isInvalidCredentials(err: unknown): boolean {
+  const e = (err && typeof err === 'object' ? err : {}) as ErrorLike;
+  return (
+    e.code === 'invalid_credentials' ||
+    (typeof e.message === 'string' && /invalid login credentials/i.test(e.message))
+  );
+}
+
 /**
  * Maps a Supabase/network auth error to translated copy. Raw server messages
  * are English-only and can expose implementation detail, so anything not
@@ -48,11 +57,11 @@ export function getLocalizedAuthError(err: unknown, t: TFunction): string {
   const name = typeof e.name === 'string' ? e.name : '';
   const message = typeof e.message === 'string' ? e.message : '';
 
-  if (code === 'invalid_credentials' || /invalid login credentials/i.test(message)) {
+  if (isInvalidCredentials(err)) {
     return t('auth.errors.invalidCredentials');
   }
   if (code === 'email_not_confirmed') return t('auth.errors.emailNotConfirmed');
-  if (code === 'user_already_exists') return t('auth.errors.emailTaken');
+  if (code === 'user_already_exists' || code === 'email_exists') return t('auth.errors.emailTaken');
   if (code === 'email_address_invalid') return t('auth.errors.emailInvalid');
   if (code === 'signup_disabled') return t('auth.errors.signupDisabled');
   if (code === 'same_password' || /different from the old password/i.test(message)) {

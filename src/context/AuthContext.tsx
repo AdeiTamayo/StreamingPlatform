@@ -78,6 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Works even when Supabase fell back to the Site URL because the
           // reset path is not in its redirect allow-list.
           navigateRef.current(PASSWORD_RESET_PATH, { replace: true });
+        } else if (event === 'USER_UPDATED' && supabaseSession?.user) {
+          // Fired after updateUser and after the user confirms an email
+          // change: refresh the user so the displayed email follows the session.
+          setCurrentUserId(supabaseSession.user.id);
+          setAuth(supabaseSession.user, supabaseSession);
         } else if (event === 'TOKEN_REFRESHED' && supabaseSession?.user) {
           setCurrentUserId(supabaseSession.user.id);
           setAuth(supabaseSession.user, supabaseSession);
@@ -142,6 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsPasswordRecovery(false);
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    await authService.changePassword(currentPassword, newPassword);
+  }, []);
+
+  const changeEmail = useCallback(async (newEmail: string) => {
+    await authService.changeEmail(newEmail);
+  }, []);
+
   const endPasswordRecovery = useCallback(() => {
     setIsPasswordRecovery(false);
   }, []);
@@ -176,6 +189,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         isPasswordRecovery,
         updatePassword,
+        changePassword,
+        changeEmail,
         endPasswordRecovery,
         isAuthModalOpen,
         openAuthModal,

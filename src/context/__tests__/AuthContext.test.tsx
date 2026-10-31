@@ -9,6 +9,8 @@ const authServiceMock = vi.hoisted(() => ({
   signIn: vi.fn(),
   signUp: vi.fn(),
   resetPassword: vi.fn(),
+  changePassword: vi.fn(),
+  changeEmail: vi.fn(),
 }));
 
 vi.mock('../../services/auth/authService', () => ({
@@ -144,5 +146,61 @@ describe('AuthContext password recovery', () => {
     await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('true'));
     fireEvent.click(screen.getByText('out'));
     await waitFor(() => expect(screen.getByTestId('recovery').textContent).toBe('false'));
+  });
+});
+
+describe('AuthContext credentials', () => {
+  let emit: (event: string, session: unknown) => void;
+
+  function CredentialsProbe() {
+    const { user, changePassword, changeEmail } = useAuth();
+    return (
+      <div>
+        <span data-testid="email">{user?.email ?? 'none'}</span>
+        <button onClick={() => void changePassword('old', 'new')}>pw</button>
+        <button onClick={() => void changeEmail('x@y.co')}>em</button>
+      </div>
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    authServiceMock.getSession.mockResolvedValue({ user: { id: 'u1', email: 'old@example.com' } });
+    authServiceMock.changePassword.mockResolvedValue(undefined);
+    authServiceMock.changeEmail.mockResolvedValue(undefined);
+    authServiceMock.onAuthStateChange.mockImplementation(((cb: (e: string, s: unknown) => void) => {
+      emit = cb;
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    }) as never);
+  });
+
+  function renderProbe() {
+    return render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <AuthProvider>
+          <CredentialsProbe />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('refreshes the user on USER_UPDATED so the displayed email follows the session', async () => {
+    renderProbe();
+    expect(await screen.findByText('old@example.com')).toBeInTheDocument();
+
+    act(() => emit('USER_UPDATED', { user: { id: 'u1', email: 'new@example.com' } }));
+
+    await waitFor(() => expect(screen.getByTestId('email').textContent).toBe('new@example.com'));
+  });
+
+  it('delegates changePassword and changeEmail to the service', async () => {
+    renderProbe();
+    await screen.findByText('old@example.com');
+
+    fireEvent.click(screen.getByText('pw'));
+    fireEvent.click(screen.getByText('em'));
+
+    await waitFor(() => expect(authServiceMock.changePassword).toHaveBeenCalledWith('old', 'new'));
+    expect(authServiceMock.changeEmail).toHaveBeenCalledWith('x@y.co');
   });
 });

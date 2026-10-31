@@ -123,6 +123,16 @@
     "allSaved": "All changes saved",
     "account": "Account",
     "cloudAccount": "Cloud account",
+    "credentials": {
+      "changePassword": "Change password",
+      "changeEmail": "Change email",
+      "currentPassword": "Current password",
+      "savePassword": "Update password",
+      "savingPassword": "Updating…",
+      "newEmail": "New email address",
+      "sendEmailChange": "Send confirmation",
+      "emailChangeSent": "We sent confirmation links. Check the inbox of both your current and your new address and open the link in each. Your email won't change until you confirm."
+    },
     "status": "Status",
     "connected": "Connected",
     "signOut": "Sign out",
@@ -315,7 +325,8 @@
     "syncDropped": "Some changes could not be synced to your account. Open Settings to retry.",
     "syncRecovered": "Everything is synced again.",
     "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later.",
-    "passwordUpdated": "Your password has been updated."
+    "passwordUpdated": "Your password has been updated.",
+    "emailChangeRequested": "Confirmation links sent. Check both inboxes."
   },
   "searchBar": {
     "searchLabel": "Search",
@@ -601,12 +612,13 @@
       "samePassword": "Choose a password different from your current one.",
       "weakPassword": "That password is too easy to guess. Choose a stronger one.",
       "rateLimited": "Too many attempts. Please wait a moment and try again.",
-      "sessionExpired": "This reset link has expired or was already used. Request a new one.",
+      "sessionExpired": "Your session or link has expired. Sign in again or request a new link.",
       "network": "Could not reach the server. Check your connection and try again.",
       "invalidCredentials": "Email or password is incorrect.",
       "emailNotConfirmed": "Confirm your email first. Check your inbox for the link.",
       "emailTaken": "This email is already registered. Try signing in instead.",
       "signupDisabled": "New sign-ups are turned off right now.",
+      "currentPasswordIncorrect": "Current password is incorrect.",
       "generic": "Something went wrong. Please try again."
     },
     "reset": {

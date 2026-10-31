@@ -9,6 +9,7 @@ import {
   getLocalizedAuthError,
   validatePassword,
 } from '../components/AuthModal/errors';
+import PasswordField from '../components/AuthModal/PasswordField';
 import { logError } from '../utils/logger';
 import authStyles from '../components/AuthModal/AuthModal.module.css';
 import styles from './ResetPassword.module.css';
@@ -61,8 +62,6 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState<FieldName | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const errorId = 'reset-password-error';
@@ -112,62 +111,28 @@ export default function ResetPassword() {
             <p className={authStyles.subtitle}>{t('auth.reset.subtitle')}</p>
 
             <form className={authStyles.form} onSubmit={handleSubmit} noValidate>
-              <label className={authStyles.field}>
-                <span className={authStyles.label}>{t('auth.reset.newPassword')}</span>
-                <div className={authStyles.inputWrap}>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    className={authStyles.input}
-                    placeholder={t('auth.newPasswordPlaceholder', { count: MIN_PASSWORD_LENGTH })}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="new-password"
-                    autoFocus
-                    required
-                    disabled={submitting}
-                    aria-invalid={errorField === 'password'}
-                    aria-describedby={errorField === 'password' ? errorId : undefined}
-                  />
-                  <button
-                    type="button"
-                    className={authStyles.togglePassword}
-                    onClick={() => setShowPassword((v) => !v)}
-                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                    aria-pressed={showPassword}
-                    disabled={submitting}
-                  >
-                    {showPassword ? t('auth.hide') : t('auth.show')}
-                  </button>
-                </div>
-              </label>
+              <PasswordField
+                label={t('auth.reset.newPassword')}
+                value={password}
+                onChange={setPassword}
+                placeholder={t('auth.newPasswordPlaceholder', { count: MIN_PASSWORD_LENGTH })}
+                autoComplete="new-password"
+                autoFocus
+                disabled={submitting}
+                invalid={errorField === 'password'}
+                describedBy={errorId}
+              />
 
-              <label className={authStyles.field}>
-                <span className={authStyles.label}>{t('auth.confirmPassword')}</span>
-                <div className={authStyles.inputWrap}>
-                  <input
-                    type={showConfirm ? 'text' : 'password'}
-                    className={authStyles.input}
-                    placeholder={t('auth.repeatPasswordPlaceholder')}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    autoComplete="new-password"
-                    required
-                    disabled={submitting}
-                    aria-invalid={errorField === 'confirm'}
-                    aria-describedby={errorField === 'confirm' ? errorId : undefined}
-                  />
-                  <button
-                    type="button"
-                    className={authStyles.togglePassword}
-                    onClick={() => setShowConfirm((v) => !v)}
-                    aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
-                    aria-pressed={showConfirm}
-                    disabled={submitting}
-                  >
-                    {showConfirm ? t('auth.hide') : t('auth.show')}
-                  </button>
-                </div>
-              </label>
+              <PasswordField
+                label={t('auth.confirmPassword')}
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                placeholder={t('auth.repeatPasswordPlaceholder')}
+                autoComplete="new-password"
+                disabled={submitting}
+                invalid={errorField === 'confirm'}
+                describedBy={errorId}
+              />
 
               {error && (
                 <p id={errorId} className={authStyles.error} role="alert">

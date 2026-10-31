@@ -30,6 +30,7 @@ import { getQueueSize, getDroppedCount, SYNC_DROPPED_EVENT } from "../utils/offl
 import { dataMigration } from "../utils/dataMigration";
 import { useToast } from "../components/useToast";
 import { useAuth } from "../hooks/useAuth";
+import AccountCredentials from "../components/AccountCredentials/AccountCredentials";
 import CheckIcon from "../components/CheckIcon";
 import FilterDropdown from "../components/FilterDropdown";
 
@@ -508,6 +509,8 @@ export default function Settings() {
                 </span>
               }
             />
+
+            <AccountCredentials />
 
             <div className={styles.actions}>
               <button
