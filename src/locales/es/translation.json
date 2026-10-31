@@ -611,6 +611,10 @@
     "rememberedPassword": "¿Recordaste tu contraseña?",
     "signInLink": "Inicia sesión",
     "accountCreated": "¡Cuenta creada! Revisa tu correo y abre el enlace de confirmación. Te traerá de vuelta aquí con la sesión iniciada.",
+    "link": {
+      "expired": "Este enlace ha caducado o ya se usó. Si tu correo ya está confirmado, inicia sesión; si no, regístrate de nuevo para recibir un enlace nuevo.",
+      "confirmed": "Correo confirmado. Has iniciado sesión."
+    },
     "resetSent": "Si existe una cuenta para <strong>{{email}}</strong>, se ha enviado un enlace para restablecer la contraseña. Revisa tu bandeja de entrada.",
     "errors": {
       "emailRequired": "Introduce tu correo electrónico.",
@@ -645,10 +649,6 @@
       "invalidTitle": "Este enlace no se puede usar",
       "invalidBody": "El enlace para restablecer la contraseña no es válido, ha caducado o ya se usó. Solicita uno nuevo para continuar.",
       "requestNew": "Solicitar un enlace nuevo"
-    },
-    "link": {
-      "expired": "Este enlace ha caducado o ya se usó. Si tu correo ya está confirmado, inicia sesión; si no, regístrate de nuevo para recibir un enlace nuevo.",
-      "confirmed": "Correo confirmado. Has iniciado sesión."
     }
   },
   "notifications": {
@@ -697,52 +697,10 @@
     "nextYears": "{{count}} años siguientes",
     "dateFormat": "{{day}} {{month}} {{year}}",
     "accessibleDate": "{{weekday}}, {{day}} de {{month}} de {{year}}",
-    "monthsShort": [
-      "ene",
-      "feb",
-      "mar",
-      "abr",
-      "may",
-      "jun",
-      "jul",
-      "ago",
-      "sept",
-      "oct",
-      "nov",
-      "dic"
-    ],
-    "monthsLong": [
-      "enero",
-      "febrero",
-      "marzo",
-      "abril",
-      "mayo",
-      "junio",
-      "julio",
-      "agosto",
-      "septiembre",
-      "octubre",
-      "noviembre",
-      "diciembre"
-    ],
-    "weekdaysShort": [
-      "lun",
-      "mar",
-      "mié",
-      "jue",
-      "vie",
-      "sáb",
-      "dom"
-    ],
-    "weekdaysLong": [
-      "lunes",
-      "martes",
-      "miércoles",
-      "jueves",
-      "viernes",
-      "sábado",
-      "domingo"
-    ]
+    "monthsShort": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"],
+    "monthsLong": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    "weekdaysShort": ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"],
+    "weekdaysLong": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
   },
   "bulkSelect": {
     "toolbar": "Selección múltiple",
