@@ -24,6 +24,9 @@ export const DELETE_ACCOUNT_PATH = '/api/delete-account';
 // Authentication > URL Configuration > Redirect URLs in the Supabase project,
 // otherwise Supabase falls back to the Site URL (the recovery event is still
 // handled there, but the user lands on the home page first).
+// Where the sign-up confirmation email lands. Must be in the Supabase
+// Redirect URLs allow-list for every origin the app runs on.
+export const SIGNUP_REDIRECT_PATH = '/';
 export const PASSWORD_RESET_PATH = '/reset-password';
 
 // Path the email-change confirmation link returns to (must be on the Supabase
@@ -52,7 +55,14 @@ export const authService = {
   // not blips, and retrying them delays feedback and burns rate limits.
   async signUp(email: string, password: string) {
     try {
-      const { data, error } = await requireSupabase().auth.signUp({ email, password });
+      // Without emailRedirectTo Supabase links to the project's Site URL, which
+      // is often still localhost. Return to whichever origin the user
+      // registered from (local, preview or production).
+      const { data, error } = await requireSupabase().auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${window.location.origin}${SIGNUP_REDIRECT_PATH}` },
+      });
       if (error) throw error;
       return { user: data.user, session: data.session };
     } catch (err) {
