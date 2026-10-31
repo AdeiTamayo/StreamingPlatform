@@ -603,6 +603,10 @@
       "rateLimited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
       "sessionExpired": "Este enlace ha caducado o ya se usó. Solicita uno nuevo.",
       "network": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
+      "invalidCredentials": "El correo o la contraseña no son correctos.",
+      "emailNotConfirmed": "Confirma primero tu correo. Revisa tu bandeja de entrada.",
+      "emailTaken": "Este correo ya está registrado. Prueba a iniciar sesión.",
+      "signupDisabled": "El registro de cuentas nuevas está desactivado por ahora.",
       "generic": "Algo salió mal. Inténtalo de nuevo."
     },
     "reset": {

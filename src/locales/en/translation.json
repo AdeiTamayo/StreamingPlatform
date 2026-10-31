@@ -603,6 +603,10 @@
       "rateLimited": "Too many attempts. Please wait a moment and try again.",
       "sessionExpired": "This reset link has expired or was already used. Request a new one.",
       "network": "Could not reach the server. Check your connection and try again.",
+      "invalidCredentials": "Email or password is incorrect.",
+      "emailNotConfirmed": "Confirm your email first. Check your inbox for the link.",
+      "emailTaken": "This email is already registered. Try signing in instead.",
+      "signupDisabled": "New sign-ups are turned off right now.",
       "generic": "Something went wrong. Please try again."
     },
     "reset": {
