@@ -7,7 +7,7 @@ import { setCurrentUserId, clearAllData } from '../api/storage';
 import { clearTMDBCache } from '../api/tmdbCache';
 import { clearOfflineQueue, clearDroppedMarker } from '../utils/offlineQueue';
 import { logError } from '../utils/logger';
-import { AuthContext, type AuthState } from './auth';
+import { AuthContext, type AuthState, type SessionLoss, type SessionLossReason } from './auth';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
@@ -19,6 +19,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [syncVersion, setSyncVersion] = useState(0);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [sessionLoss, setSessionLoss] = useState<SessionLoss | null>(null);
+  // True while a sign-out this app started is in flight. A SIGNED_OUT event
+  // outside that window means the session was ended from elsewhere (revoked,
+  // refresh token rejected, signed out in another tab).
+  const expectedSignOut = useRef(false);
+  const lossCounter = useRef(0);
   const navigate = useNavigate();
   // Under BrowserRouter useNavigate's identity changes with the location. The
   // auth subscription must not be torn down and re-created on every
@@ -68,6 +74,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (event === 'SIGNED_OUT') {
           setCurrentUserId(null);
           setAuth(null, null);
+          if (!expectedSignOut.current) {
+            setSessionLoss({ reason: 'ended', id: ++lossCounter.current });
+            navigateRef.current('/', { replace: true });
+          }
         } else if (event === 'PASSWORD_RECOVERY' && supabaseSession?.user) {
           // The reset link signs the user in with a recovery session but emits
           // PASSWORD_RECOVERY instead of SIGNED_IN. Without handling it they
@@ -165,17 +175,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // A failed remote sign-out (expired token, offline) must not strand the
     // user signed in locally: clear local state and the storage-layer user id
     // regardless, then surface the remote failure only in the log.
+    expectedSignOut.current = true;
     try {
       await authService.signOut();
     } catch (err) {
       logError('auth.signOut', err);
     } finally {
+      expectedSignOut.current = false;
       setCurrentUserId(null);
       setAuth(null, null);
       setIsPasswordRecovery(false);
       navigate('/');
     }
   }, [setAuth, navigate]);
+
+  const endSession = useCallback(async (reason: SessionLossReason) => {
+    if (reason === 'deleted') {
+      // The account is gone: its queued writes can never be replayed, and
+      // leaving them would only waste queue space.
+      clearOfflineQueue();
+      clearDroppedMarker();
+    }
+    // Set before signing out so the notice survives the state reset below.
+    setSessionLoss({ reason, id: ++lossCounter.current });
+    await signOut();
+  }, [signOut]);
 
   const deleteAccount = useCallback(async (currentPassword?: string) => {
     // Throws before anything local is touched: a failed deletion leaves the
@@ -221,6 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         openAuthModal,
         closeAuthModal,
         syncVersion,
+        sessionLoss,
+        endSession,
       }}
     >
       {children}

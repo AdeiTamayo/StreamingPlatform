@@ -6,6 +6,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
 import AuthModal from './components/AuthModal/AuthModal';
 import SyncDropNotice from './components/SyncDropNotice';
+import AccountWatcher from './components/AccountWatcher';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import './styles/shared.css';
 
@@ -81,6 +82,7 @@ export default function App() {
           <Navbar />
           <AuthModal />
           <SyncDropNotice />
+          <AccountWatcher />
           <main id="main-content" className="app-content" ref={mainRef} tabIndex={-1}>
             <Suspense fallback={<div className="page"><div className="loading">{t('app.loading')}</div></div>}>
               <Routes>

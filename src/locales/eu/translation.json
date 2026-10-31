@@ -338,7 +338,9 @@
     "syncStillFailing": "Sinkronizazioak hutsegiten jarraitzen du. Zure datuak gailu honetan gordetzen dira; saiatu berriro geroago.",
     "passwordUpdated": "Zure pasahitza eguneratu da.",
     "emailChangeRequested": "Berrespen-estekak bidali dira. Begiratu bi sarrera-ontziak.",
-    "accountDeleted": "Zure kontua eta datuak ezabatu dira."
+    "accountDeleted": "Zure kontua eta datuak ezabatu dira.",
+    "accountGone": "Kontu hau ez dago jada; beraz, saioa itxi da eta bere datuak gailu honetatik ezabatu dira.",
+    "sessionEnded": "Saioa itxi da, ez delako baliozkoa jada. Kontua ezabatu bada, bere datuak ere desagertu dira."
   },
   "searchBar": {
     "searchLabel": "Bilatu",

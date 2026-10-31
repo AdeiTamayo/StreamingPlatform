@@ -338,7 +338,9 @@
     "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde.",
     "passwordUpdated": "Tu contraseña se ha actualizado.",
     "emailChangeRequested": "Enlaces de confirmación enviados. Revisa ambas bandejas de entrada.",
-    "accountDeleted": "Tu cuenta y tus datos se han eliminado."
+    "accountDeleted": "Tu cuenta y tus datos se han eliminado.",
+    "accountGone": "Esta cuenta ya no existe, así que se ha cerrado la sesión y se han eliminado sus datos de este dispositivo.",
+    "sessionEnded": "Se ha cerrado tu sesión porque ya no es válida. Si la cuenta se eliminó, sus datos también se han borrado."
   },
   "searchBar": {
     "searchLabel": "Buscar",

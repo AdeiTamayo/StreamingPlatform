@@ -47,6 +47,43 @@ function isUserNotFoundError(err: unknown): boolean {
   return /user not found|no user found/i.test(errorText(err));
 }
 
+export type SessionCheck = 'valid' | 'deleted' | 'ended' | 'unknown';
+
+/**
+ * Decides what a failed "who am I" check means. Only a response that proves the
+ * session or account is gone may sign the user out; anything that could be a
+ * network or server hiccup is "unknown" and leaves them signed in.
+ *
+ * - deleted: the Auth server says the user no longer exists
+ * - ended: the session is revoked, expired or invalid (this is also what other
+ *   devices see after an account deletion, because its sessions go with it)
+ */
+export function classifySessionError(err: unknown): Exclude<SessionCheck, 'valid'> {
+  const e = (err && typeof err === 'object' ? err : {}) as {
+    code?: unknown;
+    status?: unknown;
+    name?: unknown;
+    message?: unknown;
+  };
+  const code = typeof e.code === 'string' ? e.code : '';
+  const message = typeof e.message === 'string' ? e.message : '';
+  const status = typeof e.status === 'number' ? e.status : 0;
+
+  if (code === 'user_not_found' || /user from sub claim in jwt does not exist/i.test(message)) {
+    return 'deleted';
+  }
+  if (
+    ['session_not_found', 'session_expired', 'refresh_token_not_found', 'bad_jwt', 'no_authorization'].includes(code) ||
+    e.name === 'AuthSessionMissingError' ||
+    /session from session_id claim in jwt does not exist|invalid refresh token|refresh token not found/i.test(message)
+  ) {
+    return 'ended';
+  }
+  // 429, 5xx, status 0 (offline) and fetch failures prove nothing.
+  if (status === 401 || status === 403) return 'ended';
+  return 'unknown';
+}
+
 export const authService = {
   // Auth calls are never retried: failures here are credential/user errors,
   // not blips, and retrying them delays feedback and burns rate limits.
@@ -233,6 +270,22 @@ export const authService = {
       message: `Account deletion failed (${response.status})`,
       code: serverCode === 'reauth_required' ? 'reauth_required' : 'delete_account_failed',
     } satisfies AuthError;
+  },
+
+  /**
+   * Asks the Auth server whether the current session still belongs to a live
+   * account. getUser() makes a real request (getSession() only reads local
+   * storage), so it notices a deleted account or a revoked session.
+   */
+  async verifySession(): Promise<SessionCheck> {
+    if (!supabase) return 'unknown';
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) return classifySessionError(error);
+      return data.user ? 'valid' : 'ended';
+    } catch (err) {
+      return classifySessionError(err);
+    }
   },
 
   async getSession() {
