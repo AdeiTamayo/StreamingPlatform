@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import type { User, Session } from '@supabase/supabase-js';
 import { authService, PASSWORD_RESET_PATH } from '../services/auth/authService';
 import { dataMigration } from '../utils/dataMigration';
-import { setCurrentUserId } from '../api/storage';
+import { setCurrentUserId, clearAllData } from '../api/storage';
+import { clearTMDBCache } from '../api/tmdbCache';
+import { clearOfflineQueue, clearDroppedMarker } from '../utils/offlineQueue';
 import { logError } from '../utils/logger';
 import { AuthContext, type AuthState } from './auth';
 
@@ -175,6 +177,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [setAuth, navigate]);
 
+  const deleteAccount = useCallback(async (currentPassword?: string) => {
+    // Throws before anything local is touched: a failed deletion leaves the
+    // user signed in with their data intact.
+    await authService.deleteAccount(currentPassword);
+
+    // The account no longer exists. Drop the storage-layer user id first so
+    // clearAllData() stays local instead of firing cloud deletes (and queueing
+    // them as "failed" writes) for a user that is gone.
+    setCurrentUserId(null);
+    try {
+      await clearAllData();
+      await clearTMDBCache();
+    } catch (err) {
+      logError('auth.deleteAccount.clearLocal', err);
+    }
+    clearOfflineQueue();
+    clearDroppedMarker();
+    // Local sign-out. The remote call may fail now that the user is gone;
+    // signOut already tolerates that, and it navigates home.
+    await signOut();
+  }, [signOut]);
+
   const resetPassword = useCallback(async (email: string) => {
     await authService.resetPassword(email);
   }, []);
@@ -187,6 +211,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         resetPassword,
+        deleteAccount,
         isPasswordRecovery,
         updatePassword,
         changePassword,

@@ -137,6 +137,7 @@ flowchart TD
 - **Offline resilience** — failed sync writes are queued and retried with exponential backoff
 - **One-time migration** — after signing in, local data is uploaded to the cloud and the app continues reading from localStorage
 - **Backup & restore** — export/import your data as JSON, both local and cloud versions
+- **Delete account** — Settings → Account → *Delete account* permanently removes the login and, through `on delete cascade`, every cloud row (see [Deleting an account](#deleting-an-account))
 
 ### Polish
 - **Last Seen** view your watch history grouped by series
@@ -258,6 +259,15 @@ This project is ready for Vercel deployment. The `vercel.json` configures SPA ro
 
 Vercel will auto-deploy on every push to `main`.
 
+**Server-only variables (needed for account deletion).** `api/delete-account.ts` is a Vercel serverless function that deletes the signed-in user with Supabase's admin API, which requires the service-role key. Add both in the Vercel dashboard (Production, and Preview only if previews have their own Supabase project):
+
+| Variable | Value |
+| --- | --- |
+| `SUPABASE_URL` | the same project URL as `VITE_SUPABASE_URL` |
+| `SUPABASE_SERVICE_ROLE_KEY` | *Supabase → Project Settings → API → `service_role`* |
+
+Neither name may start with `VITE_`: anything with that prefix is bundled into the browser, and the service-role key bypasses Row Level Security. The key is read only in `api/delete-account.ts`; never import it from code under `src/` that the client can reach. Without these two variables the function answers `500` and *Delete account* fails with a generic error (everything else keeps working).
+
 `vercel.json` also sets the security headers for every response: a Content-Security-Policy (self-only scripts/objects, explicit API `connect-src` list, `frame-ancestors 'none'`), HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Frame-Options` and `Cross-Origin-Opener-Policy`.
 
 Production-hygiene notes:
@@ -267,7 +277,34 @@ Production-hygiene notes:
 - Vercel ignores `.env*`, `dist`, `node_modules`, `screenshots` etc. via `.vercelignore`.
 
 Note: everything prefixed `VITE_` ships to the browser. Never put a server-side
-secret in this project — there is no server to keep it safe.
+secret behind that prefix. The only server-side secret is `SUPABASE_SERVICE_ROLE_KEY`,
+which lives in Vercel's environment and is read by `api/delete-account.ts` alone.
+
+### Deleting an account
+
+Settings → Account → **Delete account** opens a confirmation dialog. The user types the localized word for DELETE (`DELETE` / `ELIMINAR` / `EZABATU`) and, when the account has a password, re-enters it. The browser then:
+
+1. re-authenticates with `signInWithPassword` (this refreshes `last_sign_in_at`),
+2. calls `POST /api/delete-account` with the fresh access token,
+3. on success clears local data, the TMDB cache, the offline queue and the dropped-sync marker, signs out locally and returns to `/`.
+
+The function (`src/api/deleteAccountCore.ts`, wrapped by `api/delete-account.ts`) accepts only `POST`, requires a `Bearer` token, refuses a cross-site `Origin`, resolves the user from the token (never from the body or query), and for password accounts requires a sign-in within the last 5 minutes (`403 reauth_required` otherwise). It deletes `auth.users` and the `on delete cascade` foreign keys on `watched`, `watch_later`, `search_history` and `progress` remove every row. Responses are `Cache-Control: no-store`; failures return a generic `500` and log the detail server-side only.
+
+Accounts without a password (Google sign-in, if enabled) have no password to re-enter or freshness to check, so they confirm with the typed word alone. That is weaker than a fresh sign-in; the code keeps the branch (`hasPasswordIdentity` in `src/utils/authProviders.ts`) so a fresh Google re-authentication can replace it later.
+
+**Local development.** `vite dev` only mirrors `/api/probe`; there is deliberately no dev middleware for this route, because it would need the service-role key in the Vite process. To exercise it locally, use the Vercel CLI with both variables in `.env.local`:
+
+```bash
+# .env.local  (git-ignored; never commit it)
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role key>
+```
+
+```bash
+npx vercel dev
+```
+
+Use a throwaway Supabase project or test user: the deletion is real. Unit tests cover the handler only through its injected-dependency core with a fake admin client (`src/api/deleteAccountCore.test.ts`); they cannot verify the live Supabase call, the cascade, or the Vercel wrapper.
 
 ## Project Structure
 
@@ -283,13 +320,14 @@ src/
     tmdbCache.ts        # IndexedDB cache for TMDB API responses
     tvStatusCache.ts    # Cache for TV airing status
     newEpisodeScan.ts   # Background new-episode detection for Watch Later series
+    deleteAccountCore.ts # Server logic for POST /api/delete-account (admin client injected)
   repositories/
     watchedRepository.ts       # Supabase writes for watched marks
     watchLaterRepository.ts    # Supabase writes for watch later lists
     searchHistoryRepository.ts # Supabase writes for search history
     progressRepository.ts      # Supabase writes for Continue Watching metadata
   services/auth/
-    authService.ts      # Supabase auth wrapper (sign in/up/out, reset password, session)
+    authService.ts      # Supabase auth wrapper (sign in/up/out, reset password, delete account, session)
   context/
     AuthContext.tsx     # Auth state + global auth modal state
   components/
@@ -357,6 +395,7 @@ Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvma
 - **RLS hardening** (`004_security_hardening.sql`) — UPDATE policies carry a matching `WITH CHECK` (rows cannot be reassigned to another user), write-size constraints bound titles/posters/`meta`, triggers cap rows per user (10k watched, 5k watch-later/progress, 100 searches), and table access is revoked from `anon`.
 - **Auth** — 12-character minimum with upper/lowercase, number and symbol (client-side feedback; the server remains the authority); sign-up and password-reset respond the same whether or not an address exists, so the UI is not an email-enumeration oracle.
 - **Player** — the embed iframe is sandboxed and sends no referrer; `postMessage` events are ignored unless they come from a known player origin.
+- **Account deletion** — `/api/delete-account` takes the user id only from the verified token, requires a fresh sign-in for password accounts, rejects cross-site origins and never returns server error text. The service-role key exists only as a server environment variable.
 - **Headers** — CSP and the rest are set in `vercel.json` (see "Deploying to Vercel").
 - **Self-hosted fonts** — Inter and Plus Jakarta Sans are vendored in `public/fonts/`; no request ever goes to Google Fonts, and the CSP is `font-src 'self'`.
 - **Logs** — `app_errors` / `player_debug` redact JWT-shaped strings, email addresses and `token=`/`password=`-style values.
@@ -367,7 +406,7 @@ Co-located API tests sit next to their modules (`api/storage.test.ts`, `api/tvma
 1. Supabase → Auth → Password settings: minimum length 12, require letters + numbers (+ symbols if available), and enable leaked-password protection if your plan has it.
 2. Supabase → Auth → URL Configuration: set the Site URL and an **allow list** limited to your own domains (e.g. `https://your-domain.com/*`). The app builds reset/confirm links from `window.location.origin`, so restricting this list prevents token links pointing elsewhere.
 3. For a personal deployment: consider disabling public sign-ups (Supabase → Auth → Providers → Email) so only accounts you create can log in.
-4. Account deletion: Supabase → Auth → Users → delete the user; every row in `watched` / `watch_later` / `search_history` / `progress` is removed by `on delete cascade`.
+4. Account deletion: users can delete their own account from Settings (needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, see "Deploying to Vercel"). You can still delete a user by hand in Supabase → Auth → Users; every row in `watched` / `watch_later` / `search_history` / `progress` is removed by `on delete cascade`.
 5. API keys are intentionally public (`VITE_*` is inlined into the bundle). TMDB's key carries your quota — if abuse shows up as rate-limit 429s, rotate the key. If you ever want a true proxy you need a server, which this app does not have.
 
 Verify after deploy:

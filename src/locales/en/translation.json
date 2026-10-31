@@ -176,7 +176,18 @@
     "cancel": "Cancel",
     "unsyncedChanges": "Unsynced changes",
     "unsyncedCount": "{{count}} could not be synced",
-    "retrySync": "Retry sync"
+    "retrySync": "Retry sync",
+    "deleteAccount": {
+      "button": "Delete account",
+      "exportData": "Export my data",
+      "title": "Delete your account?",
+      "body": "This permanently deletes your account and everything stored with it: your library, watch history, search history and Continue Watching entries, on this device and in the cloud. It cannot be undone.",
+      "backupHint": "Export a backup first if you might need your data.",
+      "word": "DELETE",
+      "typeWord": "Type {{word}} to confirm",
+      "confirm": "Delete my account",
+      "deleting": "Deleting…"
+    }
   },
   "watchLater": {
     "eyebrow": "Personal library",
@@ -326,7 +337,8 @@
     "syncRecovered": "Everything is synced again.",
     "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later.",
     "passwordUpdated": "Your password has been updated.",
-    "emailChangeRequested": "Confirmation links sent. Check both inboxes."
+    "emailChangeRequested": "Confirmation links sent. Check both inboxes.",
+    "accountDeleted": "Your account and data have been deleted."
   },
   "searchBar": {
     "searchLabel": "Search",
@@ -619,6 +631,7 @@
       "emailTaken": "This email is already registered. Try signing in instead.",
       "signupDisabled": "New sign-ups are turned off right now.",
       "currentPasswordIncorrect": "Current password is incorrect.",
+      "reauthRequired": "We couldn't confirm it's you. Enter your password again and retry.",
       "generic": "Something went wrong. Please try again."
     },
     "reset": {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, type FormEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   APP_LANGUAGES,
@@ -28,9 +28,17 @@ import {
 } from "../api/storageBackup";
 import { getQueueSize, getDroppedCount, SYNC_DROPPED_EVENT } from "../utils/offlineQueue";
 import { dataMigration } from "../utils/dataMigration";
+import { hasPasswordIdentity } from "../utils/authProviders";
+import { logError } from "../utils/logger";
 import { useToast } from "../components/useToast";
 import { useAuth } from "../hooks/useAuth";
 import AccountCredentials from "../components/AccountCredentials/AccountCredentials";
+import PasswordField from "../components/AuthModal/PasswordField";
+import {
+  getLocalizedAuthError,
+  isInvalidCredentials,
+} from "../components/AuthModal/errors";
+import authStyles from "../components/AuthModal/AuthModal.module.css";
 import CheckIcon from "../components/CheckIcon";
 import FilterDropdown from "../components/FilterDropdown";
 
@@ -171,7 +179,7 @@ export default function Settings() {
   const { t } = useTranslation();
   const toast = useToast();
 
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteAccount } = useAuth();
 
   const [usage, setUsage] = useState<StorageUsage | null>(null);
   const [usageError, setUsageError] = useState(false);
@@ -189,12 +197,31 @@ export default function Settings() {
   const [confirm, setConfirm] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
+  // Delete-account dialog. Accounts without a password (Google) skip the
+  // password field and confirm with the typed word alone - an owner decision,
+  // weaker than a fresh sign-in; a fresh Google re-authentication can replace it.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteWord, setDeleteWord] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deletePasswordInvalid, setDeletePasswordInvalid] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
+  const needsPassword = hasPasswordIdentity(user);
+  const confirmWord = t("settings.deleteAccount.word");
+  const wordMatches =
+    deleteWord.trim().toLocaleUpperCase() === confirmWord.toLocaleUpperCase();
+  const canDeleteAccount =
+    wordMatches && (!needsPassword || deletePassword.length > 0) && !deleting;
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const savedTimerRef = useRef<number | null>(null);
   const supabaseFileInputRef = useRef<HTMLInputElement>(null);
   const confirmDialogRef = useRef<HTMLDivElement>(null);
   const cancelBtnRef = useRef<HTMLButtonElement>(null);
   const clearTriggerRef = useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+  const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef(false);
 
   async function loadUsage() {
@@ -242,11 +269,13 @@ export default function Settings() {
     setQueueSize(getQueueSize());
   }, []);
 
+  const dialogOpen = confirm || deleteOpen;
+
   useEffect(() => {
-    if (!confirm) {
+    if (!dialogOpen) {
       if (restoreFocusRef.current) {
         restoreFocusRef.current = false;
-        clearTriggerRef.current?.focus();
+        lastTriggerRef.current?.focus();
       }
       return;
     }
@@ -256,8 +285,15 @@ export default function Settings() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        // The account deletion request cannot be cancelled once sent.
+        if (deletingRef.current) return;
         restoreFocusRef.current = true;
         setConfirm(false);
+        setDeleteOpen(false);
+        setDeleteWord("");
+        setDeletePassword("");
+        setDeleteError("");
+        setDeletePasswordInvalid(false);
         return;
       }
       if (e.key !== "Tab" || !confirmDialogRef.current) return;
@@ -286,11 +322,60 @@ export default function Settings() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [confirm]);
+  }, [dialogOpen]);
 
   function openConfirm() {
     restoreFocusRef.current = false;
+    lastTriggerRef.current = clearTriggerRef.current;
     setConfirm(true);
+  }
+
+  function openDeleteAccount() {
+    restoreFocusRef.current = false;
+    lastTriggerRef.current = deleteTriggerRef.current;
+    setDeleteWord("");
+    setDeletePassword("");
+    setDeleteError("");
+    setDeletePasswordInvalid(false);
+    setDeleteOpen(true);
+  }
+
+  function closeDeleteAccount() {
+    if (deletingRef.current) return;
+    restoreFocusRef.current = true;
+    setDeleteOpen(false);
+    setDeleteWord("");
+    setDeletePassword("");
+    setDeleteError("");
+    setDeletePasswordInvalid(false);
+  }
+
+  async function submitDeleteAccount(e: FormEvent) {
+    e.preventDefault();
+    if (!canDeleteAccount || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
+    setDeleteError("");
+    setDeletePasswordInvalid(false);
+    try {
+      await deleteAccount(needsPassword ? deletePassword : undefined);
+      // deleteAccount has already cleared local data and signed out locally;
+      // the toast provider sits above the router outlet, so it survives the
+      // navigation home.
+      toast?.(t("toast.accountDeleted"));
+      setDeleteOpen(false);
+    } catch (err) {
+      logError("auth.deleteAccount", err);
+      if (isInvalidCredentials(err)) {
+        setDeletePasswordInvalid(true);
+        setDeleteError(t("auth.errors.currentPasswordIncorrect"));
+      } else {
+        setDeleteError(getLocalizedAuthError(err, t));
+      }
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
+    }
   }
 
   function closeConfirm() {
@@ -519,6 +604,20 @@ export default function Settings() {
                 title={t("settings.signOut")}
               >
                 {t("settings.signOut")}
+              </button>
+
+              <button
+                ref={deleteTriggerRef}
+                className={`${styles.pill} ${styles.pillDanger}`}
+                onClick={openDeleteAccount}
+              >
+                <TrashIcon />
+                {t("settings.deleteAccount.button")}
+              </button>
+
+              <button className={styles.pill} onClick={handleSupabaseExport}>
+                <DownloadIcon />
+                {t("settings.deleteAccount.exportData")}
               </button>
             </div>
           </Card>
@@ -822,6 +921,102 @@ export default function Settings() {
                 {t("settings.cancel")}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {deleteOpen && (
+        <div
+          className={styles.dialogOverlay}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) closeDeleteAccount();
+          }}
+        >
+          <div
+            ref={confirmDialogRef}
+            className={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-delete-account-title"
+            aria-describedby="confirm-delete-account-body"
+            tabIndex={-1}
+          >
+            <h4 id="confirm-delete-account-title">
+              {t("settings.deleteAccount.title")}
+            </h4>
+
+            <p id="confirm-delete-account-body">
+              {t("settings.deleteAccount.body")}
+            </p>
+            <p>{t("settings.deleteAccount.backupHint")}</p>
+
+            <form
+              className={authStyles.form}
+              onSubmit={submitDeleteAccount}
+              noValidate
+            >
+              <label className={authStyles.field}>
+                <span className={authStyles.label}>
+                  {t("settings.deleteAccount.typeWord", { word: confirmWord })}
+                </span>
+                <input
+                  type="text"
+                  className={authStyles.input}
+                  value={deleteWord}
+                  onChange={(e) => setDeleteWord(e.target.value)}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  disabled={deleting}
+                />
+              </label>
+
+              {needsPassword && (
+                <PasswordField
+                  label={t("settings.credentials.currentPassword")}
+                  value={deletePassword}
+                  onChange={setDeletePassword}
+                  placeholder={t("auth.passwordPlaceholder")}
+                  autoComplete="current-password"
+                  disabled={deleting}
+                  invalid={deletePasswordInvalid}
+                  describedBy="delete-account-error"
+                />
+              )}
+
+              {deleteError && (
+                <p
+                  id="delete-account-error"
+                  className={authStyles.error}
+                  role="alert"
+                >
+                  {deleteError}
+                </p>
+              )}
+
+              <div className={styles.dialogActions}>
+                <button
+                  type="submit"
+                  className={`${styles.pill} ${styles.pillDanger}`}
+                  disabled={!canDeleteAccount}
+                  aria-busy={deleting}
+                >
+                  {deleting
+                    ? t("settings.deleteAccount.deleting")
+                    : t("settings.deleteAccount.confirm")}
+                </button>
+
+                <button
+                  type="button"
+                  ref={cancelBtnRef}
+                  className={styles.pill}
+                  onClick={closeDeleteAccount}
+                  disabled={deleting}
+                >
+                  {t("settings.cancel")}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

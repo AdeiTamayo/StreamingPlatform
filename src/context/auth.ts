@@ -17,6 +17,12 @@ export interface AuthContextValue extends AuthState {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Requests an email change; the address only changes after the user confirms by email. */
   changeEmail: (newEmail: string) => Promise<void>;
+  /**
+   * Permanently deletes the account and all cloud data, then clears local data
+   * and signs out locally. Password accounts pass their current password.
+   * Rejects with a coded error and changes nothing locally if deletion fails.
+   */
+  deleteAccount: (currentPassword?: string) => Promise<void>;
   /** True after the user opened a password-reset email link, until they set a new password or skip. */
   isPasswordRecovery: boolean;
   /** Sets the new password for the recovery session and ends recovery mode. */

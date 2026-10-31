@@ -176,7 +176,18 @@
     "cancel": "Utzi",
     "unsyncedChanges": "Sinkronizatu gabeko aldaketak",
     "unsyncedCount": "{{count}} ezin izan dira sinkronizatu",
-    "retrySync": "Berriro saiatu sinkronizazioa"
+    "retrySync": "Berriro saiatu sinkronizazioa",
+    "deleteAccount": {
+      "button": "Kontua ezabatu",
+      "exportData": "Nire datuak esportatu",
+      "title": "Zure kontua ezabatu nahi duzu?",
+      "body": "Honek zure kontua eta harekin gordetako guztia betiko ezabatuko du: zure liburutegia, ikusitakoen historia, bilaketa-historia eta ikusten jarraitzeko sarrerak, bai gailu honetan bai hodeian. Ezin da desegin.",
+      "backupHint": "Esportatu babeskopia bat lehenago zure datuak behar badituzu.",
+      "word": "EZABATU",
+      "typeWord": "Idatzi {{word}} berresteko",
+      "confirm": "Nire kontua ezabatu",
+      "deleting": "Ezabatzen…"
+    }
   },
   "watchLater": {
     "eyebrow": "Liburutegi pertsonala",
@@ -326,7 +337,8 @@
     "syncRecovered": "Dena sinkronizatuta dago berriro.",
     "syncStillFailing": "Sinkronizazioak hutsegiten jarraitzen du. Zure datuak gailu honetan gordetzen dira; saiatu berriro geroago.",
     "passwordUpdated": "Zure pasahitza eguneratu da.",
-    "emailChangeRequested": "Berrespen-estekak bidali dira. Begiratu bi sarrera-ontziak."
+    "emailChangeRequested": "Berrespen-estekak bidali dira. Begiratu bi sarrera-ontziak.",
+    "accountDeleted": "Zure kontua eta datuak ezabatu dira."
   },
   "searchBar": {
     "searchLabel": "Bilatu",
@@ -619,6 +631,7 @@
       "emailTaken": "Posta elektroniko hau dagoeneko erregistratuta dago. Saiatu saioa hasten.",
       "signupDisabled": "Kontu berrien erregistroa itxita dago oraingoz.",
       "currentPasswordIncorrect": "Oraingo pasahitza ez da zuzena.",
+      "reauthRequired": "Ezin izan dugu zu zarela berretsi. Idatzi pasahitza berriro eta saiatu berriro.",
       "generic": "Zerbait gaizki atera da. Saiatu berriro."
     },
     "reset": {

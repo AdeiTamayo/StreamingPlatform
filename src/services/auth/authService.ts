@@ -1,4 +1,5 @@
 import { requireSupabase, supabase } from '../../lib/supabase';
+import { hasPasswordIdentity } from '../../utils/authProviders';
 
 export interface AuthError {
   message: string;
@@ -14,6 +15,10 @@ function toAuthError(err: unknown): AuthError {
   }
   return { message: String(err) };
 }
+
+// Server route that deletes the signed-in account (api/delete-account.ts).
+// Needs the service-role key, which must never reach the browser.
+export const DELETE_ACCOUNT_PATH = '/api/delete-account';
 
 // Path the password-reset email links to. It must be listed under
 // Authentication > URL Configuration > Redirect URLs in the Supabase project,
@@ -159,6 +164,75 @@ export const authService = {
     } catch (err) {
       throw toAuthError(err);
     }
+  },
+
+  /**
+   * Permanently deletes the signed-in account and, through the database's
+   * ON DELETE CASCADE, every cloud row it owns. Accounts with a password
+   * re-authenticate first (which also refreshes last_sign_in_at, the freshness
+   * the server demands); accounts without one (Google) confirm in the UI only.
+   * Local data is cleared by the caller (AuthContext.deleteAccount) once this
+   * resolves, so a failure here leaves the session and the data untouched.
+   */
+  async deleteAccount(currentPassword?: string) {
+    const session = await authService.getSession();
+    const user = session?.user;
+    if (!session || !user) {
+      throw toAuthError({
+        message: 'Auth session missing!',
+        name: 'AuthSessionMissingError',
+        code: 'session_not_found',
+      });
+    }
+
+    let accessToken = session.access_token;
+    if (hasPasswordIdentity(user)) {
+      if (!user.email || !currentPassword) {
+        throw toAuthError({
+          message: 'Invalid login credentials',
+          name: 'AuthApiError',
+          code: 'invalid_credentials',
+        });
+      }
+      try {
+        const { data, error } = await requireSupabase().auth.signInWithPassword({
+          email: user.email,
+          password: currentPassword,
+        });
+        if (error) throw error;
+        // Use the token this sign-in just issued: its user.last_sign_in_at is
+        // what the server checks.
+        accessToken = data.session?.access_token ?? accessToken;
+      } catch (err) {
+        throw toAuthError(err);
+      }
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(DELETE_ACCOUNT_PATH, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (err) {
+      throw toAuthError(err);
+    }
+    if (response.ok) return;
+
+    let serverCode = '';
+    if (response.status === 403) {
+      try {
+        const body = (await response.json()) as { error?: unknown };
+        if (typeof body.error === 'string') serverCode = body.error;
+      } catch {
+        // unreadable body: treated as a generic failure below
+      }
+    }
+    // The server's text is never surfaced; only the code picks the copy.
+    throw {
+      message: `Account deletion failed (${response.status})`,
+      code: serverCode === 'reauth_required' ? 'reauth_required' : 'delete_account_failed',
+    } satisfies AuthError;
   },
 
   async getSession() {
