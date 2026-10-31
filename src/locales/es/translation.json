@@ -636,7 +636,13 @@
     "previousYear": "Año anterior",
     "nextYear": "Año siguiente",
     "previousYears": "{{count}} años anteriores",
-    "nextYears": "{{count}} años siguientes"
+    "nextYears": "{{count}} años siguientes",
+    "dateFormat": "{{day}} {{month}} {{year}}",
+    "accessibleDate": "{{weekday}}, {{day}} de {{month}} de {{year}}",
+    "monthsShort": ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"],
+    "monthsLong": ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"],
+    "weekdaysShort": ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"],
+    "weekdaysLong": ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
   },
   "bulkSelect": {
     "toolbar": "Selección múltiple",

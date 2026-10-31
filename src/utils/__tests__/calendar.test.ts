@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import i18n from '../../i18n';
 import {
   generateCalendarGrid,
   parseISODate,
@@ -244,6 +245,28 @@ describe('calendar utility', () => {
 
     it('returns the raw value when it is not a valid date', () => {
       expect(formatDisplayDate('not-a-date')).toBe('not-a-date');
+    });
+  });
+
+  describe('localized names', () => {
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('uses Basque names for months and weekdays', async () => {
+      await i18n.changeLanguage('eu');
+      expect(getMonthName(0)).toBe('urtarrila');
+      expect(getShortMonthName(9)).toBe('urr.');
+      expect(getWeekdays()[0]).toBe('al.');
+      expect(formatDisplayDate('2025-02-15')).toBe('2025 ots. 15');
+    });
+
+    it('uses Spanish names for months and weekdays', async () => {
+      await i18n.changeLanguage('es');
+      expect(getMonthName(0)).toBe('enero');
+      expect(getShortMonthName(0)).toBe('ene');
+      expect(getWeekdays()[0]).toBe('lun');
+      expect(formatDisplayDate('2025-02-15')).toBe('15 feb 2025');
     });
   });
 

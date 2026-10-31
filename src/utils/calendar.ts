@@ -28,6 +28,18 @@ function appLocale(): string {
   return toBcp47(i18n.resolvedLanguage || i18n.language);
 }
 
+/**
+ * Reads a translated list of names (months, weekdays).
+ *
+ * Browser `Intl` does not ship every locale (Chrome has no Basque data and
+ * silently falls back to English), so the app's own translations are the
+ * source of truth and `Intl` is only used when a key is missing.
+ */
+function translatedList(key: string): string[] {
+  const value = i18n.t(key, { returnObjects: true });
+  return Array.isArray(value) ? (value as string[]) : [];
+}
+
 function getDayIndex(date: Date): number {
   const day = date.getDay();
   return day === 0 ? 6 : day - 1;
@@ -42,12 +54,11 @@ function toISOString(date: Date): string {
 }
 
 function formatAccessibleLabel(date: Date, isCurrentMonth: boolean, viewedYear: number, viewedMonth: number): string {
-  const locale = appLocale();
-  const base = date.toLocaleDateString(locale, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
+  const base = i18n.t('datePicker.accessibleDate', {
+    weekday: getWeekdayName(date),
+    month: getMonthName(date.getMonth()),
+    day: date.getDate(),
+    year: date.getFullYear(),
   });
   if (!isCurrentMonth) {
     if (date.getFullYear() < viewedYear || (date.getFullYear() === viewedYear && date.getMonth() < viewedMonth)) {
@@ -56,6 +67,14 @@ function formatAccessibleLabel(date: Date, isCurrentMonth: boolean, viewedYear: 
     return `${base}, ${i18n.t('datePicker.nextMonthSuffix')}`;
   }
   return base;
+}
+
+/** Full weekday name in the active language, Monday-first (0 = Monday). */
+function getWeekdayName(date: Date): string {
+  const names = translatedList('datePicker.weekdaysLong');
+  const index = getDayIndex(date);
+  if (names[index]) return names[index];
+  return date.toLocaleDateString(appLocale(), { weekday: 'long' });
 }
 
 export function generateCalendarGrid(
@@ -137,11 +156,15 @@ function createCell(
 }
 
 export function getMonthName(month: number): string {
+  const names = translatedList('datePicker.monthsLong');
+  if (names[month]) return names[month];
   return new Date(MONTH_REFERENCE_YEAR, month, 1).toLocaleDateString(appLocale(), { month: 'long' });
 }
 
 /** Abbreviated month name in the active language (used by the month grid). */
 export function getShortMonthName(month: number): string {
+  const names = translatedList('datePicker.monthsShort');
+  if (names[month]) return names[month];
   return new Date(MONTH_REFERENCE_YEAR, month, 1).toLocaleDateString(appLocale(), { month: 'short' });
 }
 
@@ -149,10 +172,16 @@ export function getShortMonthName(month: number): string {
 export function formatDisplayDate(isoDate: string): string {
   const date = parseISODate(isoDate);
   if (!date) return isoDate;
-  return date.toLocaleDateString(appLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
+  return i18n.t('datePicker.dateFormat', {
+    month: getShortMonthName(date.getMonth()),
+    day: date.getDate(),
+    year: date.getFullYear(),
+  });
 }
 
 export function getWeekdays(): string[] {
+  const names = translatedList('datePicker.weekdaysShort');
+  if (names.length === 7) return names;
   const locale = appLocale();
   // 2024-01-01 is a Monday; walk forward to keep the Mon-first grid order.
   const monday = new Date(MONTH_REFERENCE_YEAR, 0, 1);

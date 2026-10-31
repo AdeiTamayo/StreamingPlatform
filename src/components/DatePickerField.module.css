@@ -252,6 +252,7 @@ button.date-picker-month:hover {
   border-color: var(--blue);
   background: var(--filter-active-bg);
   color: var(--accent-bright);
+  box-shadow: 0 0 0 1px rgba(var(--blue-rgb), 0.35);
 }
 
 .date-picker.hasValue .date-picker-icon {

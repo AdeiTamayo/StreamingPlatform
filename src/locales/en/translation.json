@@ -636,7 +636,13 @@
     "previousYear": "Previous year",
     "nextYear": "Next year",
     "previousYears": "Previous {{count}} years",
-    "nextYears": "Next {{count}} years"
+    "nextYears": "Next {{count}} years",
+    "dateFormat": "{{month}} {{day}}, {{year}}",
+    "accessibleDate": "{{weekday}}, {{month}} {{day}}, {{year}}",
+    "monthsShort": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    "monthsLong": ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    "weekdaysShort": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "weekdaysLong": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
   },
   "bulkSelect": {
     "toolbar": "Bulk selection",

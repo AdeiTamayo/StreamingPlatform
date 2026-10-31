@@ -399,6 +399,7 @@ select:focus-visible {
   border-color: var(--blue);
   background: var(--filter-active-bg);
   color: var(--accent-bright);
+  box-shadow: 0 0 0 1px rgba(var(--blue-rgb), 0.35);
 }
 
 .query-select.has-value .cs-arrow {

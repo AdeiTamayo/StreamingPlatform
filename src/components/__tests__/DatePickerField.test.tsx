@@ -34,6 +34,16 @@ describe('DatePickerField', () => {
     expect(trigger).toHaveTextContent('15 feb 2025');
   });
 
+  it('localizes the calendar month and weekday names', async () => {
+    await i18n.changeLanguage('eu');
+    render(<DatePickerField {...defaultProps} value="2025-02-15" />);
+    fireEvent.click(screen.getByRole('button', { name: /Test Date: 2025 ots\. 15/i }));
+
+    expect(screen.getByRole('button', { name: 'otsaila 2025' })).toBeInTheDocument();
+    const weekdays = screen.getAllByText(/^(al\.|ar\.|az\.|og\.|or\.|lr\.|ig\.)$/);
+    expect(weekdays.map((weekday) => weekday.textContent)).toEqual(['al.', 'ar.', 'az.', 'og.', 'or.', 'lr.', 'ig.']);
+  });
+
   it('opens popover when trigger is clicked', async () => {
     render(<DatePickerField {...defaultProps} />);
     const trigger = screen.getByRole('button', { name: /Test Date: Select date/i });

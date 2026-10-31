@@ -636,7 +636,13 @@
     "previousYear": "Aurreko urtea",
     "nextYear": "Hurrengo urtea",
     "previousYears": "Aurreko {{count}} urte",
-    "nextYears": "Hurrengo {{count}} urte"
+    "nextYears": "Hurrengo {{count}} urte",
+    "dateFormat": "{{year}} {{month}} {{day}}",
+    "accessibleDate": "{{weekday}}, {{year}} {{month}} {{day}}",
+    "monthsShort": ["urt.", "ots.", "mar.", "api.", "mai.", "eka.", "uzt.", "abu.", "ira.", "urr.", "aza.", "abe."],
+    "monthsLong": ["urtarrila", "otsaila", "martxoa", "apirila", "maiatza", "ekaina", "uztaila", "abuztua", "iraila", "urria", "azaroa", "abendua"],
+    "weekdaysShort": ["al.", "ar.", "az.", "og.", "or.", "lr.", "ig."],
+    "weekdaysLong": ["astelehena", "asteartea", "asteazkena", "osteguna", "ostirala", "larunbata", "igandea"]
   },
   "bulkSelect": {
     "toolbar": "Hautaketa anizkoitza",

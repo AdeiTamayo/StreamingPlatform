@@ -21,6 +21,7 @@
 .stepper.hasValue {
   border-color: var(--blue);
   background: var(--filter-active-bg);
+  box-shadow: 0 0 0 1px rgba(var(--blue-rgb), 0.35);
 }
 
 .btn {

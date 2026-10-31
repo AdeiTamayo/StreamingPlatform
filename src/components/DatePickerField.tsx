@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import useClickOutside from '../hooks/useClickOutside';
 import { generateCalendarGrid, getWeekdays, getMonthName, getShortMonthName, formatDisplayDate, navigateMonth, formatISODate, parseISODate } from '../utils/calendar';
-import i18n, { toBcp47 } from '../i18n';
 import styles from './DatePickerField.module.css';
 
 interface DatePickerFieldProps {
@@ -71,10 +70,9 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
   }, [open, view]);
 
   const today = useMemo(() => new Date(), []);
-  const calendarGrid = useMemo(
-    () => generateCalendarGrid(viewDate.getFullYear(), viewDate.getMonth(), value || undefined, today),
-    [viewDate, value, today],
-  );
+  // Cheap to rebuild (at most 42 cells) and keeps the localized labels in sync
+  // with the active language without memoizing stale names.
+  const calendarGrid = generateCalendarGrid(viewDate.getFullYear(), viewDate.getMonth(), value || undefined, today);
   const yearRangeStart = Math.floor(viewDate.getFullYear() / 20) * 20;
   const weekdays = getWeekdays();
   // Clamp the roving tab stop to the current grid: month navigation can shrink
@@ -250,7 +248,7 @@ export default function DatePickerField({ label, value, onChange, placeholder }:
                   className={styles.datePickerMonth}
                   onClick={() => setView('month')}
                 >
-                  {viewDate.toLocaleDateString(toBcp47(i18n.resolvedLanguage || i18n.language), { month: 'long', year: 'numeric' })}
+                  {`${getMonthName(viewDate.getMonth())} ${viewDate.getFullYear()}`}
                 </button>
                 <button
                   type="button"
