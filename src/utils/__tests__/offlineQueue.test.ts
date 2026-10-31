@@ -3,10 +3,13 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 // Hermetic: repository syncs must never touch the network in unit tests
 // (.env credentials are loaded by Vite). A throwing client exercises the
 // failure/attempt paths deterministically.
-vi.mock('../lib/supabase', () => ({
+// The path is relative to this file (src/utils/__tests__). It used to read
+// '../lib/supabase', which matched nothing, so the real client was used and the
+// "transient failure" below was really the permanent "not configured" error.
+vi.mock('../../lib/supabase', () => ({
   supabase: null,
   requireSupabase: () => {
-    throw new Error('Supabase is not configured (test mock)');
+    throw new Error('Network request failed (test mock)');
   },
 }));
 
@@ -17,6 +20,8 @@ import {
   getQueueSize,
   initOfflineQueueSync,
   OFFLINE_QUEUE_KEY,
+  SYNC_DROPPED_KEY,
+  getDroppedCount,
   setSyncUserId,
   syncOfflineQueue,
 } from '../offlineQueue';
@@ -24,6 +29,7 @@ import {
 describe('offlineQueue', () => {
   beforeEach(() => {
     clearOfflineQueue();
+    localStorage.removeItem(SYNC_DROPPED_KEY);
   });
 
   afterEach(() => {
@@ -36,13 +42,16 @@ describe('offlineQueue', () => {
     expect(getQueueSize()).toBe(2);
   });
 
-  it('caps the queue at 200 entries, dropping the oldest', () => {
-    for (let i = 0; i < 205; i++) {
+  it('caps the queue at 1000 entries, dropping the oldest and recording the loss', () => {
+    for (let i = 0; i < 1005; i++) {
       enqueueWrite('watched', 'insert', { tmdb_id: i });
     }
-    expect(getQueueSize()).toBe(200);
+    expect(getQueueSize()).toBe(1000);
     const queue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
     expect(queue[0].data.tmdb_id).toBe(5);
+    // Overflow must never be silent: the marker drives the warning and stops
+    // reconcile from deleting local rows that never uploaded.
+    expect(getDroppedCount()).toBe(5);
   });
 
   it('clearOfflineQueue empties the queue', () => {
@@ -78,7 +87,8 @@ describe('offlineQueue', () => {
 
   it('leaves every op queued without burning attempts while signed out', async () => {
     enqueueWrite('watched', 'insert', { user_id: 'user-a', tmdb_id: 1 });
-    enqueueWrite('watch_later', 'delete', { user_id: 'user-a', tmdb_id: 2 });
+    // Shaped like the real delete ops the repositories enqueue (userId/tmdbId).
+    enqueueWrite('watch_later', 'delete', { userId: 'user-a', tmdbId: 2 });
     // syncUserId is null here (afterEach / signed-out state).
     await syncOfflineQueue();
     const queue = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
@@ -103,6 +113,8 @@ describe('offlineQueue', () => {
     }
     await syncOfflineQueue();
     expect(getQueueSize()).toBe(0);
+    // The op never reached the server: that has to be recorded.
+    expect(getDroppedCount()).toBe(1);
   });
 
   describe('background sync lifecycle', () => {

@@ -18,7 +18,7 @@ import {
   MIGRATION_FLAG_PREFIX,
   LEGACY_MIGRATION_FLAG_KEY,
 } from '../api/storage';
-import { getPendingOperations } from './offlineQueue';
+import { getPendingOperations, getDroppedCount, clearDroppedMarker, getQueueSize } from './offlineQueue';
 import {
   reconcileProgressToRemote,
   reconcileWatchedToRemote,
@@ -413,7 +413,12 @@ async function downloadSupabaseData(userId: string, prefetched?: RemoteSnapshot)
   const pending = getPendingOperations().some((op) =>
     ['progress', 'watched', 'watch_later'].includes(op.table)
   );
-  if (migrated && !pending) {
+  // Writes that were dropped (queue overflow / retries exhausted / rejected)
+  // never reached the server, so local rows may legitimately be missing from
+  // the snapshot. Deleting them would turn a sync failure into data loss.
+  // Skip deletions until a full re-upload succeeds (see dataMigration.resync).
+  const unsyncedLoss = getDroppedCount() > 0;
+  if (migrated && !pending && !unsyncedLoss) {
     if (watchedRows) reconcileWatchedToRemote(remoteWatchedKeys);
     if (progressRows) reconcileProgressToRemote(remoteProgressKeys);
     if (wlRows) reconcileWatchLaterToRemote(remoteWLItemKeys, remoteWLEpisodeKeys);
@@ -464,6 +469,90 @@ function serverHoldsUploadedRows(
   return true;
 }
 
+// Uploads every local row to the account. Safe to repeat: the repositories
+// tolerate rows that already exist (unique violations are treated as success),
+// so this is also the recovery path after writes were dropped.
+interface UploadResult {
+  hasData: boolean;
+  failed: boolean;
+  watchedItems: WatchedInsert[];
+  wlItems: ReturnType<typeof getLegacyWatchLater>;
+}
+
+async function uploadLocalData(userId: string): Promise<UploadResult> {
+  let hasData = false;
+  // Only flips when a write did not reach the server (it was queued for a
+  // later sync, or even that failed). Repositories never throw - they park
+  // failures in the offline queue - so "no exception" is not "persisted".
+  let failed = false;
+
+  const watchedItems = getLegacyWatched();
+  if (watchedItems.length > 0) {
+    hasData = true;
+    try {
+      const batch = watchedItems.map((item) => ({ ...item, user_id: userId }));
+      const result = await watchedRepository.markBatch(batch);
+      if (result?.queued) failed = true;
+    } catch (err) {
+      failed = true;
+      logError('dataMigration.watched', err);
+    }
+  }
+
+  const progressItems = getLegacyProgress();
+  if (progressItems.length > 0) {
+    hasData = true;
+    try {
+      for (const item of progressItems) {
+        const result = await progressRepository.save({ ...item, user_id: userId });
+        if (result?.queued) failed = true;
+      }
+    } catch (err) {
+      failed = true;
+      logError('dataMigration.progress', err);
+    }
+  }
+
+  const wlItems = getLegacyWatchLater();
+  if (wlItems.length > 0) {
+    hasData = true;
+    try {
+      for (const item of wlItems) {
+        const result = await watchLaterRepository.add({
+          user_id: userId,
+          media_type: item.media_type,
+          tmdb_id: item.tmdb_id,
+          title: item.title,
+          year: item.year,
+          poster: item.poster,
+          season: item.season,
+          episode: item.episode,
+        });
+        if (result?.queued) failed = true;
+      }
+    } catch (err) {
+      failed = true;
+      logError('dataMigration.watchLater', err);
+    }
+  }
+
+  const searchItems = getLegacySearchHistory();
+  if (searchItems.length > 0) {
+    hasData = true;
+    try {
+      for (const query of searchItems) {
+        const result = await searchHistoryRepository.add({ user_id: userId, query });
+        if (result?.queued) failed = true;
+      }
+    } catch (err) {
+      failed = true;
+      logError('dataMigration.searchHistory', err);
+    }
+  }
+
+  return { hasData, failed, watchedItems, wlItems };
+}
+
 // Guards against concurrent migration runs (e.g. sign-in resolving while the
 // SIGNED_IN event fires too). Without this, two overlapping runs would upload
 // the same local rows twice - notifications have no unique constraint, so the
@@ -485,6 +574,12 @@ export const dataMigration = {
   async runMigration(userId: string): Promise<void> {
     const flagKey = migrationFlagKey(userId);
     if (localStorage.getItem(flagKey)) {
+      // Already migrated. If earlier writes were dropped, retry them now
+      // instead of waiting for the user to notice.
+      if (getDroppedCount() > 0) {
+        await this.resync(userId);
+        return;
+      }
       await this.syncFromSupabase(userId);
       return;
     }
@@ -501,75 +596,7 @@ export const dataMigration = {
       return;
     }
 
-    let hasData = false;
-    // Only flips when a write did not reach the server (it was queued for a
-    // later sync, or even that failed). Repositories never throw - they park
-    // failures in the offline queue - so "no exception" is not "persisted".
-    let failed = false;
-
-    const watchedItems = getLegacyWatched();
-    if (watchedItems.length > 0) {
-      hasData = true;
-      try {
-        const batch = watchedItems.map((item) => ({ ...item, user_id: userId }));
-        const result = await watchedRepository.markBatch(batch);
-        if (result?.queued) failed = true;
-      } catch (err) {
-        failed = true;
-        logError('dataMigration.watched', err);
-      }
-    }
-
-    const progressItems = getLegacyProgress();
-    if (progressItems.length > 0) {
-      hasData = true;
-      try {
-        for (const item of progressItems) {
-          const result = await progressRepository.save({ ...item, user_id: userId });
-          if (result?.queued) failed = true;
-        }
-      } catch (err) {
-        failed = true;
-        logError('dataMigration.progress', err);
-      }
-    }
-
-    const wlItems = getLegacyWatchLater();
-    if (wlItems.length > 0) {
-      hasData = true;
-      try {
-        for (const item of wlItems) {
-          const result = await watchLaterRepository.add({
-            user_id: userId,
-            media_type: item.media_type,
-            tmdb_id: item.tmdb_id,
-            title: item.title,
-            year: item.year,
-            poster: item.poster,
-            season: item.season,
-            episode: item.episode,
-          });
-          if (result?.queued) failed = true;
-        }
-      } catch (err) {
-        failed = true;
-        logError('dataMigration.watchLater', err);
-      }
-    }
-
-    const searchItems = getLegacySearchHistory();
-    if (searchItems.length > 0) {
-      hasData = true;
-      try {
-        for (const query of searchItems) {
-          const result = await searchHistoryRepository.add({ user_id: userId, query });
-          if (result?.queued) failed = true;
-        }
-      } catch (err) {
-        failed = true;
-        logError('dataMigration.searchHistory', err);
-      }
-    }
+    const { hasData, failed, watchedItems, wlItems } = await uploadLocalData(userId);
 
     // Only clear the mirrored data and mark the flag when every row actually
     // reached the server - a queued-only upload (offline/RLS failure) is not
@@ -602,6 +629,31 @@ export const dataMigration = {
       }
       await this.syncFromSupabase(userId);
     }
+  },
+
+  /**
+   * Recovery after dropped writes: re-upload everything local, then pull the
+   * server state. The dropped-writes marker is cleared only when every row
+   * reached the server and nothing is left in the offline queue; otherwise it
+   * stays, deletions stay disabled, and the user keeps seeing the warning.
+   * Deletes that were dropped cannot be replayed from local data: such items
+   * may reappear after the sync, which is the safe direction (never lose data).
+   * Returns true when fully recovered.
+   */
+  async resync(userId: string): Promise<boolean> {
+    let failed = false;
+    try {
+      ({ failed } = await uploadLocalData(userId));
+    } catch (err) {
+      failed = true;
+      logError('dataMigration.resync', err);
+    }
+    await this.syncFromSupabase(userId);
+    if (!failed && getQueueSize() === 0) {
+      clearDroppedMarker();
+      return true;
+    }
+    return false;
   },
 
   async syncFromSupabase(userId: string, prefetched?: RemoteSnapshot): Promise<void> {

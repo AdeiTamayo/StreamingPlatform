@@ -5,6 +5,7 @@ import { ToastProvider } from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
 import AuthModal from './components/AuthModal/AuthModal';
+import SyncDropNotice from './components/SyncDropNotice';
 import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
 import './styles/shared.css';
 
@@ -78,6 +79,7 @@ export default function App() {
           <a href="#main-content" className="skip-link">{t('app.skipToContent')}</a>
           <Navbar />
           <AuthModal />
+          <SyncDropNotice />
           <main id="main-content" className="app-content" ref={mainRef} tabIndex={-1}>
             <Suspense fallback={<div className="page"><div className="loading">{t('app.loading')}</div></div>}>
               <Routes>
