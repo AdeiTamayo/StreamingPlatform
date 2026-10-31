@@ -281,6 +281,7 @@ describe('classifySessionError', () => {
   it.each([
     [{ code: 'user_not_found', status: 403, message: 'User from sub claim in JWT does not exist' }, 'deleted'],
     [{ message: 'User from sub claim in JWT does not exist' }, 'deleted'],
+    [{ code: 'user_not_found' }, 'deleted'],
     [{ code: 'session_not_found', status: 403 }, 'ended'],
     [{ code: 'session_expired' }, 'ended'],
     [{ code: 'refresh_token_not_found', status: 400 }, 'ended'],
