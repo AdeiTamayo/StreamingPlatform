@@ -308,7 +308,8 @@
     "loginToExport": "Hasi saioa Supabaseko datuak esportatzeko",
     "supabaseExported": "Supabaseko datuak esportatu dira",
     "supabaseImported": "Supabaseko datuak behar bezala inportatu dira",
-    "exportFailed": "Esportazioak huts egin du. Ez da babeskopia-fitxategirik sortu."
+    "exportFailed": "Esportazioak huts egin du. Ez da babeskopia-fitxategirik sortu.",
+    "passwordUpdated": "Zure pasahitza eguneratu da."
   },
   "searchBar": {
     "searchLabel": "Bilatu",
@@ -590,7 +591,25 @@
       "passwordLength": "Pasahitzak gutxienez {{count}} karaktere izan behar ditu.",
       "passwordLetters": "Pasahitzak letra larriak eta xeheak izan behar ditu.",
       "passwordNumber": "Pasahitzak gutxienez zenbaki bat izan behar du.",
-      "passwordSymbol": "Pasahitzak gutxienez sinbolo bat izan behar du."
+      "passwordSymbol": "Pasahitzak gutxienez sinbolo bat izan behar du.",
+      "samePassword": "Aukeratu oraingoa ez den beste pasahitz bat.",
+      "weakPassword": "Pasahitz hori asmatzeko errazegia da. Aukeratu sendoago bat.",
+      "rateLimited": "Saiakera gehiegi. Itxaron une bat eta saiatu berriro.",
+      "sessionExpired": "Esteka hau iraungi da edo dagoeneko erabili da. Eskatu berri bat.",
+      "network": "Ezin izan da zerbitzariarekin konektatu. Egiaztatu zure konexioa eta saiatu berriro.",
+      "generic": "Zerbait gaizki atera da. Saiatu berriro."
+    },
+    "reset": {
+      "title": "Ezarri pasahitz berria",
+      "subtitle": "Aukeratu pasahitz berri bat zure konturako.",
+      "newPassword": "Pasahitz berria",
+      "submit": "Gorde pasahitz berria",
+      "saving": "Gordetzen…",
+      "skip": "Orain ez",
+      "checking": "Zure esteka egiaztatzen…",
+      "invalidTitle": "Esteka hau ezin da erabili",
+      "invalidBody": "Pasahitza berrezartzeko esteka ez da baliozkoa, iraungi da edo dagoeneko erabili da. Eskatu berri bat jarraitzeko.",
+      "requestNew": "Eskatu esteka berri bat"
     }
   },
   "notifications": {

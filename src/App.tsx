@@ -22,6 +22,7 @@ function createPages() {
     WatchLater: lazy(() => import('./pages/WatchLater')),
     LastSeen: lazy(() => import('./pages/LastSeen')),
     Settings: lazy(() => import('./pages/Settings')),
+    ResetPassword: lazy(() => import('./pages/ResetPassword')),
     NotFound: lazy(() => import('./pages/NotFound')),
   };
 }
@@ -90,6 +91,7 @@ export default function App() {
                 <Route path="/watch-later" element={<ProtectedRoute><pages.WatchLater /></ProtectedRoute>} />
                 <Route path="/last-seen" element={<ProtectedRoute><pages.LastSeen /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><pages.Settings /></ProtectedRoute>} />
+                <Route path="/reset-password" element={<pages.ResetPassword />} />
                 <Route path="*" element={<pages.NotFound />} />
               </Routes>
             </Suspense>

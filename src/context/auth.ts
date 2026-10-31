@@ -13,6 +13,12 @@ export interface AuthContextValue extends AuthState {
   signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  /** True after the user opened a password-reset email link, until they set a new password or skip. */
+  isPasswordRecovery: boolean;
+  /** Sets the new password for the recovery session and ends recovery mode. */
+  updatePassword: (newPassword: string) => Promise<void>;
+  /** Leaves recovery mode without changing the password (the session stays signed in). */
+  endPasswordRecovery: () => void;
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
