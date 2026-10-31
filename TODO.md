@@ -16,11 +16,15 @@ findings as pending until reproduced or otherwise verified.
 For audit findings, record one status: `Confirmed`,
 `Reproduced in tests`, `Potential`, or `Resolved`.
 
-**Progress note:** `fix/offline-queue` and `fix/password-recovery` have
-been merged into `main` (typecheck, lint, 432 tests and production build
-all pass). Items marked `Resolved` below reflect code that landed with
-those merges; items marked `Partial` still need work, and live Supabase
-verification has not been performed.
+**Progress note (2026-10-31):** merged into `main`: `fix/offline-queue`,
+`fix/password-recovery`, `fix/reliability-hardening`,
+`fix/auth-localized-errors`, `feat/account-credentials` and
+`feat/delete-account`. Open PRs: #18 (calendar test month-end fix), #19
+(sign-up confirmation redirect) and #20 (revoke sessions on account
+deletion). Items marked `Resolved` reflect code that landed with those
+merges and passed typecheck, tests and build; items marked `Partial` still
+need work. **No live Supabase verification has been performed** for any
+item: everything was tested against fakes unless stated otherwise.
 
 ---
 
@@ -68,12 +72,26 @@ verification has not been performed.
       for every table, view, RPC/function and storage bucket. Attempt to
       access or modify another user's records by changing IDs directly
       through the Supabase API.
-- [ ] **H --- Test sync during account changes.** Verify queued
+- [ ] **H --- Test sync during account changes.** — `Partial`.
+      Reproduced in tests (`storage.accountSwitch.test.tsx`, merged):
+      pending writes are never replayed under another account, are sent
+      once when their owner signs back in, nothing is sent while signed
+      out, and per-account throttles and session marks reset. Still open:
+      token expiry, concurrent edits, partial failures and deterministic
+      conflict resolution, plus live verification.
+      Verify queued
       operations are bound to the correct account during logout, login,
       account switching, token expiry and reconnect. Test concurrent
       edits, partial failures and retries; resolve conflicts
       deterministically and never silently discard user data.
-- [ ] **H --- Test hostile and invalid backup imports.** Reject
+- [ ] **H --- Test hostile and invalid backup imports.** — `Partial`.
+      The local JSON import (`importData`) now validates every key and
+      value, skips and counts invalid entries, ignores derived index keys,
+      and applies the import atomically with rollback in merge and replace
+      modes (`storage.import.test.ts`, merged). Still open: the cloud
+      backup restore (`importSupabaseData`) and schema-version handling
+      (the backup format has no version field yet).
+      Reject
       malformed, oversized, unsupported-version and structurally invalid
       backups safely. Test duplicate IDs, invalid dates, unexpected fields
       and schema migrations. Failed imports must leave existing data
@@ -84,24 +102,39 @@ verification has not been performed.
       the destructive step. Live verification against a real account is
       still recommended.
 - [ ] **H --- Verify viewing progress reliability (not a new
-      feature).** Test existing watched status, episode/season actions,
+      feature).** — `Partial`. Regression tests (`storage.viewing.test.ts`,
+      merged) cover Continue Watching vs Last Seen exclusivity, series
+      flags, `clearShowHistory` and damaged local data, and found and fixed
+      two bugs (a ghost Continue Watching row for an index key with no
+      value, and a crash on a non-string index entry). Offline, resume
+      after refresh and cloud-sync scenarios are still unverified.
+      Test existing watched status, episode/season actions,
       Continue Watching and resume behaviour after refresh, offline use,
       account switching and cloud sync. Add regression tests for any
       failures found.
 
 ### CI, tests and dependencies
 
-- [ ] **H --- Restore a green dependency audit.** The audit reported
+- [x] **H --- Restore a green dependency audit.** — `Resolved`
+      (`fix/ci-green`; `npm audit --audit-level=high` reports 0
+      vulnerabilities as of 2026-10-31). Historical note: the audit reported
       `npm audit --audit-level=high` failing for `vite` 8.1.4 and `undici`
       via `jsdom`, plus moderate Vitest-related advisories. Update
       dependencies with a reviewed fix, then rerun the audit, tests,
       typecheck, lint and production build. Re-check current advisories
       rather than relying on this historical snapshot.
-- [ ] **H --- Remove secrets from test requirements.** Two tests in
+- [x] **H --- Remove secrets from test requirements.** — `Resolved`
+      (`vite.config.ts` injects dummy keys for tests; CI runs them without
+      secrets). Historical note: two tests in
       `src/test/detailPages.test.tsx` depend on `VITE_OMDB_API_KEY`. Stub
       the environment or mock the API so tests pass on forks and clean
       clones without real secrets.
-- [ ] **H --- Verify authentication lifecycle.** Test expired and
+- [ ] **H --- Verify authentication lifecycle.** — `Partial`. Covered in
+      tests: password recovery, account switching, local-data clearing on
+      sign-out, and (PR #20, open) revoked/deleted sessions detected on
+      focus, visibility and a 5-minute interval. Still open: OAuth
+      callback validation (Google sign-in does not exist yet) and live
+      verification. Test expired and
       revoked sessions, logout, password recovery, account switching,
       OAuth callback/redirect validation and local-data visibility after
       logout. Confirm no prior user's data remains visible to the next
@@ -150,16 +183,16 @@ verification has not been performed.
       (`storage.ts:260–268`) only logs quota errors. Return failure
       information to callers and show an actionable notification instead
       of displaying a state that was not saved.
-- [ ] **M --- Fix the calendar timezone test.**
-      `WatchLater.calendar.test.tsx` has a failing test for selected-day
-      labels across time zones. Reproduce the cause and freeze time with
-      fake timers where appropriate; do not assume the root cause before
-      investigation.
+- [x] **M --- Fix the calendar timezone test.** — `Resolved`. The
+      selected-day label bug was fixed in `fix/ci-green`; a separate
+      month-end failure (Auckland is already next month on the last day of
+      a month) is fixed in PR #18, pending merge.
 - [ ] **M --- Add missing regression coverage.** — `Partial`.
       `storageBackup`, `progressRepository`, `offlineQueue` error paths,
-      `ResetPassword` and `AuthContext` recovery are now covered.
-      `LoginForm` still has no tests, and the live sync/backup scenarios
-      below remain manual.
+      `ResetPassword`, `AuthContext` recovery, local backup import,
+      account switching, viewing progress and the auth-form error
+      rendering are now covered. Live sync/backup scenarios remain
+      manual.
 - [ ] **M --- Review `/api/probe` resource limits.** In addition to
       abuse protection, test cache eviction, concurrent scans, timeout
       behaviour and error responses under failure conditions.
@@ -178,13 +211,14 @@ verification has not been performed.
 - [ ] **M --- Verify reproducible builds.** Confirm a clean checkout
       can install, test and build without developer-specific files or
       secrets.
-- [ ] **M --- Account deletion and data cleanup.** Add an account
-      deletion flow that clearly explains and verifies deletion of cloud
-      rows and account credentials, with documented handling of local data
-      and exported backups.
-- [ ] **M --- Complete account management.** Add email/password change
-      flows with appropriate reauthentication and translated success/error
-      states.
+- [x] **M --- Account deletion and data cleanup.** — `Resolved` in code
+      (`feat/delete-account`, merged: server function with re-authentication
+      for password accounts; PR #20, open: revokes all sessions first and
+      signs out other devices). Not yet verified against a live Supabase
+      project in production.
+- [x] **M --- Complete account management.** — `Resolved` in code
+      (`feat/account-credentials`, merged). The real email-confirmation
+      round trip is unverified.
 - [ ] **M --- Add accessibility regression tests.** Extend beyond
       `App.a11y.test.tsx` to modal focus handling, notification
       announcements, keyboard navigation, contrast, focus visibility and
@@ -196,9 +230,8 @@ verification has not been performed.
       `RegisterForm.tsx`, `ForgotPasswordForm.tsx` and
       `src/components/AuthModal/errors.ts` contain user-facing text that
       needs translation keys.
-- [ ] **M --- Translate Supabase auth errors.** Map known error codes
-      to friendly translated messages rather than displaying raw English
-      errors.
+- [x] **M --- Translate Supabase auth errors.** — `Resolved`
+      (`fix/auth-localized-errors`, merged; `getLocalizedAuthError`).
 - [ ] **M --- Translate notifications and controls.** Review
       `Notifications.tsx`, `BulkSelectBar.tsx`, `DatePickerField.tsx`,
       `ViewModeToggle.tsx`, `SelectDropdown.tsx` and
@@ -214,10 +247,8 @@ verification has not been performed.
       script that flags hard-coded user-facing JSX text. The audit
       reported translation-key parity across `en`, `es` and `eu`, but
       components bypassing i18n still need manual confirmation.
-- [ ] **M --- Allow language selection while signed out.** Add a
-      language selector to the navbar/auth modal or expose only
-      appropriate local settings publicly. Keep account and cloud controls
-      protected.
+- [x] **M --- Allow language selection while signed out.** — `Resolved`
+      (`LanguageSwitcher` in the navbar).
 
 ### Existing features and UX
 
@@ -289,8 +320,7 @@ already present.
       Supabase provider, add production/local redirect URLs, handle
       account-linking cases, translate the UI in English/Spanish/Basque
       and test the full flow.
-- [ ] **M --- Account settings.** Complete account deletion and
-      email/password changes (see the fixes above).
+- [x] **M --- Account settings.** — `Resolved` in code (see Section 2).
 - [ ] **L --- Evaluate session/device management.** Add only if
       supported by the auth architecture and useful for the app's privacy
       model.
@@ -328,8 +358,9 @@ unless a concrete missing capability is confirmed.
 - [ ] **H --- Cross-account isolation:** test all CRUD operations and
       storage access using two accounts, including attempts to tamper with
       user IDs.
-- [ ] **H --- Account switching and queued writes:** verify no queued
-      operation can be uploaded under the wrong account.
+- [x] **H --- Account switching and queued writes:** verify no queued
+      operation can be uploaded under the wrong account. — `Reproduced in
+      tests` (see Section 1); live verification still pending.
 - [ ] **H --- Authentication lifecycle:** test expired/revoked
       sessions, logout, password recovery, OAuth callbacks and redirects.
 - [ ] **H --- Hostile backup imports:** test malformed, oversized and
