@@ -195,7 +195,9 @@ function getIndex(key: string, prefix: string): string[] {
     const raw = localStorage.getItem(key);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      // A damaged index can hold anything. Non-string entries would make the
+      // key parsers throw and take the whole screen down, so drop them.
+      if (Array.isArray(parsed)) return parsed.filter((k): k is string => typeof k === 'string');
     }
   } catch {
     // Corrupted JSON
@@ -663,7 +665,14 @@ export function getContinueWatching(): ContinueWatchingItem[] {
     const p = parseProgressKey(k);
     if (!p) continue;
     try {
-      const data = JSON.parse(localStorage.getItem(k) || '{}') as Record<string, unknown>;
+      const raw = localStorage.getItem(k);
+      if (raw == null) {
+        // Dangling index key (value removed out-of-band): heal it instead of
+        // emitting a ghost row with no title and a zero timestamp.
+        removeFromProgressIndex(k);
+        continue;
+      }
+      const data = JSON.parse(raw) as Record<string, unknown>;
       if (!data) continue;
       // Safety net for rows written by older versions that never cleared
       // progress when something was marked watched.
@@ -1012,115 +1021,291 @@ function rebuildIndices(): void {
   saveIndex(EP_WL_INDEX_KEY, epwlIndex);
 }
 
-// Union a backed-up watch-later list into the current one. Returns the
-// number of entries actually added.
-function mergeWatchLaterList(raw: string): number {
-  let incoming: unknown;
-  try {
-    incoming = JSON.parse(raw);
-  } catch {
-    return 0;
-  }
-  if (!Array.isArray(incoming)) return 0;
-  const merged = [...getWatchLater()];
-  let added = 0;
-  for (const item of incoming as WatchLaterItem[]) {
-    if (merged.length >= WATCH_LATER_MAX) break;
-    if (!item || item.type == null || item.id == null) continue;
-    if (merged.some((m) => m.type === item.type && String(m.id) === String(item.id))) continue;
-    merged.push({ ...item, addedAt: typeof item.addedAt === 'number' ? item.addedAt : Date.now() });
-    added++;
-  }
-  if (added === 0) return 0;
-  try {
-    localStorage.setItem(WL_KEY, JSON.stringify(merged));
-  } catch (err) {
-    logError('storage.importData', err);
-    return 0;
-  }
-  return added;
+// ---------------------------------------------------------------------------
+// Backup import
+//
+// A backup file is untrusted input: it can be hand-edited, corrupted or
+// hostile. Every entry is validated before anything is written, values are
+// normalised, and the whole import is applied as one unit - if a write fails
+// part-way (quota) the previous state is restored, so a failed "replace" can
+// never leave the library half-wiped.
+// ---------------------------------------------------------------------------
+
+const MAX_IMPORT_VALUE_CHARS = 8 * 1024;
+const MAX_IMPORT_LIST_CHARS = 2_500_000;
+const MAX_IMPORT_ITEM_CHARS = 2048;
+const NOTIFICATIONS_DISMISSED_IMPORT_MAX = 500;
+const ID_PART = '[A-Za-z0-9_-]{1,64}';
+
+type ImportKind = 'watched' | 'progress' | 'epwl' | 'list';
+
+// Strict grammar for every importable key. Anything else (including keys that
+// merely start with an export prefix, like "watchlaterX") is rejected.
+const IMPORT_KEY_RULES: Array<{ pattern: RegExp; kind: ImportKind }> = [
+  { pattern: new RegExp(`^watched:movie-${ID_PART}$`), kind: 'watched' },
+  { pattern: /^watched:tv-\d{1,10}$/, kind: 'watched' },
+  { pattern: /^watched:tv-\d{1,10}-S\d{1,4}E\d{1,5}$/, kind: 'watched' },
+  { pattern: new RegExp(`^progress:movie-${ID_PART}$`), kind: 'progress' },
+  { pattern: /^progress:tv-\d{1,10}-S\d{1,4}E\d{1,5}$/, kind: 'progress' },
+  { pattern: new RegExp(`^epwl:${ID_PART}-S\\d{1,4}E\\d{1,5}$`), kind: 'epwl' },
+  { pattern: /^(watchlater|search_history|notifications|notifications_dismissed)$/, kind: 'list' },
+];
+
+// Derived data: rebuilt from the imported entries, never imported itself.
+const IMPORT_DERIVED_KEYS = new Set([WATCHED_INDEX_KEY, PROGRESS_INDEX_KEY, EP_WL_INDEX_KEY]);
+
+function importKind(key: string): ImportKind | null {
+  for (const rule of IMPORT_KEY_RULES) if (rule.pattern.test(key)) return rule.kind;
+  return null;
 }
 
-// Union backed-up search history into the current one (most recent first,
-// capped). Returns the number of queries actually added.
-function mergeSearchHistoryList(raw: string): number {
-  let incoming: unknown;
-  try {
-    incoming = JSON.parse(raw);
-  } catch {
-    return 0;
-  }
-  if (!Array.isArray(incoming)) return 0;
-  const merged = [...getSearchHistory()];
-  let added = 0;
-  for (const q of incoming as unknown[]) {
-    if (added >= SEARCH_HISTORY_MAX || merged.length >= SEARCH_HISTORY_MAX) break;
-    if (typeof q !== 'string' || !q.trim()) continue;
-    if (merged.some((m) => m.toLowerCase() === q.toLowerCase())) continue;
-    merged.push(q);
-    added++;
-  }
-  if (added === 0) return 0;
-  try {
-    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(merged.slice(0, SEARCH_HISTORY_MAX)));
-  } catch (err) {
-    logError('storage.importData', err);
-    return 0;
-  }
-  return added;
+function isPlainObject(x: unknown): x is Record<string, unknown> {
+  return typeof x === 'object' && x !== null && !Array.isArray(x);
 }
 
-export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): number {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return 0;
+function isFiniteNumber(x: unknown): x is number {
+  return typeof x === 'number' && Number.isFinite(x);
+}
+
+function isValidItemId(x: unknown): boolean {
+  return isFiniteNumber(x) || (typeof x === 'string' && x.length > 0 && x.length <= 64);
+}
+
+// Returns a cleaned copy of an entry object, or null when it is unusable.
+function sanitizeEntryObject(
+  obj: unknown,
+  timeField: 'watchedAt' | 'savedAt' | 'addedAt',
+): Record<string, unknown> | null {
+  if (!isPlainObject(obj)) return null;
+  if (obj.type !== undefined && obj.type !== 'movie' && obj.type !== 'tv') return null;
+  for (const f of ['season', 'episode'] as const) {
+    if (obj[f] !== undefined && !isFiniteNumber(obj[f])) return null;
+  }
+  if (obj.id !== undefined && !isValidItemId(obj.id)) return null;
+  if (obj.title !== undefined && typeof obj.title !== 'string') return null;
+  if (obj.meta !== undefined && !isPlainObject(obj.meta)) return null;
+  // Rows without a usable timestamp would sort unpredictably (NaN).
+  return { ...obj, [timeField]: isFiniteNumber(obj[timeField]) ? obj[timeField] : Date.now() };
+}
+
+function sanitizeWatchLaterItem(item: unknown): WatchLaterItem | null {
+  if (!isPlainObject(item)) return null;
+  if (item.type !== 'movie' && item.type !== 'tv') return null;
+  if (!isValidItemId(item.id)) return null;
+  const clean = {
+    ...item,
+    title: typeof item.title === 'string' ? item.title : '',
+    year: typeof item.year === 'string' ? item.year : '',
+    poster: typeof item.poster === 'string' ? item.poster : '',
+    addedAt: isFiniteNumber(item.addedAt) ? item.addedAt : Date.now(),
+  } as unknown as WatchLaterItem;
+  return JSON.stringify(clean).length <= MAX_IMPORT_ITEM_CHARS ? clean : null;
+}
+
+function sanitizeList(key: string, arr: unknown[]): unknown[] {
+  if (key === WL_KEY) {
+    const out: WatchLaterItem[] = [];
+    for (const item of arr) {
+      const clean = sanitizeWatchLaterItem(item);
+      if (clean) out.push(clean);
+      if (out.length >= WATCH_LATER_MAX) break;
+    }
+    return out;
+  }
+  if (key === SEARCH_HISTORY_KEY) {
+    const out: string[] = [];
+    for (const q of arr) {
+      if (typeof q !== 'string') continue;
+      const t = q.trim().slice(0, 200);
+      if (t && !out.some((m) => m.toLowerCase() === t.toLowerCase())) out.push(t);
+      if (out.length >= SEARCH_HISTORY_MAX) break;
+    }
+    return out;
+  }
+  if (key === NOTIFICATIONS_DISMISSED_KEY) {
+    return arr
+      .filter(
+        (n) => isPlainObject(n) && n.showId != null && isFiniteNumber(n.season) && isFiniteNumber(n.episode),
+      )
+      .slice(0, NOTIFICATIONS_DISMISSED_IMPORT_MAX);
+  }
+  // notifications
+  return arr
+    .filter(
+      (n) =>
+        isPlainObject(n) &&
+        typeof n.id === 'string' &&
+        JSON.stringify(n).length <= MAX_IMPORT_ITEM_CHARS &&
+        (n.createdAt === undefined || isFiniteNumber(n.createdAt)),
+    )
+    .slice(0, NOTIFICATIONS_MAX);
+}
+
+type ValidatedValue = { ok: true; value: string | null } | { ok: false };
+
+// Validates one backup entry and returns the exact string to store. `null`
+// means "key absent" and removes the key.
+function validateImportEntry(key: string, raw: unknown): ValidatedValue {
+  const kind = importKind(key);
+  if (!kind) return { ok: false };
+  if (raw == null) return { ok: true, value: null };
+
+  let text: string;
+  if (typeof raw === 'string') text = raw;
+  else if (typeof raw === 'object') {
+    try {
+      text = JSON.stringify(raw);
+    } catch {
+      return { ok: false };
+    }
+  } else return { ok: false };
+
+  if (text.length > (kind === 'list' ? MAX_IMPORT_LIST_CHARS : MAX_IMPORT_VALUE_CHARS)) return { ok: false };
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false };
+  }
+
+  if (kind === 'list') {
+    if (!Array.isArray(parsed)) return { ok: false };
+    return { ok: true, value: JSON.stringify(sanitizeList(key, parsed)) };
+  }
+  if (kind === 'epwl') {
+    const e = sanitizeEntryObject(parsed, 'addedAt');
+    if (!e || e.showId == null || !isValidItemId(e.showId)) return { ok: false };
+    if (!isFiniteNumber(e.season) || !isFiniteNumber(e.episode)) return { ok: false };
+    return { ok: true, value: JSON.stringify(e) };
+  }
+  const e = sanitizeEntryObject(parsed, kind === 'watched' ? 'watchedAt' : 'savedAt');
+  if (!e) return { ok: false };
+  return { ok: true, value: JSON.stringify(e) };
+}
+
+function readList<T>(raw: unknown, fallback: T[]): T[] {
+  return Array.isArray(raw) ? (raw as T[]) : fallback;
+}
+
+export interface ImportResult {
+  /** Entries written or removed (list entries count per item added). */
+  imported: number;
+  /** Entries rejected as invalid and left out of the import. */
+  skipped: number;
+}
+
+/**
+ * Imports a backup. Invalid entries are skipped (and counted), valid ones are
+ * normalised, and the whole import is applied atomically: any storage failure
+ * restores the previous state and imports nothing.
+ */
+export function importDataDetailed(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): ImportResult {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return { imported: 0, skipped: 0 };
   if (Object.keys(data).length > MAX_IMPORT_ENTRIES) {
     throw new Error('Backup contains too many entries');
   }
+
+  // 1. Validate everything first - nothing is written yet.
+  const plan = new Map<string, string | null>();
   let imported = 0;
+  let skipped = 0;
+  for (const [k, v] of Object.entries(data)) {
+    if (!isExportKey(k) || IMPORT_DERIVED_KEYS.has(k)) continue;
+    const res = validateImportEntry(k, v);
+    if (!res.ok) {
+      skipped++;
+      continue;
+    }
+    plan.set(k, res.value);
+  }
+
+  // 2. Merge mode unions list-valued keys with what is already stored so a
+  //    partial backup cannot wipe the rest of the local lists.
+  if (mode === 'merge') {
+    const wl = plan.get(WL_KEY);
+    if (wl != null) {
+      const merged = [...getWatchLater()];
+      let added = 0;
+      for (const item of readList<WatchLaterItem>(JSON.parse(wl), [])) {
+        if (merged.length >= WATCH_LATER_MAX) break;
+        if (merged.some((m) => m.type === item.type && String(m.id) === String(item.id))) continue;
+        merged.push(item);
+        added++;
+      }
+      if (added > 0) plan.set(WL_KEY, JSON.stringify(merged));
+      else plan.delete(WL_KEY);
+      imported += added;
+    }
+    const sh = plan.get(SEARCH_HISTORY_KEY);
+    if (sh != null) {
+      const merged = [...getSearchHistory()];
+      let added = 0;
+      for (const q of readList<string>(JSON.parse(sh), [])) {
+        if (added >= SEARCH_HISTORY_MAX || merged.length >= SEARCH_HISTORY_MAX) break;
+        if (merged.some((m) => m.toLowerCase() === q.toLowerCase())) continue;
+        merged.push(q);
+        added++;
+      }
+      if (added > 0) plan.set(SEARCH_HISTORY_KEY, JSON.stringify(merged.slice(0, SEARCH_HISTORY_MAX)));
+      else plan.delete(SEARCH_HISTORY_KEY);
+      imported += added;
+    }
+  }
+
+  // 3. Snapshot every key this import can touch, so a failure can be undone.
+  const touched = new Set<string>([...plan.keys(), WATCHED_INDEX_KEY, PROGRESS_INDEX_KEY, EP_WL_INDEX_KEY]);
   if (mode === 'replace') {
-    const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && isExportKey(k)) keys.push(k);
+      if (k && isExportKey(k)) touched.add(k);
     }
-    keys.forEach((k) => localStorage.removeItem(k));
-  } else {
-    // List-valued keys union with the existing entries so importing a partial
-    // backup can't wipe the rest of the local lists.
-    const rest: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (!isExportKey(k)) continue;
-      if (k === WL_KEY && v != null) {
-        imported += mergeWatchLaterList(String(v));
-      } else if (k === SEARCH_HISTORY_KEY && v != null) {
-        imported += mergeSearchHistoryList(String(v));
-      } else {
-        rest[k] = v;
-      }
-    }
-    data = rest;
   }
-  Object.entries(data).forEach(([k, v]) => {
-    if (!isExportKey(k)) return;
-    try {
-      // Exported null means "key absent" - remove instead of storing the
-      // literal string "null".
-      if (v == null) {
-        localStorage.removeItem(k);
-      } else {
-        localStorage.setItem(k, String(v));
+  const snapshot = new Map<string, string | null>();
+  for (const k of touched) snapshot.set(k, localStorage.getItem(k));
+
+  const restore = () => {
+    // Free the space the partial import used before writing the originals back.
+    for (const k of snapshot.keys()) localStorage.removeItem(k);
+    for (const [k, v] of snapshot) {
+      if (v != null) {
+        try {
+          localStorage.setItem(k, v);
+        } catch (err) {
+          logError('storage.importData.restore', err);
+        }
       }
-      imported++;
-    } catch (err) {
-      logError('storage.importData', err);
     }
-  });
-  // Imported watched/progress/epwl keys must be reflected in the indices or
-  // they stay invisible to LastSeen/Stats/ContinueWatching.
-  rebuildIndices();
+  };
+
+  // 4. Apply.
+  try {
+    if (mode === 'replace') {
+      for (const k of touched) if (isExportKey(k)) localStorage.removeItem(k);
+    }
+    for (const [k, v] of plan) {
+      if (v == null) localStorage.removeItem(k);
+      else localStorage.setItem(k, v);
+      // Merged lists were already counted per item added above.
+      if (!(mode === 'merge' && v != null && (k === WL_KEY || k === SEARCH_HISTORY_KEY))) imported++;
+    }
+    // Imported watched/progress/epwl keys must be reflected in the indices or
+    // they stay invisible to LastSeen/Stats/ContinueWatching.
+    rebuildIndices();
+  } catch (err) {
+    logError('storage.importData', err);
+    restore();
+    return { imported: 0, skipped };
+  }
+
   // Imported rows are locally authoritative for this session so the sign-in
   // reconcile cannot delete them before they are uploaded.
   markIndicesAsSessionModified();
-  return imported;
+  return { imported, skipped };
+}
+
+export function importData(data: Record<string, unknown>, mode: 'merge' | 'replace' = 'merge'): number {
+  return importDataDetailed(data, mode).imported;
 }
 
 export async function getStorageUsage(): Promise<StorageUsage> {
