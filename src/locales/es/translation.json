@@ -176,7 +176,18 @@
     "cancel": "Cancelar",
     "unsyncedChanges": "Cambios sin sincronizar",
     "unsyncedCount": "{{count}} no se pudieron sincronizar",
-    "retrySync": "Reintentar sincronización"
+    "retrySync": "Reintentar sincronización",
+    "deleteAccount": {
+      "button": "Eliminar cuenta",
+      "exportData": "Exportar mis datos",
+      "title": "¿Eliminar tu cuenta?",
+      "body": "Esto elimina de forma permanente tu cuenta y todo lo que guarda: tu biblioteca, el historial de reproducción, el historial de búsqueda y las entradas de Seguir viendo, tanto en este dispositivo como en la nube. No se puede deshacer.",
+      "backupHint": "Exporta antes una copia de seguridad si puedes necesitar tus datos.",
+      "word": "ELIMINAR",
+      "typeWord": "Escribe {{word}} para confirmar",
+      "confirm": "Eliminar mi cuenta",
+      "deleting": "Eliminando…"
+    }
   },
   "watchLater": {
     "eyebrow": "Biblioteca personal",
@@ -326,7 +337,8 @@
     "syncRecovered": "Todo está sincronizado de nuevo.",
     "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde.",
     "passwordUpdated": "Tu contraseña se ha actualizado.",
-    "emailChangeRequested": "Enlaces de confirmación enviados. Revisa ambas bandejas de entrada."
+    "emailChangeRequested": "Enlaces de confirmación enviados. Revisa ambas bandejas de entrada.",
+    "accountDeleted": "Tu cuenta y tus datos se han eliminado."
   },
   "searchBar": {
     "searchLabel": "Buscar",
@@ -619,6 +631,7 @@
       "emailTaken": "Este correo ya está registrado. Prueba a iniciar sesión.",
       "signupDisabled": "El registro de cuentas nuevas está desactivado por ahora.",
       "currentPasswordIncorrect": "La contraseña actual no es correcta.",
+      "reauthRequired": "No hemos podido confirmar que eres tú. Vuelve a escribir tu contraseña e inténtalo de nuevo.",
       "generic": "Algo salió mal. Inténtalo de nuevo."
     },
     "reset": {

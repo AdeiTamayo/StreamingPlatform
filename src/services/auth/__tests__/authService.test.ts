@@ -13,7 +13,12 @@ vi.mock('../../../lib/supabase', () => ({
   requireSupabase: () => ({ auth: authMock }),
 }));
 
-import { authService, PASSWORD_RESET_PATH, ACCOUNT_SETTINGS_PATH } from '../authService';
+import {
+  authService,
+  PASSWORD_RESET_PATH,
+  ACCOUNT_SETTINGS_PATH,
+  DELETE_ACCOUNT_PATH,
+} from '../authService';
 
 describe('authService password recovery', () => {
   beforeEach(() => {
@@ -140,6 +145,132 @@ describe('authService changeEmail', () => {
     });
     await expect(authService.changeEmail('taken@example.com')).rejects.toMatchObject({
       code: 'email_exists',
+    });
+  });
+});
+
+describe('authService deleteAccount', () => {
+  const passwordUser = {
+    id: 'u1',
+    email: 'me@example.com',
+    app_metadata: { providers: ['email'] },
+  };
+  const googleUser = {
+    id: 'g1',
+    email: 'me@gmail.com',
+    app_metadata: { providers: ['google'] },
+  };
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  function sessionFor(user: unknown, token = 'old-token') {
+    authMock.getSession.mockResolvedValue({
+      data: { session: { user, access_token: token } },
+      error: null,
+    });
+  }
+  const response = (status: number, body?: unknown) =>
+    ({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => {
+        if (body === undefined) throw new Error('no body');
+        return body;
+      },
+    }) as Response;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    sessionFor(passwordUser);
+    authMock.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'fresh-token' } },
+      error: null,
+    });
+    fetchMock = vi.fn().mockResolvedValue(response(204));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  it('re-authenticates first, then posts with the fresh access token', async () => {
+    await authService.deleteAccount('Old!Password-1');
+    expect(authMock.signInWithPassword).toHaveBeenCalledWith({
+      email: 'me@example.com',
+      password: 'Old!Password-1',
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(DELETE_ACCOUNT_PATH, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer fresh-token' },
+    });
+    expect(authMock.signInWithPassword.mock.invocationCallOrder[0]).toBeLessThan(
+      fetchMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('sends no body and no user id: the server takes it from the token', async () => {
+    await authService.deleteAccount('Old!Password-1');
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.body).toBeUndefined();
+    expect(DELETE_ACCOUNT_PATH).toBe('/api/delete-account');
+  });
+
+  it('does not call the server when the password is wrong', async () => {
+    authMock.signInWithPassword.mockResolvedValue({
+      data: null,
+      error: { message: 'Invalid login credentials', code: 'invalid_credentials', name: 'AuthApiError' },
+    });
+    await expect(authService.deleteAccount('wrong')).rejects.toMatchObject({ code: 'invalid_credentials' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not call the server when a password account supplies no password', async () => {
+    await expect(authService.deleteAccount()).rejects.toMatchObject({ code: 'invalid_credentials' });
+    expect(authMock.signInWithPassword).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects with a session-expired error when nobody is signed in', async () => {
+    authMock.getSession.mockResolvedValue({ data: { session: null }, error: null });
+    await expect(authService.deleteAccount('x')).rejects.toMatchObject({
+      code: 'session_not_found',
+      name: 'AuthSessionMissingError',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips the password step for Google-only accounts and uses the session token', async () => {
+    sessionFor(googleUser, 'google-token');
+    await authService.deleteAccount();
+    expect(authMock.signInWithPassword).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(DELETE_ACCOUNT_PATH, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer google-token' },
+    });
+  });
+
+  it('maps 403 reauth_required to a coded error', async () => {
+    fetchMock.mockResolvedValue(response(403, { error: 'reauth_required' }));
+    await expect(authService.deleteAccount('Old!Password-1')).rejects.toMatchObject({
+      code: 'reauth_required',
+    });
+  });
+
+  it('maps any other failure to a generic code and never carries the server text', async () => {
+    for (const res of [
+      response(500, { error: 'FK violation on secret_table' }),
+      response(403, { error: 'forbidden_origin' }),
+      response(401, { error: 'unauthorized' }),
+      response(502),
+    ]) {
+      fetchMock.mockResolvedValue(res);
+      const err = await authService.deleteAccount('Old!Password-1').catch((e) => e);
+      expect(err).toMatchObject({ code: 'delete_account_failed' });
+      expect(JSON.stringify(err)).not.toMatch(/secret_table|forbidden_origin|unauthorized/);
+    }
+  });
+
+  it('turns a network failure into a coded error', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(authService.deleteAccount('Old!Password-1')).rejects.toMatchObject({
+      message: 'Failed to fetch',
     });
   });
 });

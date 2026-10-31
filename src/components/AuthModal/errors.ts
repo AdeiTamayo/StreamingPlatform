@@ -67,6 +67,7 @@ export function getLocalizedAuthError(err: unknown, t: TFunction): string {
   if (code === 'same_password' || /different from the old password/i.test(message)) {
     return t('auth.errors.samePassword');
   }
+  if (code === 'reauth_required') return t('auth.errors.reauthRequired');
   if (code === 'weak_password') return t('auth.errors.weakPassword');
   if (
     code === 'over_request_rate_limit' ||
