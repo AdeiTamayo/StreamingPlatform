@@ -603,6 +603,10 @@
       "rateLimited": "Saiakera gehiegi. Itxaron une bat eta saiatu berriro.",
       "sessionExpired": "Esteka hau iraungi da edo dagoeneko erabili da. Eskatu berri bat.",
       "network": "Ezin izan da zerbitzariarekin konektatu. Egiaztatu zure konexioa eta saiatu berriro.",
+      "invalidCredentials": "Posta elektronikoa edo pasahitza ez da zuzena.",
+      "emailNotConfirmed": "Berretsi lehenik zure posta elektronikoa. Begiratu sarrera-ontzian.",
+      "emailTaken": "Posta elektroniko hau dagoeneko erregistratuta dago. Saiatu saioa hasten.",
+      "signupDisabled": "Kontu berrien erregistroa itxita dago oraingoz.",
       "generic": "Zerbait gaizki atera da. Saiatu berriro."
     },
     "reset": {

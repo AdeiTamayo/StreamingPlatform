@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { getErrorMessage, isValidEmail } from './errors';
+import { getLocalizedAuthError, isValidEmail } from './errors';
+import { logError } from '../../utils/logger';
 import styles from './AuthModal.module.css';
 
 interface LoginFormProps {
@@ -49,7 +50,8 @@ export default function LoginForm({ onSwitchToRegister, onSwitchToForgot }: Logi
     try {
       await signIn(trimmedEmail, password);
     } catch (err) {
-      setError(getErrorMessage(err));
+      logError('auth.signIn', err);
+      setError(getLocalizedAuthError(err, t));
     } finally {
       setSubmitting(false);
     }

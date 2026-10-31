@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { getErrorMessage, isValidEmail, validatePassword, MIN_PASSWORD_LENGTH } from './errors';
+import { getLocalizedAuthError, isValidEmail, validatePassword, MIN_PASSWORD_LENGTH } from './errors';
+import { logError } from '../../utils/logger';
 import styles from './AuthModal.module.css';
 
 interface RegisterFormProps {
@@ -60,7 +61,8 @@ export default function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
         setPendingConfirmation(true);
       }
     } catch (err) {
-      setError(getErrorMessage(err));
+      logError('auth.signUp', err);
+      setError(getLocalizedAuthError(err, t));
     } finally {
       setSubmitting(false);
     }

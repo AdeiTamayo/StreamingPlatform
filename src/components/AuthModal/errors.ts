@@ -2,13 +2,6 @@ import type { TFunction } from 'i18next';
 
 export const MIN_PASSWORD_LENGTH = 12;
 
-export function getErrorMessage(err: unknown): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return String(err);
-}
-
 export function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -55,6 +48,13 @@ export function getLocalizedAuthError(err: unknown, t: TFunction): string {
   const name = typeof e.name === 'string' ? e.name : '';
   const message = typeof e.message === 'string' ? e.message : '';
 
+  if (code === 'invalid_credentials' || /invalid login credentials/i.test(message)) {
+    return t('auth.errors.invalidCredentials');
+  }
+  if (code === 'email_not_confirmed') return t('auth.errors.emailNotConfirmed');
+  if (code === 'user_already_exists') return t('auth.errors.emailTaken');
+  if (code === 'email_address_invalid') return t('auth.errors.emailInvalid');
+  if (code === 'signup_disabled') return t('auth.errors.signupDisabled');
   if (code === 'same_password' || /different from the old password/i.test(message)) {
     return t('auth.errors.samePassword');
   }

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { useAuth } from '../../hooks/useAuth';
-import { getErrorMessage, isValidEmail } from './errors';
+import { getLocalizedAuthError, isValidEmail } from './errors';
+import { logError } from '../../utils/logger';
 import styles from './AuthModal.module.css';
 
 interface ForgotPasswordFormProps {
@@ -37,7 +38,8 @@ export default function ForgotPasswordForm({ onSwitchToLogin }: ForgotPasswordFo
       await resetPassword(trimmedEmail);
       setSent(true);
     } catch (err) {
-      setError(getErrorMessage(err));
+      logError('auth.resetPassword', err);
+      setError(getLocalizedAuthError(err, t));
     } finally {
       setSubmitting(false);
     }
