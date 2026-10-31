@@ -21,6 +21,10 @@ function toAuthError(err: unknown): AuthError {
 // handled there, but the user lands on the home page first).
 export const PASSWORD_RESET_PATH = '/reset-password';
 
+// Path the email-change confirmation link returns to (must be on the Supabase
+// Redirect URLs allow-list, like PASSWORD_RESET_PATH).
+export const ACCOUNT_SETTINGS_PATH = '/settings';
+
 function errorText(err: unknown): string {
   return err && typeof err === 'object' && 'message' in err
     ? String((err as { message: unknown }).message)
@@ -107,6 +111,53 @@ export const authService = {
       await client.auth.signOut({ scope: 'others' });
     } catch {
       // keep the successful reset
+    }
+  },
+
+  /**
+   * Changes the password of the signed-in user. The current password is
+   * verified first with a fresh sign-in, so a stolen but still-open session
+   * cannot change the password on its own. The second half is updatePassword,
+   * which also signs out the other sessions (best effort).
+   */
+  async changePassword(currentPassword: string, newPassword: string) {
+    const session = await authService.getSession();
+    const email = session?.user?.email;
+    if (!email) {
+      throw toAuthError({
+        message: 'Auth session missing!',
+        name: 'AuthSessionMissingError',
+        code: 'session_not_found',
+      });
+    }
+    try {
+      const { error } = await requireSupabase().auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (error) throw error;
+    } catch (err) {
+      // A wrong current password arrives as code invalid_credentials.
+      throw toAuthError(err);
+    }
+    await authService.updatePassword(newPassword);
+  },
+
+  /**
+   * Requests an email change. Supabase sends a confirmation link (to both the
+   * old and the new address when "Secure email change" is on) and the address
+   * only changes once it is confirmed, so the session still holds the old
+   * email when this resolves.
+   */
+  async changeEmail(newEmail: string) {
+    try {
+      const { error } = await requireSupabase().auth.updateUser(
+        { email: newEmail },
+        { emailRedirectTo: `${window.location.origin}${ACCOUNT_SETTINGS_PATH}` },
+      );
+      if (error) throw error;
+    } catch (err) {
+      throw toAuthError(err);
     }
   },
 

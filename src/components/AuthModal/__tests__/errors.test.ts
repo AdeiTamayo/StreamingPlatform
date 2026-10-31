@@ -41,6 +41,8 @@ describe('getLocalizedAuthError', () => {
   it.each([
     [{ code: 'invalid_credentials', message: 'x' }, 'auth.errors.invalidCredentials'],
     [{ message: 'Invalid login credentials' }, 'auth.errors.invalidCredentials'],
+    [{ code: 'email_exists', message: 'x' }, 'auth.errors.emailTaken'],
+    [{ code: 'session_not_found', message: 'x' }, 'auth.errors.sessionExpired'],
     [{ code: 'email_not_confirmed', message: 'x' }, 'auth.errors.emailNotConfirmed'],
     [{ code: 'user_already_exists', message: 'x' }, 'auth.errors.emailTaken'],
     [{ code: 'email_address_invalid', message: 'x' }, 'auth.errors.emailInvalid'],

@@ -123,6 +123,16 @@
     "allSaved": "Todos los cambios guardados",
     "account": "Cuenta",
     "cloudAccount": "Cuenta en la nube",
+    "credentials": {
+      "changePassword": "Cambiar contraseña",
+      "changeEmail": "Cambiar correo",
+      "currentPassword": "Contraseña actual",
+      "savePassword": "Actualizar contraseña",
+      "savingPassword": "Actualizando…",
+      "newEmail": "Nuevo correo electrónico",
+      "sendEmailChange": "Enviar confirmación",
+      "emailChangeSent": "Hemos enviado enlaces de confirmación. Revisa la bandeja de entrada de tu correo actual y del nuevo, y abre el enlace de cada uno. Tu correo no cambiará hasta que lo confirmes."
+    },
     "status": "Estado",
     "connected": "Conectado",
     "signOut": "Cerrar sesión",
@@ -315,7 +325,8 @@
     "syncDropped": "Algunos cambios no se pudieron sincronizar con tu cuenta. Abre Ajustes para reintentar.",
     "syncRecovered": "Todo está sincronizado de nuevo.",
     "syncStillFailing": "La sincronización sigue fallando. Tus datos se conservan en este dispositivo; inténtalo más tarde.",
-    "passwordUpdated": "Tu contraseña se ha actualizado."
+    "passwordUpdated": "Tu contraseña se ha actualizado.",
+    "emailChangeRequested": "Enlaces de confirmación enviados. Revisa ambas bandejas de entrada."
   },
   "searchBar": {
     "searchLabel": "Buscar",
@@ -601,12 +612,13 @@
       "samePassword": "Elige una contraseña distinta de la actual.",
       "weakPassword": "Esa contraseña es demasiado fácil de adivinar. Elige una más segura.",
       "rateLimited": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
-      "sessionExpired": "Este enlace ha caducado o ya se usó. Solicita uno nuevo.",
+      "sessionExpired": "Tu sesión o el enlace ha caducado. Inicia sesión de nuevo o solicita un enlace nuevo.",
       "network": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
       "invalidCredentials": "El correo o la contraseña no son correctos.",
       "emailNotConfirmed": "Confirma primero tu correo. Revisa tu bandeja de entrada.",
       "emailTaken": "Este correo ya está registrado. Prueba a iniciar sesión.",
       "signupDisabled": "El registro de cuentas nuevas está desactivado por ahora.",
+      "currentPasswordIncorrect": "La contraseña actual no es correcta.",
       "generic": "Algo salió mal. Inténtalo de nuevo."
     },
     "reset": {
