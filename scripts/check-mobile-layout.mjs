@@ -16,6 +16,9 @@
  *     endpoints are answered by route handlers;
  *   - api.themoviedb.org and image.tmdb.org are answered with fixtures.
  *
+ * /watch-later and /last-seen are seeded through localStorage (697 history
+ * items for Last Seen, to also exercise a long grid).
+ *
  * For every .media-card it asserts that each footer button:
  *   - does not intersect h3, .media-card-year or .media-card-rating,
  *   - is at least 44px tall and lies inside the card,
@@ -30,7 +33,7 @@ const PORT = 5199;
 const BASE = `http://127.0.0.1:${PORT}`;
 const SUPABASE = 'http://127.0.0.1:54321';
 const WIDTHS = [360, 393, 430, 600];
-const ROUTES = (process.env.LAYOUT_ROUTES ?? '/,/movies,/tv').split(',');
+const ROUTES = (process.env.LAYOUT_ROUTES ?? '/,/movies,/tv,/watch-later,/last-seen').split(',');
 const shotsDir = process.argv.includes('--shots')
   ? process.argv[process.argv.indexOf('--shots') + 1]
   : null;
@@ -77,6 +80,25 @@ function seededSession() {
       created_at: new Date().toISOString(),
     },
   };
+}
+
+
+function seededLibrary() {
+  const wl = fixtureItems.slice(0, 8).map((it, i) => ({
+    type: i % 2 ? 'tv' : 'movie', id: it.id, title: it.title, year: '1999',
+    poster: it.poster_path, addedAt: 1000 + i,
+  }));
+  const watched = {};
+  const index = [];
+  for (let i = 0; i < 697; i++) {
+    const key = `watched:movie-${5000 + i}`;
+    watched[key] = JSON.stringify({
+      type: 'movie', id: 5000 + i, title: `Seeded movie ${i}`,
+      watchedAt: 1700000000000 + i, meta: { title: `Seeded movie ${i}`, poster: '/p0.jpg' },
+    });
+    index.push(key);
+  }
+  return { wl: JSON.stringify(wl), watched, watchedIndex: JSON.stringify(index) };
 }
 
 async function waitForServer() {
@@ -129,7 +151,7 @@ function measure(minHeight) {
     const cardRect = R(card);
     const others = ['h3', '.media-card-year', '.media-card-rating']
       .flatMap((sel) => [...card.querySelectorAll(sel)].map((el) => [sel, R(el)]));
-    for (const btn of card.querySelectorAll('.media-card-actions button')) {
+    for (const btn of card.querySelectorAll('.media-card-actions button, .media-card-footer button')) {
       const b = R(btn);
       if (b.h < minHeight - 0.5) out.push(`${title}: button ${b.h.toFixed(1)}px tall (< ${minHeight})`);
       if (b.l < cardRect.l - 0.5 || b.r > cardRect.r + 0.5 || b.b > cardRect.b + 0.5) {
@@ -170,18 +192,25 @@ try {
       isMobile: true,
     });
     await mockNetwork(context);
-    await context.addInitScript((session) => {
+    await context.addInitScript(({ session, lib }) => {
       // supabase-js storage key: sb-<first label of the host>-auth-token
       localStorage.setItem('sb-127-auth-token', JSON.stringify(session));
-    }, seededSession());
+      // Seed once per context so reloads do not overwrite in-page changes.
+      if (!localStorage.getItem('__layout_seeded')) {
+        localStorage.setItem('watchlater', lib.wl);
+        for (const [k, v] of Object.entries(lib.watched)) localStorage.setItem(k, v);
+        localStorage.setItem('watched_index', lib.watchedIndex);
+        localStorage.setItem('__layout_seeded', '1');
+      }
+    }, { session: seededSession(), lib: seededLibrary() });
 
     for (const route of ROUTES) {
       const page = await context.newPage();
       await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
       if (big) await page.addStyleTag({ content: 'html { font-size: 200% !important; }' });
-      await page.waitForSelector('.media-card-actions', { timeout: 15000 }).catch(() => {});
+      await page.waitForSelector('.media-card-actions, .media-card-footer', { timeout: 15000 }).catch(() => {});
       const cards = await page.locator('.media-card').count();
-      const buttons = await page.locator('.media-card-actions button').count();
+      const buttons = await page.locator('.media-card-actions button, .media-card-footer button').count();
       const label = `${route} @ ${w}px${big ? ' (text 200%)' : ''}`;
       if (!cards || !buttons) {
         console.log(`FAIL ${label}: ${cards} cards, ${buttons} footer buttons (auth/data mock not working?)`);
