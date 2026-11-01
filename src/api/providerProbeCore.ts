@@ -25,8 +25,15 @@ export interface ProbeScanResult extends ProbeResult {
   best: string | null;
 }
 
-const PROBE_TIMEOUT_MS = 8_000;
+// A scan checks providers in parallel, so its worst case is one timeout, not
+// one per provider. 6 s keeps it inside Vercel's 10 s function limit.
+const PROBE_TIMEOUT_MS = 6_000;
 const CACHE_TTL_MS = 10 * 60_000;
+// The cache key includes caller-chosen ids, so without a cap a client could
+// grow it until the instance runs out of memory.
+export const CACHE_MAX_ENTRIES = 500;
+const MAX_ID_DIGITS = 10;
+const MAX_EPISODE_DIGITS = 4;
 
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
@@ -36,14 +43,33 @@ const USER_AGENT =
 const NO_SIGNAL_SOURCES = new Set(['2embedskin', 'embos']);
 
 const cache = new Map<string, { at: number; result: ProbeResult }>();
+// Identical concurrent probes share one upstream request.
+const inFlight = new Map<string, Promise<ProbeResult>>();
+
+function remember(key: string, result: ProbeResult): void {
+  cache.delete(key);
+  cache.set(key, { at: Date.now(), result });
+  // Map iterates in insertion order, so the first key is the oldest.
+  while (cache.size > CACHE_MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
+
+/** Test hook: forget cached and in-flight probes. */
+export function resetProbeState(): void {
+  cache.clear();
+  inFlight.clear();
+}
 
 interface Page {
   status: number;
   html: string;
 }
 
-function isPositiveInt(value: string | undefined): boolean {
-  return value != null && /^\d+$/.test(value) && Number(value) > 0;
+function isPositiveInt(value: string | undefined, maxDigits = MAX_ID_DIGITS): boolean {
+  return value != null && value.length <= maxDigits && /^\d+$/.test(value) && Number(value) > 0;
 }
 
 function titleOf(html: string): string {
@@ -160,7 +186,7 @@ export async function probeProvider(params: ProbeParams): Promise<ProbeResult> {
   let season: number | undefined;
   let episode: number | undefined;
   if (type === 'tv') {
-    if (!isPositiveInt(params.season) || !isPositiveInt(params.episode)) return { available: null };
+    if (!isPositiveInt(params.season, MAX_EPISODE_DIGITS) || !isPositiveInt(params.episode, MAX_EPISODE_DIGITS)) return { available: null };
     season = Number(params.season);
     episode = Number(params.episode);
   }
@@ -170,15 +196,21 @@ export async function probeProvider(params: ProbeParams): Promise<ProbeResult> {
   const cached = cache.get(cacheKey);
   if (cached && Date.now() - cached.at < CACHE_TTL_MS) return cached.result;
 
-  const available = source === 'vsembed'
-    ? await probeVsembed(type, id, season, episode)
-    : await fetchPage(probeUrl(source, type, id, season, episode))
-      .then((page) => (page ? evaluate(source, type, page) : null));
-  const result: ProbeResult = { available };
+  const pending = inFlight.get(cacheKey);
+  if (pending) return pending;
 
-  // Do not cache "unknown": a transient network failure should be retried.
-  if (result.available !== null) cache.set(cacheKey, { at: Date.now(), result });
-  return result;
+  const run = (async (): Promise<ProbeResult> => {
+    const available = source === 'vsembed'
+      ? await probeVsembed(type, id, season, episode)
+      : await fetchPage(probeUrl(source, type, id, season, episode))
+        .then((page) => (page ? evaluate(source, type, page) : null));
+    const result: ProbeResult = { available };
+    // Do not cache "unknown": a transient network failure should be retried.
+    if (result.available !== null) remember(cacheKey, result);
+    return result;
+  })().finally(() => inFlight.delete(cacheKey));
+  inFlight.set(cacheKey, run);
+  return run;
 }
 
 export async function probeBestSource(params: ProbeParams): Promise<ProbeScanResult> {
@@ -186,15 +218,14 @@ export async function probeBestSource(params: ProbeParams): Promise<ProbeScanRes
   const currentSource = params.source && Object.hasOwn(SOURCES, params.source) ? params.source : DEFAULT_SOURCE;
   if (current.available === true) return { ...current, best: currentSource };
 
-  // The current provider is missing or unknown; look for one that confirms it
-  // has the title. Unknown providers are skipped because they cannot prove it.
-  for (const source of SOURCE_KEYS) {
-    if (source === currentSource) continue;
-    const result = await probeProvider({ ...params, source });
-    if (result.available === true) return { available: current.available, best: source };
-  }
-
-  return { available: current.available, best: null };
+  // The current provider is missing or unknown; ask the others at the same
+  // time (a sequential scan could take one timeout per provider) and take the
+  // first one, in preference order, that confirms the title. Unknown providers
+  // are skipped because they cannot prove it.
+  const others = SOURCE_KEYS.filter((source) => source !== currentSource);
+  const results = await Promise.all(others.map((source) => probeProvider({ ...params, source })));
+  const index = results.findIndex((result) => result.available === true);
+  return { available: current.available, best: index === -1 ? null : others[index] };
 }
 
 export function handleProbeQuery(

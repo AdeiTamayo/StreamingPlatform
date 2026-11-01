@@ -186,12 +186,12 @@ Create a `.env` file in the project root (see `.env.example`):
 
 ```
 VITE_TMDB_API_KEY=your_tmdb_api_key_here
-VITE_OMDB_API_KEY=your_omdb_api_key_here        # optional, enables IMDb ratings
+OMDB_API_KEY=your_omdb_api_key_here             # optional, server-only (no VITE_ prefix), enables IMDb ratings
 VITE_SUPABASE_URL=your_supabase_project_url   # optional
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key # optional
 ```
 
-`VITE_OMDB_API_KEY` is optional — without it the app shows TMDB ratings instead. `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are optional — without them the app runs entirely in local-only mode (no sign-in).
+`OMDB_API_KEY` is optional and server-only: it is read by the `/api/omdb` function (also mirrored by `vite dev`) and never reaches the browser. Without it the app uses Cinemeta ratings instead. If you previously set `VITE_OMDB_API_KEY`, rename it and rotate the key, because the old name was bundled into the browser. `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are optional — without them the app runs entirely in local-only mode (no sign-in).
 
 ### Setting up Supabase (optional)
 
@@ -256,7 +256,7 @@ This project is ready for Vercel deployment. The `vercel.json` configures SPA ro
 
 1. Push to GitHub
 2. Import the repo on [vercel.com](https://vercel.com)
-3. Add `VITE_TMDB_API_KEY`, optionally `VITE_OMDB_API_KEY`, `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`, as environment variables in the Vercel dashboard
+3. Add `VITE_TMDB_API_KEY`, optionally `OMDB_API_KEY` (server-only, no `VITE_` prefix), `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`, as environment variables in the Vercel dashboard
 4. Deploy
 
 Vercel will auto-deploy on every push to `main`.

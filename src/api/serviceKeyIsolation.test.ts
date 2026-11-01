@@ -29,4 +29,12 @@ describe('service-role key isolation', () => {
       .map(([file]) => file);
     expect(offenders).toEqual([]);
   });
+
+  it('never exposes the OMDb key through a VITE_ variable', () => {
+    const offenders = Object.entries(sources)
+      .filter(([file]) => !file.endsWith('serviceKeyIsolation.test.ts'))
+      .filter(([, text]) => /VITE_OMDB/i.test(text))
+      .map(([file]) => file);
+    expect(offenders).toEqual([]);
+  });
 });

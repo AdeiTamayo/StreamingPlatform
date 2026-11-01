@@ -1,6 +1,8 @@
 import { logDebug } from '../utils/logger';
 
-const OMDB_API_KEY = import.meta.env.VITE_OMDB_API_KEY as string | undefined;
+// IMDb ratings come through the same-origin /api/omdb function, which holds the
+// OMDb key server-side (OMDB_API_KEY). The browser never sees the key.
+const OMDB_PROXY = '/api/omdb';
 const OMDB_SUCCESS_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const OMDB_MISS_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -84,7 +86,9 @@ async function fetchRating(url: string, signal?: AbortSignal): Promise<FetchOutc
   try {
     const res = await fetch(url, { signal });
     if (!res.ok) {
-      if (res.status === 401) return { status: 'limited' };
+      // 429 = quota reached; 503 = the server has no OMDb key. Either way
+      // OMDb is unusable for a while, so callers use the fallback.
+      if (res.status === 429 || res.status === 503 || res.status === 401) return { status: 'limited' };
       return { status: 'failed' };
     }
     const data = (await res.json()) as { imdbRating?: string; imdbVotes?: string; Ratings?: { Source?: string; Value?: string }[]; Error?: string };
@@ -128,9 +132,9 @@ async function fetchCinemetaRating(
   }
 }
 
-// Returns the numeric IMDb rating for a title via the OMDb API (key-based,
-// CORS-enabled). When OMDb is out of daily quota (or no key is set) it falls
-// back to the keyless Cinemeta API. Results are cached in localStorage for 7
+// Returns the numeric IMDb rating for a title via the OMDb API, reached through
+// the /api/omdb proxy. When OMDb is out of daily quota (or the server has no
+// key) it falls back to the keyless Cinemeta API. Results are cached in localStorage for 7
 // days so the free tier's daily request limit isn't exhausted by repeat visits.
 // Transient failures (network/5xx/abort) are NOT cached - only definitive
 // answers are, so a flaky connection can't pin a 24h "no rating" miss.
@@ -143,8 +147,8 @@ export async function getImdbRating(
   const entry = readEntry(key);
   if (entry && !entryExpired(entry)) return entry.data;
 
-  if (OMDB_API_KEY && Date.now() > omdbLimitedUntil) {
-    const url = `https://www.omdbapi.com/?i=${encodeURIComponent(imdbId)}&type=${type}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
+  if (Date.now() > omdbLimitedUntil) {
+    const url = `${OMDB_PROXY}?i=${encodeURIComponent(imdbId)}&type=${type}`;
     const outcome = await fetchRating(url, signal);
     if (outcome.status === 'ok') {
       // Includes definitive misses (rating null) - those are safe to cache.
@@ -155,8 +159,6 @@ export async function getImdbRating(
       logDebug(`OMDb quota reached for ${imdbId}, using Cinemeta fallback`);
       omdbLimitedUntil = Date.now() + FALLBACK_COOLDOWN_MS;
     }
-  } else if (!OMDB_API_KEY) {
-    logDebug('VITE_OMDB_API_KEY not set, using Cinemeta fallback');
   }
 
   // OMDb unavailable, limited, or missing the title - try the fallback
@@ -194,7 +196,7 @@ export async function getOmdbRatingByTitle(
   year: string,
   type: OmdbMediaType,
 ): Promise<ImdbRating | null> {
-  if (!OMDB_API_KEY || !title) return null;
+  if (!title) return null;
 
   const key = tmdbCacheKey(tmdbId);
   const entry = readEntry(key);
@@ -207,7 +209,7 @@ export async function getOmdbRatingByTitle(
 
   let promise = inFlight.get(key);
   if (!promise) {
-    const url = `https://www.omdbapi.com/?t=${encodeURIComponent(title)}&y=${encodeURIComponent(year)}&type=${type}&apikey=${encodeURIComponent(OMDB_API_KEY)}`;
+    const url = `${OMDB_PROXY}?t=${encodeURIComponent(title)}&y=${encodeURIComponent(year)}&type=${type}`;
     promise = fetchRating(url).then((outcome) => {
       inFlight.delete(key);
       if (outcome.status === 'ok') {
