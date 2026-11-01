@@ -131,6 +131,16 @@ function calendarKey(item: CalendarItem) {
 // no matter how duplicates entered state (stale hydrate racing a load,
 // an old poisoned cache, StrictMode double-mounts in dev). Prefers the
 // copy carrying the exact broadcast instant so timezone bucketing survives.
+//
+// Identity is the release itself (type, id, season, episode), not its date: an
+// episode airs once, and the stored TMDB date can disagree between two copies
+// (a stale cache entry and a fresh one). Keying on the raw date let both
+// survive, and then the display step moved them onto the same day, which
+// rendered the episode twice and made React warn about duplicate keys.
+function releaseIdentity(item: CalendarItem) {
+  return `${item.type}-${item.id}-S${item.season ?? 0}E${item.episode ?? 0}`;
+}
+
 function dedupeCalendarItems(items: CalendarItem[]): CalendarItem[] {
   const seen = new Set<string>();
   const out: CalendarItem[] = [];
@@ -138,7 +148,7 @@ function dedupeCalendarItems(items: CalendarItem[]): CalendarItem[] {
     (a, b) => Number(b.airTimestamp != null) - Number(a.airTimestamp != null),
   );
   for (const item of ranked) {
-    const key = calendarKey(item);
+    const key = releaseIdentity(item);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(item);
@@ -1230,7 +1240,7 @@ export default function WatchLater() {
                   >
                     {selectedItems.map((item) => (
                       <div
-                        key={`${item.id}-${item.date}-${item.season}-${item.episode}`}
+                        key={calendarKey(item)}
                         className={styles.releaseCard}
                       >
                           <img
