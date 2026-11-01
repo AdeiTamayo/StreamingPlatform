@@ -508,21 +508,27 @@ export default function LastSeen() {
                             {body}
                           </Link>
                           {!selectMode && (
-                            <button
-                              className={styles.lastSeenViewBtn}
-                              onClick={() => showSeriesEpisodes(show)}
-                            >
-                              {t("lastSeen.view")}
-                            </button>
-                          )}
-                          {!selectMode && (
-                            <button
-                              className="wl-remove"
-                              onClick={() => handleRemoveShow(show.id)}
-                              title={t("lastSeen.removeAllEpisodes")}
-                            >
-                              <CloseIcon />
-                            </button>
+                            <div className="media-card-footer">
+                              <button
+                                className={`${styles.lastSeenViewBtn} media-card-footer-view`}
+                                onClick={() => showSeriesEpisodes(show)}
+                                aria-label={t("lastSeen.viewLabel", { title: show.title })}
+                              >
+                                <span className="media-card-btn-icon phone-only" aria-hidden="true">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                                </span>
+                                <span>{t("lastSeen.view")}</span>
+                              </button>
+                              <button
+                                className="wl-remove"
+                                onClick={() => handleRemoveShow(show.id)}
+                                title={t("lastSeen.removeAllEpisodes")}
+                                aria-label={t("lastSeen.removeShowLabel", { title: show.title })}
+                              >
+                                <CloseIcon />
+                                <span className="media-card-btn-label">{t("common.remove")}</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       );
@@ -554,13 +560,19 @@ export default function LastSeen() {
                           </div>
                         </Link>
                         {!selectMode && (
-                          <button
-                            className="wl-remove"
-                            onClick={() => handleRemove(item)}
-                            title={t("common.remove")}
-                          >
-                            <CloseIcon />
-                          </button>
+                          <div className="media-card-footer">
+                            <button
+                              className="wl-remove"
+                              onClick={() => handleRemove(item)}
+                              title={t("common.remove")}
+                              aria-label={t("lastSeen.removeLabel", {
+                                title: item.title || t("lastSeen.movieFallback", { id: item.id }),
+                              })}
+                            >
+                              <CloseIcon />
+                              <span className="media-card-btn-label">{t("common.remove")}</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     );

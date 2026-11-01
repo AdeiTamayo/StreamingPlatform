@@ -8,6 +8,10 @@ import {
   removeWatchLater,
   getEpisodeWatchLater,
   removeEpisodeWatchLater,
+  isWatched,
+  markWatched,
+  markUnwatched,
+  clearWatching,
   getEffectiveTimezone,
   getUpcomingOpen,
   setUpcomingOpen,
@@ -204,6 +208,8 @@ function pruneCalendarCache(
 
 export default function WatchLater() {
   const [items, setItems] = useState<WatchLaterItem[]>([]);
+  // Bumped after a Seen toggle so cards re-read the watched state.
+  const [, setSeenTick] = useState(0);
   const [epItems, setEpItems] = useState<EpisodeWatchLaterItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
@@ -678,6 +684,21 @@ export default function WatchLater() {
       calendarInitedRef.current = false;
     }
   }, [view, todayStr]);
+
+  function handleToggleSeen(item: WatchLaterItem) {
+    const type = item.type as MediaType;
+    if (isWatched(type, item.id)) {
+      markUnwatched(type, item.id);
+    } else {
+      markWatched(type, item.id, item.title, null, null, {
+        title: item.title,
+        poster: item.poster,
+        source: "explicit",
+      });
+      clearWatching(type, item.id);
+    }
+    setSeenTick((n) => n + 1);
+  }
 
   function handleRemove(type: string, id: string | number) {
     removeWatchLater(type as MediaType, id);
@@ -1524,13 +1545,32 @@ export default function WatchLater() {
                             </div>
                           </Link>
                           {!selectMode && (
-                            <button
-                              className="wl-remove"
-                              onClick={() => handleRemove(item.type, item.id)}
-                              title={t("common.remove")}
-                            >
-                              <CloseIcon />
-                            </button>
+                            <div className="media-card-footer">
+                              <button
+                                className={`media-card-watched-btn media-card-footer-seen${isWatched(item.type as MediaType, item.id) ? " active" : ""}`}
+                                onClick={() => handleToggleSeen(item)}
+                                aria-label={
+                                  isWatched(item.type as MediaType, item.id)
+                                    ? t("media.markUnwatchedLabel", { title: item.title })
+                                    : t("media.markWatchedLabel", { title: item.title })
+                                }
+                                aria-pressed={isWatched(item.type as MediaType, item.id)}
+                              >
+                                <span className="media-card-btn-icon" aria-hidden="true">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 7.5 5.5 10.5 11.5 3.5"/></svg>
+                                </span>
+                                <span className="media-card-btn-label">{t("media.seenShort")}</span>
+                              </button>
+                              <button
+                                className="wl-remove"
+                                onClick={() => handleRemove(item.type, item.id)}
+                                title={t("common.remove")}
+                                aria-label={t("media.removeWatchLaterLabel", { title: item.title })}
+                              >
+                                <CloseIcon />
+                                <span className="media-card-btn-label">{t("common.remove")}</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -1583,19 +1623,27 @@ export default function WatchLater() {
                           </div>
                         </Link>
                         {!selectMode && (
-                          <button
-                            className="wl-remove"
-                            onClick={() =>
-                              handleRemoveEp(
-                                item.showId,
-                                item.season,
-                                item.episode,
-                              )
-                            }
-                            title={t("common.remove")}
-                          >
-                            <CloseIcon />
-                          </button>
+                          <div className="media-card-footer">
+                            <button
+                              className="wl-remove"
+                              onClick={() =>
+                                handleRemoveEp(
+                                  item.showId,
+                                  item.season,
+                                  item.episode,
+                                )
+                              }
+                              title={t("common.remove")}
+                              aria-label={t("watchLater.removeEpisodeLabel", {
+                                title: item.showTitle,
+                                season: item.season,
+                                episode: item.episode,
+                              })}
+                            >
+                              <CloseIcon />
+                              <span className="media-card-btn-label">{t("common.remove")}</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     );
