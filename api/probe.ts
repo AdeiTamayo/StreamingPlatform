@@ -1,4 +1,4 @@
-import { handleProbeQuery } from '../src/api/providerProbeCore';
+import { handleProbeQuery } from '../src/api/providerProbeCore.js';
 
 type ProbeRequest = {
   method?: string;

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { handleDeleteAccount, type AdminClient } from '../src/api/deleteAccountCore';
+import { handleDeleteAccount, type AdminClient } from '../src/api/deleteAccountCore.js';
 
 // Server-only variables (NOT prefixed VITE_, so they are never bundled into the
 // browser): SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY. The service-role key

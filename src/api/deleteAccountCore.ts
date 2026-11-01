@@ -1,4 +1,4 @@
-import { hasPasswordIdentity } from '../utils/authProviders';
+import { hasPasswordIdentity } from '../utils/authProviders.js';
 
 // Server-side logic for POST /api/delete-account. It lives in src/ so it can be
 // unit tested, but it never touches the service-role key itself: the Vercel

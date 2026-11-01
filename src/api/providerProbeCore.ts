@@ -5,7 +5,7 @@ import {
   getMovieEmbedUrl,
   getTVEmbedUrl,
   type MediaType,
-} from './sources';
+} from './sources.js';
 
 export interface ProbeParams {
   source?: string;
