@@ -338,7 +338,9 @@
     "syncStillFailing": "Sync is still failing. Your data is kept on this device; try again later.",
     "passwordUpdated": "Your password has been updated.",
     "emailChangeRequested": "Confirmation links sent. Check both inboxes.",
-    "accountDeleted": "Your account and data have been deleted."
+    "accountDeleted": "Your account and data have been deleted.",
+    "accountGone": "This account no longer exists, so you've been signed out and its data was removed from this device.",
+    "sessionEnded": "You've been signed out: this session is no longer valid. If the account was deleted, its data is gone too."
   },
   "searchBar": {
     "searchLabel": "Search",

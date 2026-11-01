@@ -8,6 +8,14 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
+export type SessionLossReason = 'deleted' | 'ended';
+
+export interface SessionLoss {
+  reason: SessionLossReason;
+  /** Increments for every loss so a repeat of the same reason is still noticed. */
+  id: number;
+}
+
 export interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
   signUp: (email: string, password: string) => Promise<{ user: User | null; session: Session | null }>;
@@ -33,6 +41,14 @@ export interface AuthContextValue extends AuthState {
   openAuthModal: () => void;
   closeAuthModal: () => void;
   syncVersion: number;
+  /** Set when this session was ended from outside (deleted account, revoked session). */
+  sessionLoss: SessionLoss | null;
+  /**
+   * Ends the local session after the server reported it dead. 'deleted' also
+   * discards the pending offline queue, which belongs to an account that no
+   * longer exists and can never be replayed.
+   */
+  endSession: (reason: SessionLossReason) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

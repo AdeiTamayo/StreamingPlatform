@@ -35,6 +35,8 @@ export interface AdminClient {
       error: unknown;
     }>;
     admin: {
+      /** Revokes the user's sessions (refresh tokens) on the Auth server. */
+      signOut(jwt: string, scope?: 'global' | 'local' | 'others'): Promise<{ error: unknown }>;
       deleteUser(id: string): Promise<{ error: unknown }>;
     };
   };
@@ -105,6 +107,18 @@ export async function handleDeleteAccount(
     if (!Number.isFinite(signedInAt) || now() - signedInAt > REAUTH_WINDOW_MS) {
       return respond(403, 'reauth_required');
     }
+  }
+
+  // Revoke every session first, so other devices lose their refresh tokens
+  // even if something goes wrong while the user row is being removed. An
+  // already-issued access token cannot be revoked and stays accepted until it
+  // expires; the client's session check is what ends it sooner. A failure here
+  // must not block the deletion the user asked for.
+  try {
+    const { error } = await deps.admin.auth.admin.signOut(jwt, 'global');
+    if (error) logError('delete-account.revokeSessions', error);
+  } catch (err) {
+    logError('delete-account.revokeSessions', err);
   }
 
   try {

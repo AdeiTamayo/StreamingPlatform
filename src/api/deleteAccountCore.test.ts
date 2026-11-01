@@ -27,7 +27,10 @@ function makeDeps(over: { user?: AdminUser | null; getUserError?: unknown } = {}
     error: over.getUserError ?? null,
   }));
   const deleteUser = vi.fn(async (_id: string): Promise<{ error: unknown }> => ({ error: null }));
-  const admin: AdminClient = { auth: { getUser, admin: { deleteUser } } };
+  const signOut = vi.fn(
+    async (_jwt: string, _scope?: 'global' | 'local' | 'others'): Promise<{ error: unknown }> => ({ error: null }),
+  );
+  const admin: AdminClient = { auth: { getUser, admin: { deleteUser, signOut } } };
   const logError = vi.fn();
   const deps: DeleteAccountDeps = {
     admin,
@@ -35,7 +38,7 @@ function makeDeps(over: { user?: AdminUser | null; getUserError?: unknown } = {}
     now: () => NOW,
     logError,
   };
-  return { deps, getUser, deleteUser, logError };
+  return { deps, getUser, deleteUser, signOut, logError };
 }
 
 const valid = { method: 'POST', authorization: 'Bearer good.jwt.token', origin: ORIGIN };
@@ -202,5 +205,56 @@ describe('handleDeleteAccount', () => {
     ];
     expect(responses.map((r) => r.status)).toEqual([405, 401, 403, 500, 204]);
     for (const r of responses) expect(r.headers['Cache-Control']).toBe('no-store');
+  });
+});
+
+describe('handleDeleteAccount session revocation', () => {
+  it("revokes every session of the caller (global scope, the caller's own token) before deleting", async () => {
+    const h = makeDeps();
+    const res = await handleDeleteAccount(valid, h.deps);
+
+    expect(res.status).toBe(204);
+    expect(h.signOut).toHaveBeenCalledTimes(1);
+    expect(h.signOut).toHaveBeenCalledWith('good.jwt.token', 'global');
+    expect(h.signOut.mock.invocationCallOrder[0]).toBeLessThan(h.deleteUser.mock.invocationCallOrder[0]);
+  });
+
+  it('still deletes the account when revoking sessions returns an error, and logs it server-side only', async () => {
+    const h = makeDeps();
+    h.signOut.mockResolvedValue({ error: { message: 'SECRET revoke detail' } });
+
+    const res = await handleDeleteAccount(valid, h.deps);
+
+    expect(res.status).toBe(204);
+    expect(h.deleteUser).toHaveBeenCalledWith('token-user');
+    expect(h.logError).toHaveBeenCalledWith('delete-account.revokeSessions', expect.anything());
+    expect(JSON.stringify(res)).not.toContain('SECRET');
+  });
+
+  it('still deletes the account when revoking sessions throws', async () => {
+    const h = makeDeps();
+    h.signOut.mockRejectedValue(new Error('SECRET network'));
+
+    const res = await handleDeleteAccount(valid, h.deps);
+
+    expect(res.status).toBe(204);
+    expect(h.deleteUser).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(res)).not.toContain('SECRET');
+  });
+
+  it('does not revoke anything for a request that is refused', async () => {
+    const refused = [
+      { ...valid, method: 'GET' },
+      { ...valid, authorization: undefined },
+      { ...valid, origin: 'https://evil.example' },
+    ];
+    for (const req of refused) {
+      const h = makeDeps();
+      await handleDeleteAccount(req, h.deps);
+      expect(h.signOut).not.toHaveBeenCalled();
+    }
+    const stale = makeDeps({ user: makeUser({ last_sign_in_at: iso(NOW - REAUTH_WINDOW_MS - 1000) }) });
+    expect((await handleDeleteAccount(valid, stale.deps)).status).toBe(403);
+    expect(stale.signOut).not.toHaveBeenCalled();
   });
 });

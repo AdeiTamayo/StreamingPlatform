@@ -6,6 +6,7 @@ const authMock = vi.hoisted(() => ({
   signOut: vi.fn(),
   signInWithPassword: vi.fn(),
   signUp: vi.fn(),
+  getUser: vi.fn(),
   getSession: vi.fn(),
 }));
 
@@ -20,6 +21,7 @@ import {
   ACCOUNT_SETTINGS_PATH,
   DELETE_ACCOUNT_PATH,
   SIGNUP_REDIRECT_PATH,
+  classifySessionError,
 } from '../authService';
 
 describe('authService password recovery', () => {
@@ -296,5 +298,68 @@ describe('authService sign-up confirmation email', () => {
   it('still hides whether an address is already registered', async () => {
     authMock.signUp.mockResolvedValue({ data: null, error: { message: 'User already registered', code: 'user_already_exists' } });
     await expect(authService.signUp('a@b.co', 'x')).resolves.toEqual({ user: null, session: null });
+  });
+});
+
+describe('classifySessionError', () => {
+  it.each([
+    [{ code: 'user_not_found', status: 403, message: 'User from sub claim in JWT does not exist' }, 'deleted'],
+    [{ message: 'User from sub claim in JWT does not exist' }, 'deleted'],
+    [{ code: 'user_not_found' }, 'deleted'],
+    [{ code: 'session_not_found', status: 403 }, 'ended'],
+    [{ code: 'session_expired' }, 'ended'],
+    [{ code: 'refresh_token_not_found', status: 400 }, 'ended'],
+    [{ code: 'bad_jwt', status: 401 }, 'ended'],
+    [{ name: 'AuthSessionMissingError', message: 'Auth session missing!' }, 'ended'],
+    [{ message: 'Session from session_id claim in JWT does not exist' }, 'ended'],
+    [{ status: 401 }, 'ended'],
+    [{ status: 403 }, 'ended'],
+    // Anything that could be a hiccup must NOT sign the user out.
+    [{ status: 0, message: 'Failed to fetch' }, 'unknown'],
+    [{ name: 'AuthRetryableFetchError', status: 0 }, 'unknown'],
+    [{ status: 429, code: 'over_request_rate_limit' }, 'unknown'],
+    [{ status: 500 }, 'unknown'],
+    [{ status: 503, message: 'Service unavailable' }, 'unknown'],
+    [new TypeError('NetworkError when attempting to fetch resource.'), 'unknown'],
+    [null, 'unknown'],
+    ['boom', 'unknown'],
+  ])('classifies %j as %s', (err, expected) => {
+    expect(classifySessionError(err)).toBe(expected);
+  });
+});
+
+describe('authService.verifySession', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('is valid when the server returns the user', async () => {
+    authMock.getUser.mockResolvedValue({ data: { user: { id: 'u' } }, error: null });
+    await expect(authService.verifySession()).resolves.toBe('valid');
+  });
+
+  it('reports a deleted account', async () => {
+    authMock.getUser.mockResolvedValue({
+      data: { user: null },
+      error: { code: 'user_not_found', status: 403, message: 'User from sub claim in JWT does not exist' },
+    });
+    await expect(authService.verifySession()).resolves.toBe('deleted');
+  });
+
+  it('reports a revoked session', async () => {
+    authMock.getUser.mockResolvedValue({ data: { user: null }, error: { code: 'session_not_found', status: 403 } });
+    await expect(authService.verifySession()).resolves.toBe('ended');
+  });
+
+  it('does not treat a network failure as a lost session, whether returned or thrown', async () => {
+    authMock.getUser.mockResolvedValue({ data: { user: null }, error: { status: 0, message: 'Failed to fetch' } });
+    await expect(authService.verifySession()).resolves.toBe('unknown');
+    authMock.getUser.mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(authService.verifySession()).resolves.toBe('unknown');
+  });
+
+  it('treats a response with no user and no error as an ended session', async () => {
+    authMock.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    await expect(authService.verifySession()).resolves.toBe('ended');
   });
 });
