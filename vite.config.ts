@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react'
 
 // Catches a production bundle that would ship broken: VITE_TMDB_API_KEY is
 // required at runtime (src/config.ts throws), so building without it used to
-// succeed and only blow up in the browser. VITE_OMDB_API_KEY degrades
-// gracefully (IMDb badges fall back to TMDB), so it warns instead of failing.
+// succeed and only blow up in the browser. The OMDb key is server-only
+// (OMDB_API_KEY, read by api/omdb.ts) and is not a build input; without it the
+// IMDb badges fall back to Cinemeta.
 // apply: 'build' keeps this out of `vite dev` and the test runner.
 function validateApiKeys(mode: string): Plugin {
   const env = loadEnv(mode, process.cwd(), '')
@@ -18,25 +19,45 @@ function validateApiKeys(mode: string): Plugin {
           'VITE_TMDB_API_KEY is not set. Add it to .env (see .env.example) or the CI environment before building.',
         )
       }
-      if (!env.VITE_OMDB_API_KEY) {
-        console.warn(
-          '[validate-api-keys] VITE_OMDB_API_KEY is not set - every IMDb badge will fall back to TMDB ratings.',
-        )
-      }
     },
   }
 }
 
-// Mirrors the Vercel function at api/probe.ts during `vite dev`, so provider
-// availability can be tested locally instead of silently falling back to
-// "unknown" in development.
-function providerProbeDevServer(): Plugin {
+// Mirrors the Vercel functions at api/probe.ts and api/omdb.ts during
+// `vite dev`, so provider availability and IMDb ratings can be tested locally
+// instead of silently falling back in development. OMDB_API_KEY is read from
+// .env here, server side, and never reaches the browser.
+function providerProbeDevServer(mode: string): Plugin {
+  const env = loadEnv(mode, process.cwd(), '')
   return {
     name: 'provider-probe-dev-server',
     apply: 'serve',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
         const url = new URL(req.url ?? '/', 'http://localhost');
+        if (url.pathname === '/api/omdb') {
+          void (async () => {
+            try {
+              const module = await server.ssrLoadModule('/src/api/omdbCore.ts');
+              const handle = module.handleOmdbQuery as (
+                query: Record<string, string>,
+                deps: { apiKey: string | undefined },
+              ) => Promise<{ status: number; headers: Record<string, string>; body: unknown }>;
+              const result = await handle(Object.fromEntries(url.searchParams.entries()), {
+                apiKey: env.OMDB_API_KEY,
+              });
+              res.statusCode = result.status;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              for (const [name, value] of Object.entries(result.headers)) res.setHeader(name, value);
+              res.end(JSON.stringify(result.body));
+            } catch {
+              res.statusCode = 502;
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
+              res.end(JSON.stringify({ error: 'upstream_failed' }));
+            }
+          })();
+          return;
+        }
         if (url.pathname !== '/api/probe') {
           next();
           return;
@@ -61,7 +82,7 @@ function providerProbeDevServer(): Plugin {
 }
 
 export default defineConfig((config) => ({
-  plugins: [react(), validateApiKeys(config.mode), providerProbeDevServer()],
+  plugins: [react(), validateApiKeys(config.mode), providerProbeDevServer(config.mode)],
   css: {
     modules: {
       // Page components use styles.someClassName against kebab-case CSS.
@@ -105,7 +126,6 @@ export default defineConfig((config) => ({
     // need the "no key" path override with vi.stubEnv.
     env: {
       VITE_TMDB_API_KEY: 'test-tmdb-key',
-      VITE_OMDB_API_KEY: 'test-omdb-key',
     },
   },
 }))

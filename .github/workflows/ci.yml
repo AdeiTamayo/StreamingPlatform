@@ -42,11 +42,9 @@ jobs:
       - name: Test
         run: npm test
 
-      # VITE_OMDB_API_KEY is required here too: a bundle built without it makes
-      # getOmdbRatingByTitle return null for every card, so every IMDb badge
-      # silently falls back to TMDB.
+      # The OMDb key is server-only (OMDB_API_KEY on Vercel) and is not a build
+      # input any more.
       - name: Build
         run: npm run build
         env:
           VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
-          VITE_OMDB_API_KEY: ${{ secrets.VITE_OMDB_API_KEY }}

@@ -9,7 +9,7 @@ import { dirname, resolve, relative } from 'node:path';
 // and vitest all pass. This walks each function's local import chain.
 
 const ROOT = resolve(__dirname, '../..');
-const ENTRY_POINTS = ['api/probe.ts', 'api/delete-account.ts'];
+const ENTRY_POINTS = ['api/probe.ts', 'api/delete-account.ts', 'api/omdb.ts'];
 const RELATIVE_IMPORT = /(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g;
 
 // Assertions use POSIX paths; Windows would otherwise report `src\api\...`.
