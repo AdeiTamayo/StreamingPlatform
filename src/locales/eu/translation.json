@@ -25,6 +25,10 @@
     "tvSeries": "Telebista-telesaila",
     "episodes_one": "{{count}} atal",
     "episodes_other": "{{count}} atal",
+    "episodesShort_one": "{{count}} atal",
+    "episodesShort_other": "{{count}} atal",
+    "laterShort": "Geroago",
+    "seenShort": "Ikusia",
     "open": "{{title}} ireki",
     "openWithYear": "{{title}} ({{year}}) ireki",
     "addWatchLater": "Geroago ikusteko zerrendara gehitu",
@@ -34,8 +38,8 @@
     "markSeen": "Ikusitzat markatu",
     "markSeriesSeen": "Telesaila ikusitzat markatu",
     "unmarkSeen": "Ikusitako marka kendu",
-    "markWatchedLabel": "{{title}} ikusitzat markatu",
-    "markUnwatchedLabel": "{{title}} ikusi gabekotzat markatu"
+    "markWatchedLabel": "{{title}} ikusia bezala markatu",
+    "markUnwatchedLabel": "{{title}} ez-ikusia bezala markatu"
   },
   "detailActions": {
     "linkCopied": "Esteka arbelean kopiatu da",

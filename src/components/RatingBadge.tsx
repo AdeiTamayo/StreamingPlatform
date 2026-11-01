@@ -104,9 +104,12 @@ export default function RatingBadge({
       <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 2.5l2.9 6.06 6.6.8-4.87 4.5 1.27 6.54L12 17.9l-5.9 3.5 1.27-6.54L2.5 9.36l6.6-.8z" />
       </svg>
-      <span className="rating-source">{display}{imdbRating?.tomatoes ? " /" : ""}</span>
+      <span className="rating-source">{display}</span>
       {imdbRating?.tomatoes && (
-        <span className="rating-rt-text">{imdbRating.tomatoes}</span>
+        <span className="rating-rt">
+          <span aria-hidden="true">/</span>
+          <span className="rating-rt-text">{imdbRating.tomatoes}</span>
+        </span>
       )}
     </span>
   );

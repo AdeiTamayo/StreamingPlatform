@@ -25,6 +25,10 @@
     "tvSeries": "TV Series",
     "episodes_one": "{{count}} episode",
     "episodes_other": "{{count}} episodes",
+    "episodesShort_one": "{{count}} ep",
+    "episodesShort_other": "{{count}} eps",
+    "laterShort": "Later",
+    "seenShort": "Seen",
     "open": "Open {{title}}",
     "openWithYear": "Open {{title}} ({{year}})",
     "addWatchLater": "Add to Watch Later",
@@ -34,8 +38,8 @@
     "markSeen": "Mark as seen",
     "markSeriesSeen": "Mark series as seen",
     "unmarkSeen": "Unmark watched",
-    "markWatchedLabel": "Mark {{title}} as watched",
-    "markUnwatchedLabel": "Mark {{title}} as unwatched"
+    "markWatchedLabel": "Mark {{title}} as seen",
+    "markUnwatchedLabel": "Mark {{title}} as unseen"
   },
   "detailActions": {
     "linkCopied": "Link copied to clipboard",
