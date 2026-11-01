@@ -77,17 +77,94 @@ function titleOf(html: string): string {
   return match ? match[1].replace(/\s+/g, ' ').trim() : '';
 }
 
+// Upstream hosts the probe may contact. Derived from the provider table so a
+// new provider is allowed automatically, plus the JSON API that VSEmbed uses.
+// A redirect to anywhere else is refused, so a compromised or misbehaving
+// provider cannot make this function fetch an arbitrary address.
+const EXTRA_ALLOWED_HOSTS = ['data.vidsrc.sh'];
+const MAX_REDIRECTS = 3;
+// Provider pages are a few hundred kB at most; anything bigger is not a page
+// worth reading, and reading it unbounded would let one upstream exhaust memory.
+export const MAX_BODY_BYTES = 1_000_000;
+
+function bareHost(hostname: string): string {
+  return hostname.toLowerCase().replace(/^www\./, '');
+}
+
+function allowedHosts(): Set<string> {
+  const hosts = new Set(EXTRA_ALLOWED_HOSTS.map(bareHost));
+  for (const source of SOURCE_KEYS) {
+    try {
+      hosts.add(bareHost(new URL(getMovieEmbedUrl('1', source)).hostname));
+    } catch {
+      // a source without a movie URL contributes no host
+    }
+  }
+  return hosts;
+}
+
+const ALLOWED_HOSTS = allowedHosts();
+
+export function isAllowedUpstream(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && ALLOWED_HOSTS.has(bareHost(parsed.hostname));
+  } catch {
+    return false;
+  }
+}
+
+/** Reads at most MAX_BODY_BYTES; null when the body is larger. */
+async function readBodyCapped(response: Response): Promise<string | null> {
+  const declared = Number(response.headers?.get?.('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    await response.body?.cancel?.().catch(() => {});
+    return null;
+  }
+  const reader = response.body?.getReader?.();
+  if (!reader) {
+    const text = await response.text();
+    return text.length > MAX_BODY_BYTES ? null : text;
+  }
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 async function fetchPage(url: string, accept = 'text/html,application/xhtml+xml'): Promise<Page | null> {
+  // One timer covers the whole chain of redirects, not each hop.
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
-      headers: { 'user-agent': USER_AGENT, accept },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    const html = await response.text();
-    return { status: response.status, html };
+    let current = url;
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      if (!isAllowedUpstream(current)) return null;
+      const response = await fetch(current, {
+        headers: { 'user-agent': USER_AGENT, accept },
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+      const location = response.headers?.get?.('location');
+      if (response.status >= 300 && response.status < 400 && location) {
+        await response.body?.cancel?.().catch(() => {});
+        current = new URL(location, current).toString();
+        continue;
+      }
+      const html = await readBodyCapped(response);
+      return html === null ? null : { status: response.status, html };
+    }
+    return null; // too many redirects: no signal
   } catch {
     // A network error or timeout says nothing about the catalogue - treat it
     // as "no signal" instead of switching the user to another provider.
