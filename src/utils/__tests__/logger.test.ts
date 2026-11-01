@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { logDebug, logError, redact } from '../logger';
+import { describeError, logDebug, logError, redact } from '../logger';
 
 const DEBUG_KEY = 'player_debug';
 const ERROR_KEY = 'app_errors';
@@ -42,5 +42,26 @@ describe('logger redaction', () => {
     const entries = JSON.parse(localStorage.getItem(DEBUG_KEY) ?? '[]');
     expect(entries).toHaveLength(50);
     expect(entries[0].msg).toBe('message 10');
+  });
+
+  it('describes plain-object errors instead of "[object Object]"', () => {
+    expect(describeError({ message: 'row violates policy', code: '42501' })).toBe(
+      'row violates policy (42501)',
+    );
+    expect(describeError({ foo: 1 })).toBe('{"foo":1}');
+    expect(describeError('boom')).toBe('boom');
+    expect(describeError(new Error('e'))).toBe('e');
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    expect(describeError(cyclic)).not.toBe('');
+  });
+
+  it('stores a readable, redacted message for a plain-object error', () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    logError('db', { message: 'failed for user@example.com', code: 'X1' });
+    const stored = localStorage.getItem(ERROR_KEY) ?? '';
+    expect(stored).not.toContain('[object Object]');
+    expect(stored).not.toContain('user@example.com');
+    expect(stored).toContain('X1');
   });
 });
