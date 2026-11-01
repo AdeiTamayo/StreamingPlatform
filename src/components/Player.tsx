@@ -211,7 +211,6 @@ const Player = memo(function Player({ src, title, onWatching, onEnded, runtimeMi
         src={src}
         title={title}
         allow="autoplay; fullscreen; encrypted-media"
-        allowFullScreen
         referrerPolicy="no-referrer"
         className="player-iframe"
       />
