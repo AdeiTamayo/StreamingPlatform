@@ -145,9 +145,17 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
                     (tvStatus?.ended && tvStatus.endYear
                       ? `${year}-${tvStatus.endYear}`
                       : year)}
-                  {!isMovie && tvStatus?.episodes
-                    ? `${year ? " \u00b7 " : ""}${t('media.episodes', { count: tvStatus.episodes })}`
-                    : ""}
+                  {!isMovie && tvStatus?.episodes ? (
+                    <>
+                      {year ? " \u00b7 " : ""}
+                      <span className="ep-long">
+                        {t('media.episodes', { count: tvStatus.episodes })}
+                      </span>
+                      <span className="ep-short">
+                        {t('media.episodesShort', { count: tvStatus.episodes })}
+                      </span>
+                    </>
+                  ) : null}
                 </span>
               )}
             </>
@@ -163,7 +171,8 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             aria-label={inWL ? t('media.removeWatchLaterLabel', { title }) : t('media.addWatchLaterLabel', { title })}
             aria-pressed={inWL}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+            <span className="media-card-btn-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg></span>
+            <span className="media-card-btn-label">{t('media.laterShort')}</span>
           </button>
           <button
             className={`media-card-watched-btn ${isWatchedState ? "active" : ""}`}
@@ -178,7 +187,8 @@ const MediaCard = memo(function MediaCard({ item, mediaType }: MediaCardProps) {
             aria-label={isWatchedState ? t('media.markUnwatchedLabel', { title }) : t('media.markWatchedLabel', { title })}
             aria-pressed={isWatchedState}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 7.5 5.5 10.5 11.5 3.5"/></svg>
+            <span className="media-card-btn-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 7.5 5.5 10.5 11.5 3.5"/></svg></span>
+            <span className="media-card-btn-label">{t('media.seenShort')}</span>
           </button>
         </div>
       )}

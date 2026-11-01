@@ -574,6 +574,12 @@
   flex-shrink: 0;
 }
 
+.rating-rt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+}
+
 .media-card-rating .rating-rt-text {
   color: #f28b82;
   font-weight: 700;
@@ -608,6 +614,21 @@
   display: flex;
   gap: 4px;
   transition: opacity 0.2s;
+}
+
+/* Desktop keeps the compact icon-only hover overlay. */
+.media-card-btn-label {
+  display: none;
+}
+
+.media-card-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ep-short {
+  display: none;
 }
 
 @media (hover: hover) {
@@ -1609,11 +1630,6 @@
     font-size: 0.85rem;
   }
 
-  .media-grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 0.6rem;
-  }
-
   .section-title {
     font-size: 1rem;
   }
@@ -1630,6 +1646,62 @@
   .watch-toggle {
     padding: 0.4rem 0.8rem;
     font-size: 0.78rem;
+  }
+}
+
+/* Phone layout. Card buttons live in their own footer row in normal flow so
+   nothing interactive sits on top of the poster or the text.
+   Phone query: narrow viewport OR a coarse-pointer touch device. */
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+  .media-card-actions {
+    position: static;
+    opacity: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 0 0.6rem 0.7rem;
+  }
+
+  .media-card-wl,
+  .media-card-watched-btn {
+    width: auto;
+    height: auto;
+    min-height: 44px;
+    border-radius: 10px;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+  }
+
+  .media-card-btn-label {
+    display: inline;
+  }
+
+  .ep-long {
+    display: none;
+  }
+
+  .ep-short {
+    display: inline;
+  }
+}
+
+/* Two columns on phones (three from about 640px, via the base auto-fill). */
+@media (max-width: 640px) {
+  .media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  /* IMDb score only on the poster; Rotten Tomatoes stays on the detail page. */
+  .media-card-rating .rating-rt {
+    display: none;
+  }
+
+  /* Keep the last row of cards clear of the back-to-top button. */
+  .page:has(.media-grid) {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1679,8 +1751,6 @@
 
 /* Touch targets: enlarge small controls on touch devices (>= 44px) */
 @media (hover: none) and (pointer: coarse) {
-  .media-card-wl,
-  .media-card-watched-btn,
   .wl-remove,
   .cw-remove,
   .ls-remove,
