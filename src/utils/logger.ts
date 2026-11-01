@@ -21,6 +21,26 @@ export function redact(value: unknown): string {
     : text;
 }
 
+// Supabase's REST client rejects with plain objects ({ message, code, details,
+// hint }), not Error instances, and String() of those is "[object Object]".
+export function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const { message, code, details, hint } = error as Record<string, unknown>;
+    if (typeof message === 'string' && message) {
+      const extra = [code, details, hint].filter((v) => typeof v === 'string' && v);
+      return extra.length ? `${message} (${extra.join('; ')})` : message;
+    }
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return Object.prototype.toString.call(error);
+    }
+  }
+  return String(error);
+}
+
 export function logDebug(msg: string) {
   try {
     const prev = JSON.parse(localStorage.getItem(DEBUG_KEY) || '[]');
@@ -31,7 +51,7 @@ export function logDebug(msg: string) {
 }
 
 export function logError(context: string, error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = describeError(error);
   const stack = error instanceof Error ? error.stack : undefined;
   try {
     const prev = JSON.parse(localStorage.getItem(ERROR_KEY) || '[]');
