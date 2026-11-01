@@ -403,6 +403,41 @@ describe('WatchLater calendar integration', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows one card, with no duplicate-key warning, when two copies of an episode disagree on the date', async () => {
+    setTimezone('UTC');
+    const { year, month } = currentMonthDates();
+    const staleDate = iso(year, month, 14);
+    const freshDate = iso(year, month, 15);
+    setupSuccessMocks(staleDate, staleDate);
+    addWatchLater('tv', 103540, 'Duplicate Show', '2026', '/x.png');
+    const base = { title: 'Duplicate Show', type: 'tv', id: 103540, season: 3, episode: 5 };
+    localStorage.setItem(
+      CALENDAR_CACHE_KEY,
+      JSON.stringify({
+        savedAt: Date.now(),
+        items: [
+          { ...base, date: staleDate },
+          // Raw TMDB date is a day later, but the broadcast instant lands on the 14th.
+          { ...base, date: freshDate, airTimestamp: Date.UTC(year, month, 14, 12, 0, 0) },
+        ],
+      }),
+    );
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    renderWatchLater();
+    await switchToCalendarView();
+
+    const monthName = generateCalendarGrid(year, month).monthName;
+    expect(
+      screen.getByRole('button', { name: new RegExp(`${monthName} 14,.*1 release`) }),
+    ).toBeInTheDocument();
+    const duplicateKeyWarnings = errors.mock.calls.filter((call) =>
+      String(call[0]).includes('same key'),
+    );
+    expect(duplicateKeyWarnings).toEqual([]);
+    errors.mockRestore();
+  });
+
   it('weekdays are in Monday through Sunday order', async () => {
     const { movieDate } = currentMonthDates();
     setupSuccessMocks(movieDate, movieDate);
