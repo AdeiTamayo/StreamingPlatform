@@ -616,6 +616,21 @@
   transition: opacity 0.2s;
 }
 
+/* Footer row shared by Watch Later and Last Seen cards. On desktop the
+   wrapper generates no box, so the corner X (.wl-remove) and the Last Seen
+   View button keep their current positions; the Seen button is phone-only. */
+.media-card-footer {
+  display: contents;
+}
+
+.media-card .media-card-footer-seen {
+  display: none;
+}
+
+.media-card-btn-icon.phone-only {
+  display: none;
+}
+
 /* Desktop keeps the compact icon-only hover overlay. */
 .media-card-btn-label {
   display: none;
@@ -1685,6 +1700,60 @@
   .ep-short {
     display: inline;
   }
+
+  /* Library cards (Watch Later, Last Seen): Seen / View / Remove footer. */
+  .media-card-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 0 0.6rem 0.7rem;
+  }
+
+  .media-card .media-card-footer > :only-child {
+    grid-column: 1 / -1;
+  }
+
+  .media-card .media-card-footer .media-card-footer-seen {
+    display: flex;
+  }
+
+  .media-card-btn-icon.phone-only {
+    display: inline-flex;
+  }
+
+  .media-card .media-card-footer > .wl-remove,
+  .media-card .media-card-footer > .media-card-footer-view {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    width: auto;
+    height: auto;
+    min-height: 44px;
+    padding: 0 0.5rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-card-strong);
+    backdrop-filter: none;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+  }
+
+  .media-card .media-card-footer > .media-card-footer-view {
+    color: var(--accent);
+  }
+
+  .media-card .media-card-footer > .wl-remove:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger-strong);
+  }
 }
 
 /* Two columns on phones (three from about 640px, via the base auto-fill). */
@@ -1751,7 +1820,6 @@
 
 /* Touch targets: enlarge small controls on touch devices (>= 44px) */
 @media (hover: none) and (pointer: coarse) {
-  .wl-remove,
   .cw-remove,
   .ls-remove,
   .filter-clear-btn,
