@@ -625,7 +625,7 @@ describe('TVDetail episode ratings coalescing', () => {
       if (url.includes('/tv/520000/season/1')) {
         return delay({ ok: true, json: () => Promise.resolve({ id: 1, season_number: 1, episodes: EPISODES }) });
       }
-      if (url.includes('omdbapi.com') || url.includes('cinemeta.strem.io')) {
+      if (url.includes('/api/omdb') || url.includes('cinemeta.strem.io')) {
         return delay({ ok: true, json: () => Promise.resolve({ imdbRating: '8.5', imdbVotes: '1000' }) }, 10);
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ results: [] }) });
