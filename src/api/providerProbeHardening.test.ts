@@ -152,3 +152,34 @@ describe('GET /api/probe handler', () => {
     expect((await call(handler, {}, 'POST')).status).toBe(405);
   });
 });
+
+describe('scan only switches away from a provider that proves the title missing', () => {
+  const answerEveryoneElse = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes('data.vidsrc.sh')) return VSEMBED_OK;
+    return EMPTY_VIDSRC;
+  });
+
+  it.each(['2embedskin', 'embos'])('stays on %s, which never gives a signal', async (source) => {
+    const fetchMock = vi.fn(answerEveryoneElse);
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(probeBestSource({ source, type: 'tv', id: '290856', season: '2', episode: '1' }))
+      .resolves.toEqual({ available: null, best: null });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('stays on a provider whose page could not be read (403 from Cloudflare)', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) =>
+      String(input).includes('nontongo') ? page(403, 'Just a moment...') : answerEveryoneElse(input));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(probeBestSource({ source: 'nontongo', type: 'tv', id: '290856', season: '2', episode: '1' }))
+      .resolves.toEqual({ available: null, best: null });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('still switches when the current provider proves the title is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn(answerEveryoneElse));
+    const result = await probeBestSource({ source: 'vidsrc', type: 'movie', id: '9100' });
+    expect(result).toEqual({ available: false, best: 'vsembed' });
+  });
+});
