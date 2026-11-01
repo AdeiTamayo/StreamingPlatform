@@ -1,3 +1,6 @@
+// Must stay the first import: it records the URL hash before supabase-js
+// consumes and strips it, so the app can tell what kind of email link opened it.
+import './lib/authLink';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

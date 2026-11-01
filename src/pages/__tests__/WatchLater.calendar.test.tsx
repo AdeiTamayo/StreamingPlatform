@@ -285,7 +285,13 @@ describe('WatchLater calendar integration', () => {
   });
 
   it('buckets episodes on the day they air in the calendar timezone', async () => {
-    const { year, month, movieDate } = currentMonthDates();
+    const { movieDate } = currentMonthDates();
+    // The page opens on today's month *in the calendar zone*. Auckland is 12-13h
+    // ahead, so on the last day of a month (device time) it is already the next
+    // month there; building the scenario from the device month made this test
+    // fail for half a day every month end.
+    const [year, monthNumber] = toZonedDateString(Date.now(), 'Pacific/Auckland').split('-').map(Number);
+    const month = monthNumber - 1;
     // 15:00 UTC on the 15th is the 16th in Auckland (UTC+12/+13).
     const instant = Date.UTC(year, month, 15, 15);
     setTimezone('Pacific/Auckland');

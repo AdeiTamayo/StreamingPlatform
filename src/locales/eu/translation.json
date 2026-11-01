@@ -610,7 +610,11 @@
     "alreadyHaveAccount": "Baduzu konturik?",
     "rememberedPassword": "Pasahitza gogoratu duzu?",
     "signInLink": "Hasi saioa",
-    "accountCreated": "Kontua sortu da! Egiaztatu zure posta elektronikoa kontua berresteko, eta gero hasi saioa.",
+    "accountCreated": "Kontua sortu da! Begiratu zure posta eta ireki berrespen-esteka. Hona itzuliko zaitu, saioa hasita.",
+    "link": {
+      "expired": "Esteka hau iraungi da edo dagoeneko erabili da. Zure posta dagoeneko berretsita badago, hasi saioa; bestela, erregistratu berriro esteka berri bat jasotzeko.",
+      "confirmed": "Posta berretsi da. Saioa hasi duzu."
+    },
     "resetSent": "Kontu bat badago <strong>{{email}}</strong> helbiderako, pasahitza berrezartzeko esteka bidali da. Begiratu zure sarrera-ontzia.",
     "errors": {
       "emailRequired": "Idatzi zure posta elektronikoa.",
