@@ -218,10 +218,18 @@ export async function probeBestSource(params: ProbeParams): Promise<ProbeScanRes
   const currentSource = params.source && Object.hasOwn(SOURCES, params.source) ? params.source : DEFAULT_SOURCE;
   if (current.available === true) return { ...current, best: currentSource };
 
-  // The current provider is missing or unknown; ask the others at the same
-  // time (a sequential scan could take one timeout per provider) and take the
-  // first one, in preference order, that confirms the title. Unknown providers
-  // are skipped because they cannot prove it.
+  // "Unknown" (null) is not "missing". Embos and 2Embed Skin never give a
+  // signal, and NontonGo/Cloudflare answer datacentre IPs with 403, so null is
+  // the normal answer for them. Switching away on it sent every user of those
+  // providers to another one immediately, with a toast claiming the title had
+  // no stream. Only a provider that proves the title is missing may trigger a
+  // switch; otherwise the player stays where the user put it.
+  if (current.available !== false) return { available: current.available, best: null };
+
+  // The current provider proved the title is missing; ask the others at the
+  // same time (a sequential scan could take one timeout per provider) and take
+  // the first one, in preference order, that confirms the title. Unknown
+  // providers are skipped because they cannot prove it.
   const others = SOURCE_KEYS.filter((source) => source !== currentSource);
   const results = await Promise.all(others.map((source) => probeProvider({ ...params, source })));
   const index = results.findIndex((result) => result.available === true);
