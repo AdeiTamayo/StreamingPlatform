@@ -12,6 +12,11 @@ const ROOT = resolve(__dirname, '../..');
 const ENTRY_POINTS = ['api/probe.ts', 'api/delete-account.ts'];
 const RELATIVE_IMPORT = /(?:^|\n)\s*(?:import|export)\s[^'"]*?from\s+['"](\.{1,2}\/[^'"]+)['"]|import\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g;
 
+// Assertions use POSIX paths; Windows would otherwise report `src\api\...`.
+function repoPath(file: string): string {
+  return relative(ROOT, file).replaceAll('\\', '/');
+}
+
 function localImports(file: string): string[] {
   const source = readFileSync(file, 'utf8');
   return [...source.matchAll(RELATIVE_IMPORT)].map((m) => m[1] ?? m[2]);
@@ -38,14 +43,14 @@ describe('Vercel function import chains', () => {
     const offenders: string[] = [];
     for (const [file, specs] of walk(entry)) {
       for (const spec of specs) {
-        if (!/\.js$/.test(spec)) offenders.push(`${relative(ROOT, file)} -> ${spec}`);
+        if (!/\.js$/.test(spec)) offenders.push(`${repoPath(file)} -> ${spec}`);
       }
     }
     expect(offenders).toEqual([]);
   });
 
   it('actually follows the chain (guards against a vacuous pass)', () => {
-    const files = [...walk('api/delete-account.ts').keys()].map((f) => relative(ROOT, f));
+    const files = [...walk('api/delete-account.ts').keys()].map(repoPath);
     expect(files).toEqual(
       expect.arrayContaining([
         'api/delete-account.ts',
@@ -53,7 +58,7 @@ describe('Vercel function import chains', () => {
         'src/utils/authProviders.ts',
       ]),
     );
-    const probe = [...walk('api/probe.ts').keys()].map((f) => relative(ROOT, f));
+    const probe = [...walk('api/probe.ts').keys()].map(repoPath);
     expect(probe).toEqual(expect.arrayContaining(['src/api/providerProbeCore.ts', 'src/api/sources.ts']));
   });
 });
