@@ -117,3 +117,14 @@ describe('Player runtime prop changes', () => {
     expect(onEnded).not.toHaveBeenCalled();
   });
 });
+
+describe('Player iframe permissions', () => {
+  it('grants fullscreen through `allow` only (the legacy allowfullscreen attribute makes the browser warn)', () => {
+    const { container } = render(
+      <Player src="https://vidsrc.to/embed/movie/550" title="Test" onWatching={vi.fn()} onEnded={vi.fn()} runtimeMinutes={null} />,
+    );
+    const iframe = container.querySelector('iframe');
+    expect(iframe?.getAttribute('allow')).toMatch(/\bfullscreen\b/);
+    expect(iframe?.hasAttribute('allowfullscreen')).toBe(false);
+  });
+});
